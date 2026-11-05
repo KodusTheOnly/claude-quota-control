@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; img-src 'self' data:; script-src 'self'">
+<title>Claude Quota Control</title>
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/crt.css">
+<link rel="stylesheet" href="strip.css">
+</head>
+<body>
+  <div class="pill" id="pill">
+    <button type="button" class="sk" id="refresh" data-i18n-title="strip.refresh"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16.5 10a6.5 6.5 0 1 1-1.9-4.6"/><path d="M16.5 3.5v3.6h-3.6"/></svg><span class="bang" aria-hidden="true">!</span></button>
+    <span class="sd" aria-hidden="true"></span>
+    <span class="today lv-none" id="today">
+      <span class="lb" id="todayLabel"></span>
+      <span class="shp" id="todayShape"></span>
+      <b id="todayValue"></b>
+      <span class="flag hidden" id="todayFlag"></span>
+    </span>
+    <span class="sbar hb hidden" id="todayBar" aria-hidden="true"><span class="tr"><i class="fill"></i><i class="ov"></i></span><b class="tick"></b></span>
+    <span class="sd" aria-hidden="true"></span>
+    <button type="button" class="sk" id="more" data-i18n-title="strip.more"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 12.5l5-5 5 5"/></svg></button>
+  </div>
+  <script src="i18n.js"></script>
+  <script src="strip.js"></script>
+</body>
+</html>

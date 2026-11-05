@@ -1,0 +1,212 @@
+/* Overview: one frame, panels edge to edge, separated by 1px lines (no gaps, no padding between them).
+     keys          Type it in, Math (in the header from 1100px up, in the "..." menu below that)
+     Now           Session | Today, two slim tiles with a shared divider
+     verdict band  one row split like the tiles: the verdict on the left, the week's % and bar on the right
+     graph         a header row (legend, plan, reset time), the pace chart with its % scale in a gutter on the left, the HRS strip
+                   (when in the week the usage happened) and the seven day columns, all on one grid
+     extra         a slim strip, only when Extra usage is set up
+
+   Two window formats, chosen by width:
+     720px or wider  the graph takes the height that is left.
+     Under 720px     vertical: the same pieces packed tighter. Scrolls only when the window is too short.
+
+   Sizes are in rem (see tokens.css), so a bigger window shows more information, not bigger text.
+   Tiles are containers and decide how much to show by their own size: essentials always (no class),
+   secondary info (.t2) and detail (.t3) only when the tile has room. */
+
+.dash {
+  position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; margin: .6rem; font-size: 1rem; --gut: 2.75rem;
+  background-color: var(--mod); border-top: 2px solid var(--ink); outline: 1px solid var(--edge); outline-offset: -1px;
+  background-image:
+    radial-gradient(circle at 6px 6px, var(--edge) 0 1.6px, transparent 2.2px),
+    radial-gradient(circle at calc(100% - 6px) 6px, var(--edge) 0 1.6px, transparent 2.2px),
+    radial-gradient(circle at 6px calc(100% - 6px), var(--edge) 0 1.6px, transparent 2.2px),
+    radial-gradient(circle at calc(100% - 6px) calc(100% - 6px), var(--edge) 0 1.6px, transparent 2.2px);
+}
+/* Inside the frame the screens are flat: no rounded corners, no bezel of their own */
+.dash .crt { border: 0; border-radius: 0; box-shadow: none; }
+.is-stale :is(.crt, .graph, .sum), .is-offline :is(.crt, .graph, .sum) { opacity: .7; } /* dimmed, but the small grey text keeps 4.5:1 */
+
+/* ---- Type it in and Math keys ---- */
+.pl-keys { display: flex; gap: .4rem; }
+.sync .pl-keys.hidden { display: none; }
+.mb { min-height: 2rem; padding: .1rem .6rem; font-size: .75rem; background: var(--win); }
+
+/* ---- Now: Session | Today ---- */
+.now { flex: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid var(--edge); }
+.blk { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; container-type: inline-size; }
+.blk--session { container-name: session; }
+.blk--today { container-name: today; border-left: 1px solid var(--edge); }
+.blk--week { container-name: week; flex: 1 1 auto; }
+.now .crt { flex: 1 1 auto; justify-content: flex-start; gap: .25rem; padding: .35rem .65rem .4rem; }
+.th { display: flex; align-items: center; gap: .6rem; min-width: 0; }
+.th .lv { margin-left: auto; }
+.tl { margin: 0; font: 600 .75rem/1.2 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--sm); }
+.meter { display: flex; align-items: center; gap: .6rem; min-width: 0; }
+.meter .big { font-size: 1.75rem; }
+.meter .sbar { flex: 1 1 auto; min-width: 3rem; }
+@container session (min-width: 14rem) { .blk--session .meter { padding-bottom: 1.3rem; } }
+@container today (min-width: 14rem) { .blk--today .meter { padding-bottom: 1.3rem; } }
+@container session (max-width: 24rem) { #sResets { display: none; } }
+@container today (max-width: 24rem) { #tWo { display: none; } }
+
+/* ---- Verdict band: verdict | week, split at the same line as Session | Today ---- */
+.band { flex: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; padding: 0; border-top: 1px solid var(--sline); border-bottom: 1px solid var(--sline); }
+.band .vl, .band .wk { display: flex; align-items: center; gap: .2rem .9rem; min-width: 0; padding: .4rem .8rem; }
+.band .wk { order: -1; gap: .5rem; } /* the week sits under Session, the verdict under Today (the verdict stays first in the page for screen readers) */
+.band .vl { border-left: 1px solid var(--edge); container-type: inline-size; container-name: verdict; }
+.band .ans { flex: none; font-size: 1rem; }
+/* The projection takes the room left after the shapes (basis 0, so it never pushes the line to wrap). fitBand() in
+   verdict.js drops its pieces until it fits: first the leftover, then the words; the number stays while it fits. */
+.band .vnum { flex: 1 1 0; display: flex; align-items: baseline; gap: .5rem; min-width: 0; white-space: nowrap; }
+.band .vnum.fit-nofirst .vfirst, .band .vnum.fit-noleft .vfirst, .band .vnum.fit-num .vfirst, .band .vnum.fit-noleft .vleft, .band .vnum.fit-num .vleft, .band .vnum.fit-num .vwd, .band .vnum.fit-none > * { display: none; }
+.band .vl.lit-only .ruler > span:not(.on), .band .vl.lit-bare .ruler > span.on > span:not(.shp) { display: none; }
+.band .vbig { font: 500 1.25rem/1 var(--mono); white-space: nowrap; }
+.band #vLevel { display: none; } /* the ruler already lights the level */
+.band .ruler { flex: none; display: flex; gap: 2px; }
+.ruler > span { flex: none; display: flex; align-items: center; justify-content: center; gap: .4em; padding: .2rem .4rem; border: 1px solid var(--sline); color: var(--sm); font: 600 .75rem/1.2 var(--mono); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.ruler > span:not(.on) > span:not(.shp) { display: none; } /* the shapes stay in a row, only the lit level says its name */
+.ruler > span.on { background: var(--c); border-color: var(--c); color: #0A0F0C; }
+.ruler .shp { background: currentColor; }
+.wk .wbig { flex: none; font: 500 1.25rem/1 var(--mono); white-space: nowrap; }
+.wk .mu { flex: none; white-space: nowrap; font-size: .75rem; }
+.wk .sbar { flex: 1 1 auto; min-width: 3rem; }
+/* The week bar's white mark is labeled under the bar, as in Session and Today: "▲ 37% expected" */
+.band .wk { container-type: inline-size; container-name: weekbar; padding-bottom: 1.5rem; }
+.blk--week #wBar .bl { display: block; }
+.blk--week #wBar .bl .bwd { font-style: normal; }
+@container weekbar (max-width: 26rem) { .blk--week #wBar .bl .bwd { display: none; } }
+.wk .lc { display: none; } /* the verdict already says the level */
+
+/* ---- Graph: header row, chart, hours, days ---- */
+.graph { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: var(--scr); }
+.ghead { flex: none; display: flex; border-top: 1px solid var(--sline); align-items: center; gap: .2rem 1.2rem; padding: .3rem .8rem .3rem calc(var(--gut) + .4rem); font: 500 .75rem/1.3 var(--mono); color: var(--sm); }
+.ghead .leg { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: .1rem 1rem; font: 500 .75rem/1.3 var(--mono); color: var(--sm); }
+.leg i { display: inline-block; width: 1.6em; height: 0; margin-right: .4em; vertical-align: middle; border-top: 2px solid; }
+.ghead .plan, .ghead .rs { flex: none; white-space: nowrap; text-transform: uppercase; letter-spacing: .04em; }
+.ghead .plan { margin-left: auto; }
+.gbody { position: relative; flex: 1 1 auto; min-height: 0; background: var(--scr); display: grid; grid-template-columns: var(--gut) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; }
+.osc { grid-column: 1 / -1; grid-row: 1; position: relative; min-height: 6.2rem; display: flex; flex-direction: column; overflow: hidden; z-index: 1; }
+.osc::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .03) 0 1px, transparent 1px 3px); }
+.plot { position: relative; flex: 1 1 auto; min-height: 0; }
+.plot svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.plot text { font-family: var(--mono); font-size: .75rem; }
+.plot text.halo { paint-order: stroke; stroke: var(--scr); stroke-width: 4px; stroke-linejoin: round; }
+
+/* The hours sit right above the day names; their label lives in the gutter */
+.hl { grid-column: 1; grid-row: 2; display: flex; align-items: center; padding: 0 .25rem 0 .4rem; border-top: 1px solid var(--sline); background: var(--scr); font: 600 .75rem/1.2 var(--mono); letter-spacing: .1em; color: var(--sm); }
+.hrs { grid-column: 2; grid-row: 2; position: relative; z-index: 1; height: 2rem; border-top: 1px solid var(--sline); }
+.hcells { position: absolute; inset: 0; }
+.hc { position: absolute; top: 4px; bottom: 4px; box-sizing: border-box; border-right: 1px solid var(--scr); background: rgba(255, 255, 255, .045); }
+.hc.fut { background: transparent; }
+.hc.m { background: color-mix(in srgb, var(--free) calc(var(--a, 1) * 100%), transparent); }
+.hc.e { background: color-mix(in srgb, var(--free) calc(var(--a, 1) * 45%), transparent); }
+.hc.t0::before, .hc.t6::before { content: ""; position: absolute; left: 0; width: 1px; z-index: 2; pointer-events: none; }
+.hc.t0::before { top: -4px; bottom: -4px; background: var(--sline); }
+.hc.t6::before { top: 0; bottom: 0; background: rgba(255, 255, 255, .16); }
+/* The current hour: a small triangle pointing down, in the slack above the block (the block keeps the color of its data) */
+.hc.nowh::after { content: ""; position: absolute; top: -3px; left: 50%; margin-left: -3.5px; border-style: solid; border-width: 3px 3.5px 0; border-color: var(--crt-accent) transparent transparent; pointer-events: none; }
+
+/* The seven days: four rows each (name and date, % and tag, level or state, budget bar) */
+.dg { grid-column: 1; grid-row: 3; border-top: 1px solid var(--sline); background: var(--scr); }
+.days { grid-column: 2; grid-row: 3; position: relative; z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid var(--sline); }
+.day {
+  position: relative; display: flex; flex-direction: column; align-items: stretch; gap: .1rem; min-width: 0; padding: .3rem .5rem .35rem; overflow: hidden;
+  text-align: left; font: inherit; color: var(--st); background: transparent; border: 0; border-left: 1px solid var(--sline); border-radius: 0; cursor: pointer;
+}
+.day:first-child { border-left: 0; }
+.day .nm { display: flex; justify-content: space-between; align-items: baseline; gap: .4rem; min-width: 0; font: 600 .75rem/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.day .nm b { font-weight: 600; }
+.day .dt { font-style: normal; font-weight: 400; letter-spacing: .02em; color: var(--sm); }
+.day .pr { display: flex; justify-content: space-between; align-items: center; gap: .4rem; min-height: 1.5rem; }
+.day .nu { font: 500 1.1rem/1.2 var(--mono); white-space: nowrap; }
+.day.live .nu { color: var(--c); }
+.day.idle .nu { color: var(--sm); }
+.day .tg { padding: 0 .35rem; background: var(--sline); color: var(--st); font: 600 .75rem/1.4 var(--mono); font-style: normal; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.day.today .tg { background: var(--crt-accent); color: #0A0F0C; }
+.day .lv { align-self: flex-start; font-size: .75rem; }
+.day .sx { font: 400 .75rem/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--sm); white-space: nowrap; }
+.day .bg { display: flex; align-items: center; gap: .4rem; margin-top: .15rem; }
+.day .bg .sbar { flex: 1 1 auto; min-width: 1.5rem; height: .5rem; }
+.day .bd { font: 400 .75rem/1.3 var(--mono); color: var(--sm); white-space: nowrap; }
+.day:hover:not(.locked) { background: var(--crt-hover); box-shadow: inset 0 0 0 1px var(--crt-accent); }
+.day.locked { cursor: default; }
+.day:focus-visible { outline: 2px solid var(--crt-accent); outline-offset: -2px; }
+/* The frame around today runs from the top of the chart down through the hours and the day column */
+.todaybox { position: absolute; top: 0; bottom: 0; z-index: 0; box-sizing: border-box; pointer-events: none; border: 1px solid color-mix(in srgb, var(--crt-accent) 50%, transparent); background: color-mix(in srgb, var(--crt-accent) 6%, transparent);
+  left: calc(var(--gut) + (100% - var(--gut)) * var(--ti, 0) / 7); width: calc((100% - var(--gut)) / 7); }
+
+/* ---- Extra usage: a slim strip, only when it is set up ---- */
+.foot { flex: none; display: flex; border-top: 1px solid var(--sline); }
+.xcell { flex: 1 1 auto; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: .6rem; padding: .4rem .8rem; min-width: 0; }
+.xcell .xl { font: 600 .75rem/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--sm); white-space: nowrap; }
+.xcell .sbar { width: 5rem; flex: none; }
+.xcell .sbar .fill { background: var(--crt-accent); }
+.xcell #xInfo { display: none; }
+
+/* ---- Bars with a label under the white mark (Session, Today) ---- */
+.sbar .bl { display: none; position: absolute; top: calc(100% + .35rem); left: var(--tx, 80%); width: 0; height: 1rem; font: 400 .75rem/1 var(--mono); letter-spacing: .04em; white-space: nowrap; color: var(--sm); }
+.sbar .bl .ar { position: absolute; left: 0; top: 0; transform: translateX(-50%); font-style: normal; }
+.sbar .bl .tx { position: absolute; top: 0; right: .9rem; text-align: right; }
+.sbar .bl.rt .tx { right: auto; left: .9rem; text-align: left; }
+.blk--session #sBar .bl, .blk--today #tBar .bl { display: block; }
+.blk--today #tBar .bl .bwd { font-style: normal; }
+/* Under 22rem the words go and the numbers stay: "39%" and "▲ 28%" */
+@container today (max-width: 22rem) { .blk--today #tBar .bl .bwd, #tUsedWord { display: none; } }
+
+/* ---- Tall: fixed summary line ---- */
+.sum {
+  display: none; position: sticky; top: 0; z-index: 5; align-items: center; gap: .8rem; padding: .45rem .8rem; flex: none;
+  background: var(--scr); color: var(--st); border-bottom: 2px solid var(--ink); font: 500 .8125rem/1.3 var(--mono); white-space: nowrap; overflow: hidden;
+}
+
+/* =================== Layouts =================== */
+
+/* Vertical: under 720px. Same pieces as the wide format, packed tighter: the band keeps its two halves, the graph takes the
+   height that is left (9rem at least; under that the page scrolls), the day columns keep the name, the % and the bar.
+   Type it in and Math live in the "..." menu in the header (as in every window under 1100px). */
+@media (max-width: 719px) {
+  #view-panel, .dash { flex: 1 0 auto; }
+  .dash { margin: .4rem; --gut: 2.4rem; }
+  .graph, .gbody { flex: 1 0 auto; }
+  .osc { min-height: 9rem; }
+  .wk #wUsedWord { display: none; }
+  /* The verdict half is narrow: the words on the first line, the four shapes under them (the lit one is filled, its name is in the tile above) */
+  .band .vl { flex-wrap: wrap; row-gap: .25rem; }
+  .band .vfirst { display: none; } /* too narrow for it */
+  .ruler > span.on > span:not(.shp) { display: none; }
+  .ghead { flex-wrap: wrap; gap: .1rem .6rem; padding-left: .6rem; padding-right: .6rem; }
+  .ghead .plan { margin-left: 0; }
+  .ghead .rs { margin-left: auto; }
+}
+
+/* The "..." menu (under 1100px): holds Type it in and Math */
+.hd { position: relative; }
+#moreBtn { min-width: 0; padding-inline: .6rem; }
+#moreBtn .ico circle { fill: currentColor; stroke: none; }
+.ovmenu { position: absolute; z-index: 20; top: calc(100% - .2rem); right: .8rem; padding: .4rem; background: var(--win); border: 1px solid var(--edge); }
+.ovmenu .pl-keys { flex-direction: column; align-items: stretch; }
+.ovmenu .mb { justify-content: flex-start; }
+
+/* Short windows (a small window with a message strip open): the legend gives way so the chart keeps its height */
+@media (min-width: 720px) and (max-height: 640px) {
+  .dash { margin: .4rem .6rem; }
+  .ghead .leg { display: none; }
+  .osc { min-height: 4.5rem; }
+  .hrs { height: 1.6rem; }
+}
+
+/* =================== Tiers =================== */
+/* .t2 is secondary info, .t3 is detail. Thresholds are in rem, so they follow the scale (npm run test:layout checks that
+   nothing is cut off). Session and Today decide by their width. */
+.t2, .t3 { display: none; }
+#sPace, #tStop { white-space: nowrap; overflow: hidden; min-width: 0; }
+@container today (min-width: 14rem) { .t2 { display: block; } }
+@container today (min-width: 30rem) { .t3 { display: flex; } }
+@container session (min-width: 14rem) { .t2 { display: block; } }
+@container session (min-width: 30rem) { .t3 { display: block; } }
+/* The week: the band and the day columns give up their extras as they get narrow. A column needs about 110px for the
+   tag and the level word, 100px for the date. */
+@container week (max-width: 52rem) { .day .tg, .day .lvn { display: none; } }
+@container week (max-width: 46rem) { .day .dt, .ghead .leg { display: none; } }
+@container week (max-width: 36rem) { .day .bd, .day .sx { display: none; } .day { padding: .3rem .3rem; } }

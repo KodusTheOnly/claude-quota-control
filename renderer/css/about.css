@@ -1,0 +1,35 @@
+/* About: a CRT nameplate with the bar mark, three keys and four numbered plates. It opens from Help (back key at the top). */
+
+#view-about { container: about / inline-size; padding-top: .8rem; }
+.about { display: flex; flex-direction: column; gap: .8rem; }
+.back { display: flex; }
+.back .key { gap: .4rem; }
+
+/* Nameplate */
+.np { flex: none; flex-direction: row; justify-content: flex-start; align-items: center; gap: 1.1rem; padding: .9rem 1rem; }
+.mark { flex: none; display: grid; place-items: center; width: 6.4rem; height: 6.4rem; background: var(--scr); border: 1px solid var(--sline); border-radius: 4px; }
+.mark svg { width: 3.6rem; height: 3rem; }
+.mark .bar-a { fill: var(--st); }
+.mark .bar-b { fill: var(--crt-accent); }
+.np-text { display: flex; flex-direction: column; gap: .35rem; min-width: 0; }
+.np h1 { margin: 0; font: 600 1.5rem/1.15 var(--mono); letter-spacing: .06em; text-transform: uppercase; overflow-wrap: anywhere; }
+.ver { font: 500 .8rem/1.3 var(--mono); letter-spacing: .04em; text-transform: uppercase; color: var(--sm); }
+.tag2 { max-width: 34rem; font-size: .95rem; line-height: 1.45; color: var(--st); }
+.by { font: 500 .8rem/1.3 var(--mono); color: var(--sm); }
+.con { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .6rem; margin-top: .1rem; padding-top: .45rem; border-top: 1px dotted var(--sline); font: 500 .85rem/1.4 var(--mono); }
+.con b { font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--sm); }
+.con a { color: var(--crt-accent); text-decoration: underline; }
+.con .cur { --c: var(--st); }
+@container about (max-width: 38rem) {
+  .np { flex-direction: column; align-items: flex-start; }
+}
+
+/* Keys */
+.keys2 { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: 0 .2rem; }
+.keys2 .key { text-decoration: none; }
+.gh { flex: none; width: 1em; height: 1em; fill: currentColor; }
+
+/* Plates */
+.plates4 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; align-items: start; }
+@container about (max-width: 44rem) { .plates4 { grid-template-columns: minmax(0, 1fr); } }
+.p4 { max-width: 44rem; margin: 0; padding: .1rem .3rem .3rem; font-size: .9rem; line-height: 1.5; }

@@ -1,0 +1,71 @@
+{
+  "name": "claude-quota-control",
+  "productName": "Claude Quota Control",
+  "version": "2.0.0",
+  "description": "Windows app that shows how much room you have left on your Claude plan, from the 5-hour session and weekly limits.",
+  "main": "main.js",
+  "author": "Kodus",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "dist": "electron-builder --win",
+    "test:layout": "node test/layout/run.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KodusTheOnly/claude-quota-control.git"
+  },
+  "homepage": "https://github.com/KodusTheOnly/claude-quota-control#readme",
+  "bugs": {
+    "url": "https://github.com/KodusTheOnly/claude-quota-control/issues"
+  },
+  "keywords": [
+    "claude",
+    "electron",
+    "windows",
+    "usage",
+    "quota",
+    "tray",
+    "desktop-app"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "playwright": "^1.63.0"
+  },
+  "build": {
+    "appId": "com.kodus.claudequotacontrol",
+    "productName": "Claude Quota Control",
+    "electronLanguages": [
+      "en-US",
+      "pt-BR"
+    ],
+    "files": [
+      "main.js",
+      "preload.js",
+      "claude-sync.js",
+      "claude-activity.js",
+      "usage-parser.js",
+      "usage-json.js",
+      "usage-listener.js",
+      "refresh-policy.js",
+      "renderer/**",
+      "collector/**",
+      "assets/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Claude Quota Control"
+    }
+  }
+}

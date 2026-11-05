@@ -1,0 +1,41 @@
+// Bridge between the renderer and the main process. Only these calls are exposed.
+const { contextBridge, ipcRenderer } = require("electron");
+
+contextBridge.exposeInMainWorld("quota", {
+  getData: () => ipcRenderer.invoke("get-data"),
+  activityHours: (sinceMs) => ipcRenderer.invoke("activity-hours", sinceMs),
+  onData: (callback) => ipcRenderer.on("data", (_e, data) => callback(data)),
+  getSettings: () => ipcRenderer.invoke("get-settings"),
+  settingsRecovery: () => ipcRenderer.invoke("settings-recovery"),
+  setSettings: (patch) => ipcRenderer.invoke("set-settings", patch),
+  collectorStatus: () => ipcRenderer.invoke("collector-status"),
+  installCollector: () => ipcRenderer.invoke("install-collector"),
+  uninstallCollector: () => ipcRenderer.invoke("uninstall-collector"),
+  setTray: (payload) => ipcRenderer.send("set-tray", payload),
+  notify: (payload) => ipcRenderer.send("notify", payload),
+  openUsage: () => ipcRenderer.send("open-usage"),
+  onAutoReadStopped: (callback) => ipcRenderer.on("auto-read-stopped", () => callback()),
+  onFocusUpdate: (callback) => ipcRenderer.on("focus-update", () => callback()),
+  claudeLogin: () => ipcRenderer.invoke("claude-login"),
+  claudeLogout: () => ipcRenderer.invoke("claude-logout"),
+  claudeSync: (opts) => ipcRenderer.invoke("claude-sync", opts),
+  onSyncRequest: (callback) => ipcRenderer.on("sync-request", (_e, opts) => callback(opts || {})),
+  rendererReady: () => ipcRenderer.send("renderer-ready"),
+  shortcutStatus: () => ipcRenderer.invoke("shortcut-status"),
+  toast: (payload) => ipcRenderer.send("toast", payload),
+  appInfo: () => ipcRenderer.invoke("app-info"),
+  checkUpdate: () => ipcRenderer.invoke("check-update"),
+  exportData: (format) => ipcRenderer.invoke("export-data", format),
+  importData: () => ipcRenderer.invoke("import-data"),
+  clearData: () => ipcRenderer.invoke("clear-data"),
+  // Tray card
+  publishSummary: (summary) => ipcRenderer.send("summary", summary),
+  getSummary: () => ipcRenderer.invoke("get-summary"),
+  onSummary: (callback) => ipcRenderer.on("summary", (_e, s) => callback(s)),
+  popupAction: (action) => ipcRenderer.send("popup-action", action),
+  popupResize: (height) => ipcRenderer.send("popup-resize", height),
+  // Taskbar strip
+  stripAction: (action) => ipcRenderer.send("strip-action", action),
+  stripDrag: (phase, x, y) => ipcRenderer.send("strip-drag", phase, x, y),
+  stripResize: (width) => ipcRenderer.send("strip-resize", width),
+});

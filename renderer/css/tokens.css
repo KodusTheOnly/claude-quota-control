@@ -1,0 +1,73 @@
+/* Design tokens: fonts, colors, themes and the one rule that scales the whole app.
+   Claude Quota Control 2.0 is a mainframe console: data sits on dark CRT screens, the frame is warm grey.
+   Text is IBM Plex Sans, numbers and labels are IBM Plex Mono (SIL Open Font License, see renderer/fonts).
+   Every level is color + shape + word: Free = circle, Moderate = diamond, Tight = triangle, Pause = square. */
+
+@font-face { font-family: "IBM Plex Mono"; src: url("../fonts/ibm-plex-mono-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("../fonts/ibm-plex-mono-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("../fonts/ibm-plex-mono-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; src: url("../fonts/ibm-plex-sans-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; src: url("../fonts/ibm-plex-sans-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; src: url("../fonts/ibm-plex-sans-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+
+/* Scale. Everything in the Overview is sized in rem, so this single rule resizes it.
+   Fixed at 16px: the smallest text is .75rem, which is the 12px floor, so the base cannot go lower.
+   A bigger window shows more information, never bigger text. */
+html { font-size: 16px; }
+
+/* Light panel (default) */
+:root {
+  --win: #C9C5BA;
+  --mod: #B7B3A7;
+  --card: #EDE7D3;
+  --edge: #6A665B;
+  --ink: #1A1A18;
+  --ink2: #3E3C35;
+  --cobalt: #1F3FA6;
+  --keybg: #E6E2D6;
+  --keyhi: #F0EDE3;
+  --keyon: #B7B3A7;
+  --bezel: #1A1A18;
+  --fc: #1F3FA6;
+  --danger: #B3201F; /* error and delete text and marks, 5.4:1 on the card */
+  /* CRT screens, the same in both themes */
+  --scr: #0A0F0C;
+  --crt-accent: #86A2FF;
+  --st: #E4EFE6;
+  --sm: #9DB0A2;
+  --sl: #1C2620;
+  --sline: #2F4036;
+  --crt-inset: #1A2A20; /* thin inner edge of a CRT screen */
+  --crt-hi: #B8C7BC; --crt-line: #6B8070; --crt-hover: #17211B; --crt-field: #11170F; --crt-thumb: #3A4A40;
+  --free: #46C07F;
+  --moderate: #E8C547;
+  --tight: #F28C38;
+  --pause: #F2575A;
+  --tick: #FFFFFF;
+
+  /* Room the native window buttons take in the top-right corner (Electron's title bar overlay).
+     Outside Electron the variable falls back to a typical 140px. */
+  --ctl: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 140px)));
+
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", Consolas, monospace;
+  color-scheme: light;
+}
+
+/* Dark panel (switched on by the theme setting) */
+html[data-theme="dark"] {
+  --win: #17191B;
+  --mod: #212427;
+  --card: #222527;
+  --edge: #737A82;
+  --ink: #E8E6DE;
+  --ink2: #ABA99F;
+  --cobalt: #86A2FF;
+  --keybg: #2D3134;
+  --keyhi: #383D41;
+  --keyon: #121415;
+  --bezel: #5B626A;
+  --fc: #86A2FF;
+  --danger: #F2575A;
+  color-scheme: dark;
+}

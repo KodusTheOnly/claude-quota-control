@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; img-src 'self' data:; script-src 'self'">
+<title>Claude Quota Control</title>
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/shell.css">
+<link rel="stylesheet" href="css/crt.css">
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main class="pop" id="card">
+    <header class="pop-hd">
+      <div class="brand">
+        <svg viewBox="0 0 22 18" aria-hidden="true"><rect class="bar-a" x="0" y="6" width="5" height="12"/><rect class="bar-b" x="8.5" y="0" width="5" height="18"/><rect class="bar-a" x="17" y="9" width="5" height="9"/></svg>
+        <span class="brand-name">CQC</span>
+      </div>
+      <span class="lamp lc lv-none" id="lamp" role="status"><span class="shp"></span><span id="lampText"></span></span>
+    </header>
+    <div class="rule" aria-hidden="true"></div>
+
+    <p class="note hidden" id="notice" role="status"></p>
+    <p class="note hidden" id="msg" role="status"></p>
+
+    <div class="screens hidden" id="body">
+      <section class="crt fit lv-none" id="verdict">
+        <div class="row"><span class="big" id="vPct">–</span><span class="mu" id="vWhen"></span></div>
+        <p class="ans"><span id="vAns"></span><span class="face" id="vFace" aria-hidden="true"></span><span class="cur" aria-hidden="true"></span></p>
+        <span class="lv lv-none" id="vLevel"><span class="shp"></span><span class="lvn"></span></span>
+      </section>
+      <section class="crt fit rows" id="rows"></section>
+    </div>
+
+    <section class="crt fit empty lv-none hidden" id="empty">
+      <span class="lv lv-none"><span class="shp"></span><span data-i18n="level.none.name">Not rated</span></span>
+      <p class="mu" data-i18n="pop.empty">No usage reading yet.</p>
+    </section>
+
+    <div class="keyrow">
+      <button class="key primary" type="button" id="popSync">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 0 1-14.3 4.9" /><path d="M4 12a8 8 0 0 1 14.3-4.9" /><path d="M18.5 3v4.2h-4.2" /><path d="M5.5 21v-4.2h4.2" /></svg>
+        <span id="popSyncText" data-i18n="pop.sync">Refresh now</span>
+      </button>
+      <button class="key primary hidden" type="button" id="typeKey" data-i18n="pop.type">Type it in</button>
+      <button class="key" type="button" id="openBtn" data-i18n="pop.open">Open app</button>
+    </div>
+    <div class="meta" id="meta">
+      <span id="updated"></span>
+      <button class="tl" type="button" id="typeLink" data-i18n="pop.type">Type it in</button>
+    </div>
+  </main>
+  <script src="i18n.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

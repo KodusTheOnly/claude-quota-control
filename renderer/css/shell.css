@@ -1,0 +1,100 @@
+/* App shell: the frame, the header, the strips under it and the floating toast. */
+
+.app { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+/* Only .content scrolls. The Overview in the wide and medium window formats never needs it. */
+.content { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.content::-webkit-scrollbar { width: 12px; }
+.content::-webkit-scrollbar-thumb { background: var(--edge); border: 3px solid var(--win); }
+.view { flex: none; }
+.view:not(#view-panel) { padding: 0 1rem 1rem; }
+#view-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+
+/* Header: brand, tabs, status lamp, time of the last reading, Refresh.
+   The window buttons (minimize, maximize, close) are native and sit in the top-right corner, so the
+   header leaves --ctl of room there. In the vertical format it becomes two rows. */
+.hd {
+  display: grid; align-items: center; column-gap: .8rem; min-height: 2.5rem; padding: 0 max(.8rem, var(--ctl)) 0 1rem;
+  grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "brand sep keys sync";
+  -webkit-app-region: drag; user-select: none;
+}
+.hd button, .hd a { -webkit-app-region: no-drag; }
+.brand { grid-area: brand; display: flex; align-items: center; gap: .55rem; font: 600 1.1rem/1 var(--mono); letter-spacing: .08em; }
+.brand svg { width: 1.4rem; height: 1.15rem; flex: none; }
+.brand .bar-a { fill: var(--ink); }
+.brand .bar-b { fill: var(--cobalt); }
+.sepv { grid-area: sep; width: 1px; height: 1.6rem; background: var(--edge); }
+.keys { grid-area: keys; display: flex; gap: .4rem; min-width: 0; }
+.sync { grid-area: sync; display: flex; align-items: center; gap: .7rem; min-width: 0; }
+.lamp { padding: .25rem .6rem; color: var(--st); font-size: .75rem; } /* a chip with bone text; only the shape carries the state color */
+#lampAgeTxt { text-transform: none; } /* "3m", not "3M" */
+@media (max-width: 1039px) { #lampAgeTxt { display: none; } } /* the header has no room for it (measured) */
+.lamp.is-updating .shp { animation: lamp-pulse 1s ease-in-out infinite; }
+@keyframes lamp-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .lamp.is-updating .shp { animation: none; } }
+.rd { font: 500 .75rem var(--mono); color: var(--ink2); white-space: nowrap; }
+#syncBtn { min-width: 6rem; }
+#connectBtn .short { display: none; }
+.rule { flex: none; height: .5rem; margin: .1rem 0 0; background: repeating-linear-gradient(0deg, var(--cobalt) 0 2px, transparent 2px 4px); }
+
+/* From 1100px the Overview's two keys (Type it in, Math) join the header, so the right side needs room the tabs
+   would otherwise lose (they slid under it, measured: up to 104px in Portuguese at 1100px). Under 1200px the time of
+   the reading gives way to the lamp; under 1280px the account key says only "Connect", as it does under 860px. */
+@media (max-width: 1199px) { .rd { display: none; } }
+@media (min-width: 1100px) and (max-width: 1279px) {
+  #connectBtn .long { display: none; }
+  #connectBtn .short { display: inline; }
+}
+
+/* Medium window under 1000px: the brand shrinks to its icon and Refresh to an icon, so one row still fits
+   (from 860 to 999px the tabs used to slide under the right side, measured: up to 127px in Portuguese) */
+@media (min-width: 720px) and (max-width: 999px) {
+  .brand-name, #syncLabel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .keys .key { padding-inline: .6rem; }
+  .keys .key.on { padding-left: 1.2rem; }
+  #syncBtn { min-width: 0; padding-inline: .6rem; }
+  #connectBtn .long { display: none; }
+  #connectBtn .short { display: inline; }
+}
+
+/* Vertical format: row 1 holds the brand, the lamp and Refresh (as an icon); row 2 holds the tabs */
+@media (max-width: 719px) {
+  .hd { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "brand sync" "keys keys"; row-gap: .15rem; padding-top: .3rem; padding-bottom: .35rem; }
+  .sepv, .rd { display: none; }
+  .brand, .sync { min-height: 2.15rem; }
+  .keys { margin-right: calc(max(.8rem, var(--ctl)) * -1 + .8rem); }
+  .keys .key { flex: 1 1 auto; padding-inline: .5rem; }
+  .keys .key.on { padding-left: 1.2rem; }
+  #syncBtn { min-width: 0; padding-inline: .6rem; }
+  #syncLabel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  #connectBtn .long { display: none; }
+  #connectBtn .short { display: inline; }
+}
+
+/* Strips under the header: data-state message and the "week reset" notice */
+.prog { flex: none; position: relative; height: 4px; background: var(--mod); overflow: hidden; margin-top: .1rem; }
+.prog::after { content: ""; position: absolute; top: 0; bottom: 0; width: 30%; background: var(--cobalt); animation: prog 1.2s ease-in-out infinite; }
+@keyframes prog { 0% { left: -30%; } 100% { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .prog::after { animation: none; width: 100%; } }
+.msg, .banner {
+  flex: none; display: flex; align-items: center; gap: .8rem; margin: .5rem .7rem 0; padding: .45rem .7rem;
+  background: var(--card); border-top: 2px solid var(--ink); font-size: .9rem; line-height: 1.35;
+}
+.msg .bt { flex: 1 1 auto; min-width: 0; }
+.msg .key { flex: none; }
+
+/* Floating notice: a line on a small CRT that shows over the content and pushes nothing. The mark is the
+   shape of the kind (a circle for done, a triangle for a problem), so it never relies on color alone. */
+.toast {
+  position: fixed; top: 3.2rem; left: 50%; transform: translateX(-50%); z-index: 20;
+  display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .6rem; width: max-content; max-width: calc(100vw - 2rem); margin: 0; padding: .45rem .8rem;
+  background: var(--scr); color: var(--st); border: 1px solid var(--sline); border-radius: 3px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .35); font: 500 .8125rem/1.35 var(--mono);
+  transition: opacity .45s ease, transform .45s ease;
+  animation: toast-in .22s ease-out;
+}
+.toast::before { content: ""; flex: none; width: .75rem; height: .75rem; border-radius: 50%; background: var(--free); }
+.toast.error::before { border-radius: 0; background: var(--pause); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.toast.fade { opacity: 0; transform: translate(-50%, -6px); }
+.toast .tmsg { flex: 1 1 12rem; min-width: 0; }
+.toast .link { min-height: 2rem; margin-left: auto; padding: 0 .5rem; color: var(--crt-accent); white-space: nowrap; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, -8px); } }

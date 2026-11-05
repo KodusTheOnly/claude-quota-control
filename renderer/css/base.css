@@ -1,0 +1,71 @@
+/* Base: reset, helpers, the level marks and the controls every screen shares. */
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+/* Only .content scrolls; the page itself must never move */
+body {
+  margin: 0;
+  background: var(--win);
+  color: var(--ink);
+  font: 14px/1.45 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+h1, h2, p { margin: 0; }
+h1 { font-size: 22px; font-weight: 600; }
+h2 { font-size: 14px; font-weight: 600; color: var(--ink); }
+button, input, select { font: inherit; color: inherit; }
+button { font-family: var(--sans); }
+:focus-visible { outline: 2px solid var(--fc); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--cobalt) 30%, transparent); }
+.hidden { display: none !important; }
+.sr-only { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.eng { font: 600 .75rem/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink2); }
+
+/* Levels. One bright palette in both themes. A level is never color alone: it always has a shape and a word too.
+   On a CRT screen it is plain text (.lv). On a light or dark panel it sits on its own CRT chip (.lc), so the
+   contrast never depends on what is behind it. */
+.lv-free { --c: var(--free); }
+.lv-moderate { --c: var(--moderate); }
+.lv-tight { --c: var(--tight); }
+.lv-pause { --c: var(--pause); }
+.lv-none { --c: var(--sm); }
+.shp { display: inline-block; flex: none; width: .85em; height: .85em; background: var(--c); }
+.lv-free .shp { border-radius: 50%; }
+.lv-moderate .shp { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.lv-tight .shp { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.lv-none .shp { background: transparent; border: 1.5px dashed var(--c); }
+/* .lv is plain text on a CRT; .lc is the chip for a light or dark surface */
+.lv, .lc { display: inline-flex; align-items: center; gap: .4em; white-space: nowrap; font: 600 .8125rem/1.2 var(--mono); color: var(--c); letter-spacing: .06em; text-transform: uppercase; }
+.lc { padding: .15em .6em .15em .5em; background: var(--scr); border: 1px solid var(--sline); border-radius: 3px; font-size: .75rem; }
+.lv-none.lv, .lv-none.lc { font-style: normal; }
+
+/* Keys: the buttons of the console */
+.key {
+  position: relative; min-height: 2rem; padding: .3rem .9rem; font: 600 .8125rem/1.2 var(--mono); letter-spacing: .02em;
+  background: var(--keybg); color: var(--ink); border: 1px solid var(--edge); border-bottom-width: 3px; border-radius: 3px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem; white-space: nowrap;
+}
+.key:hover { background: var(--keyhi); }
+.key:disabled { opacity: .6; cursor: progress; }
+.key.primary { background: var(--card); border-bottom-color: var(--cobalt); }
+.key.primary:hover { background: var(--keyhi); }
+.key.on { background: var(--keyon); border-bottom-width: 1px; margin-top: 2px; box-shadow: inset 0 2px 0 rgba(0, 0, 0, .25); padding-left: 1.4rem; }
+.key.on::before { content: ""; position: absolute; left: .55rem; top: 50%; margin-top: -3px; width: 6px; height: 6px; background: var(--cobalt); }
+.key .ico { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.key.is-busy .ico { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: no-preference) {
+  .key { transition: transform .08s, border-bottom-width .08s; }
+  .key:not(.on):active { transform: translateY(2px); border-bottom-width: 1px; }
+}
+@media (prefers-reduced-motion: reduce) { .key.is-busy .ico { animation: none; } }
+
+/* Fields. The console field is .fld (settings.css); the Type it in dialog styles its own (dialogs.css). */
+.input-suffix { position: relative; display: block; }
+.input-suffix input { width: 100%; padding-right: 1.9rem; }
+.input-suffix i { position: absolute; right: .7rem; top: 50%; transform: translateY(-50%); font-style: normal; color: var(--ink2); pointer-events: none; }
+
+/* A link inside a message */
+.link { padding: .1rem 0; border: 0; background: none; color: var(--cobalt); font-weight: 600; cursor: pointer; text-decoration: underline; }

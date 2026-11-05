@@ -1,0 +1,346 @@
+// Forms
+
+$("setupForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const weekly = readNumber($("sUsed"));
+  const anchor = new Date($("sReset").value).getTime();
+  // Say what is wrong instead of doing nothing (the date field is required, so the browser already flags an empty one)
+  if (weekly === null || Number.isNaN(weekly)) {
+    toast(t("q.invalid"), "error");
+    $("sUsed").focus();
+    return;
+  }
+  if (Number.isNaN(anchor)) return;
+  await saveManual({ weekly, anchor });
+});
+
+$("anchorForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const anchor = new Date($("aReset").value).getTime();
+  if (Number.isNaN(anchor)) return;
+  const manual = state.settings.manual;
+  if (manual && manual.weekly) {
+    manual.anchor = anchor;
+    manual.weekly.resetsAt = nextReset(anchor);
+    state.settings = await api.setSettings({ manual });
+  } else {
+    state.settings = await api.setSettings({ manual: { ...(manual || {}), anchor } });
+  }
+  toast(t("anchor.saved", { when: fmtWhen(nextReset(anchor)) }));
+  render();
+});
+
+$("manualClear").addEventListener("click", async () => {
+  if (!confirm(t("data.confirm"))) return;
+  state.settings = await api.clearData(); // the main process keeps a copy in backups/ first
+  $("aReset").value = "";
+  render();
+});
+
+// Export and import
+
+async function runTransfer(action, kind) {
+  const res = await action();
+  if (!res || res.canceled) return;
+  if (res.ok) {
+    state.settings = await api.getSettings();
+    bindSettings();
+    render();
+    toast(kind === "import" ? t("data.imported", { n: res.readings }) : t("data.exported"));
+  } else {
+    toast(t("data.failed"), "error");
+  }
+}
+$("exportJson").addEventListener("click", () => runTransfer(() => api.exportData("json"), "export"));
+$("exportCsv").addEventListener("click", () => runTransfer(() => api.exportData("csv"), "export"));
+$("importData").addEventListener("click", () => runTransfer(() => api.importData(), "import"));
+
+// A group of keys where exactly one is chosen (role="radiogroup"): Theme and Language.
+// Arrow keys move and choose, like native radio buttons, and only the chosen key is in the tab order.
+function setChoice(group, value) {
+  group.querySelectorAll('[role="radio"]').forEach((key) => {
+    const on = key.dataset.value === value;
+    key.setAttribute("aria-checked", String(on));
+    key.classList.toggle("on", on);
+    key.tabIndex = on ? 0 : -1;
+  });
+}
+
+function bindChoice(group, onPick) {
+  const keys = () => [...group.querySelectorAll('[role="radio"]')];
+  group.addEventListener("click", (e) => {
+    const key = e.target.closest('[role="radio"]');
+    if (key && key.getAttribute("aria-checked") !== "true") onPick(key.dataset.value);
+  });
+  group.addEventListener("keydown", (e) => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const all = keys();
+    const next = all[(all.indexOf(document.activeElement) + step + all.length) % all.length];
+    next.focus();
+    onPick(next.dataset.value);
+  });
+}
+
+// Theme: light, dark, or the system's. The main process recolors the title bar buttons to match.
+
+const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+function applyTheme() {
+  const choice = (state.settings && state.settings.theme) || "system";
+  const dark = choice === "dark" || (choice === "system" && darkQuery.matches);
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+}
+darkQuery.addEventListener("change", applyTheme);
+bindChoice($("theme"), async (value) => {
+  state.settings = await api.setSettings({ theme: value });
+  setChoice($("theme"), value);
+  applyTheme();
+  render();
+});
+
+// Language
+
+// Applies the saved language: static HTML text and the strings that depend on a count
+function applyLanguage() {
+  I18N.setLang(state.settings && state.settings.language);
+  I18N.applyStatic();
+  document.querySelectorAll("#remindEvery option[data-hours]").forEach((o) => {
+    o.textContent = t("alerts.every", { n: o.dataset.hours });
+  });
+  document.querySelectorAll(".rk").forEach((b) => {
+    b.textContent = t("history.days", { n: b.dataset.range });
+  });
+  if (state.view === "about") renderAbout();
+  if (state.view === "help") {
+    renderHelpCalc();
+    renderHelpTiles();
+  }
+}
+
+// About
+
+let appInfo = null;
+async function renderAbout() {
+  if (!appInfo && api && api.appInfo) appInfo = await api.appInfo();
+  const info = appInfo || {};
+  const parts = [];
+  if (info.version) parts.push(t("about.version", { v: info.version }));
+  if (info.electron) parts.push(t("about.electron", { e: info.electron }));
+  $("aboutVersion").textContent = parts.join(" · ");
+}
+
+// The update result is a line on the nameplate screen: UPDATE, the result, and a cursor
+$("updateBtn").addEventListener("click", async () => {
+  const btn = $("updateBtn");
+  const out = $("updateResult");
+  btn.disabled = true;
+  $("updateLine").classList.remove("hidden");
+  out.textContent = t("about.checking");
+  const res = await api.checkUpdate();
+  btn.disabled = false;
+  out.textContent = "";
+  if (res.status === "newer") {
+    out.append(t("about.newer", { v: res.version }) + " ");
+    const a = document.createElement("a");
+    a.href = res.url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = t("about.download");
+    out.appendChild(a);
+  } else if (res.status === "latest") out.textContent = t("about.latest");
+  else if (res.status === "none") out.textContent = t("about.noReleases");
+  else out.textContent = t("about.updateFail");
+});
+
+// Settings
+
+async function refreshCollector() {
+  if (!api) return;
+  const st = await api.collectorStatus();
+  const chip = $("collectorChip");
+  const note = $("collectorNote");
+  note.classList.add("hidden");
+  if (st.installed) {
+    setLevelClass(chip, 0);
+    $("collectorText").textContent = t("coll.on");
+    $("installBtn").textContent = t("coll.reinstall");
+    $("uninstallBtn").classList.remove("hidden");
+    if (st.chained) {
+      note.textContent = t("coll.chained");
+      note.classList.remove("hidden");
+    }
+  } else {
+    setLevelClass(chip, null);
+    $("collectorText").textContent = t("coll.off");
+    $("installBtn").textContent = t("coll.install");
+    $("uninstallBtn").classList.add("hidden");
+    if (st.otherCommand) {
+      note.textContent = t("coll.other");
+      note.classList.remove("hidden");
+    }
+  }
+  if (!st.node) {
+    note.textContent = t("coll.noNode");
+    note.classList.remove("hidden");
+  }
+}
+
+$("installBtn").addEventListener("click", async () => {
+  const btn = $("installBtn");
+  btn.disabled = true;
+  const res = await api.installCollector();
+  btn.disabled = false;
+  if (res.ok) toast(t("coll.installedOk"));
+  else toast(res.error, "error");
+  refreshCollector();
+});
+
+$("uninstallBtn").addEventListener("click", async () => {
+  const res = await api.uninstallCollector();
+  if (res.ok) toast(t("coll.removedOk"));
+  else toast(res.error, "error");
+  refreshCollector();
+});
+
+// With notifications off, the individual switches have nothing to control
+function syncNotifyGroup() {
+  const on = $("notifyAll").checked;
+  for (const id of ["notifyLevel", "notifyResets", "notifySpikes", "notifyExtra"]) {
+    $(id).disabled = !on;
+    $(id).closest("label").classList.toggle("is-disabled", !on);
+  }
+}
+
+async function saveSetting(patch) {
+  state.settings = await api.setSettings(patch);
+  render();
+}
+
+function bindSettings() {
+  const s = state.settings;
+  $("notifyAll").checked = s.notifyAll !== false;
+  syncNotifyGroup();
+  $("notifyLevel").checked = s.notifyLevel !== false;
+  $("fiveHourThreshold").value = String(warnAt());
+  $("remindEvery").value = String(s.remindEvery ?? "smart");
+  $("notifyResets").checked = s.notifyResets !== false;
+  $("notifySpikes").checked = s.notifySpikes !== false;
+  $("notifyExtra").checked = s.notifyExtra !== false;
+  $("showExtra").checked = s.showExtra !== false;
+  $("miniWindow").checked = Boolean(s.miniWindow);
+  $("openAtLogin").checked = s.openAtLogin;
+  $("codeLogs").checked = s.codeLogs !== false;
+  $("autoRead").checked = Boolean(s.autoRead);
+  $("shortcutOn").checked = Boolean(s.shortcutOn);
+  paintShortcutKeys();
+  renderShortcutNote();
+  setChoice($("language"), I18N.getLang());
+  setChoice($("theme"), s.theme || "system");
+  const anchor = (s.manual && s.manual.anchor) || (autoSource() && autoSource().data.weekly.resetsAt);
+  if (anchor && document.activeElement !== $("aReset")) $("aReset").value = toLocalInput(nextReset(anchor));
+}
+
+$("notifyAll").addEventListener("change", (e) => {
+  syncNotifyGroup();
+  saveSetting({ notifyAll: e.target.checked });
+});
+$("notifyLevel").addEventListener("change", (e) => saveSetting({ notifyLevel: e.target.checked }));
+$("fiveHourThreshold").addEventListener("change", (e) => saveSetting({ fiveHourThreshold: Number(e.target.value) }));
+$("remindEvery").addEventListener("change", (e) => saveSetting({ remindEvery: e.target.value === "smart" ? "smart" : Number(e.target.value) }));
+$("notifyResets").addEventListener("change", (e) => saveSetting({ notifyResets: e.target.checked }));
+$("showExtra").addEventListener("change", (e) => saveSetting({ showExtra: e.target.checked }));
+$("miniWindow").addEventListener("change", (e) => saveSetting({ miniWindow: e.target.checked }));
+$("notifySpikes").addEventListener("change", (e) => saveSetting({ notifySpikes: e.target.checked }));
+$("notifyExtra").addEventListener("change", (e) => saveSetting({ notifyExtra: e.target.checked }));
+
+$("openAtLogin").addEventListener("change", (e) => saveSetting({ openAtLogin: e.target.checked }));
+$("codeLogs").addEventListener("change", (e) => saveSetting({ codeLogs: e.target.checked }));
+// The timer asks first: it is automated access, which Claude's terms do not cover
+$("autoRead").addEventListener("change", (e) => {
+  if (e.target.checked && !confirm(t("adv.autoConfirm"))) {
+    e.target.checked = false;
+    return;
+  }
+  saveSetting({ autoRead: e.target.checked });
+});
+bindChoice($("language"), async (value) => {
+  state.settings = await api.setSettings({ language: I18N.normalize(value) });
+  setChoice($("language"), I18N.normalize(value));
+  applyLanguage();
+  bindAccount();
+  refreshCollector();
+  paintShortcutKeys();
+  renderShortcutNote();
+  render();
+});
+
+// Global shortcut: refreshes from any app, even with the window in the tray
+
+const SHORTCUT_DEFAULT = "Ctrl+Alt+R";
+const KEY_NAMES = { Space: "Space", Tab: "Tab", Backspace: "Backspace", Delete: "Delete", Insert: "Insert", Home: "Home", End: "End", PageUp: "PageUp", PageDown: "PageDown", ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right", Enter: "Enter" };
+let capturingShortcut = false;
+
+// "Ctrl+Alt+R" from a key press, or null for a modifier on its own. The main process checks it again.
+function acceleratorFromEvent(e) {
+  let key = null;
+  if (/^Key[A-Z]$/.test(e.code)) key = e.code.slice(3);
+  else if (/^Digit\d$/.test(e.code)) key = e.code.slice(5);
+  else if (/^F([1-9]|1\d|2[0-4])$/.test(e.code)) key = e.code;
+  else key = KEY_NAMES[e.code] || null;
+  if (!key) return null;
+  return [e.ctrlKey && "Ctrl", e.altKey && "Alt", e.shiftKey && "Shift", key].filter(Boolean).join("+");
+}
+
+// The shortcut as keycaps, and a key that changes it (it reads "Press the keys…" while it listens)
+function paintShortcutKeys() {
+  const keys = (state.settings.shortcutKeys || SHORTCUT_DEFAULT).split("+");
+  const caps = $("shortcutCaps");
+  caps.textContent = "";
+  for (const key of keys) caps.appendChild(node("kbd", "kb", key));
+  caps.setAttribute("aria-label", keys.join(" + "));
+  caps.classList.toggle("is-capturing", capturingShortcut);
+  $("shortcutKeys").textContent = capturingShortcut ? t("set.shortcutPress") : t("set.shortcutChange");
+}
+
+async function renderShortcutNote() {
+  if (!api || !api.shortcutStatus) return;
+  const st = await api.shortcutStatus();
+  const note = $("shortcutNote");
+  note.textContent = t(`set.shortcut.${st.state}`, { keys: state.settings.shortcutKeys || SHORTCUT_DEFAULT });
+  note.classList.toggle("is-error", st.state === "taken" || st.state === "invalid");
+  $("shortcutKeys").disabled = !state.settings.shortcutOn;
+  $("shortcutCaps").classList.toggle("is-off", !state.settings.shortcutOn);
+}
+
+$("shortcutOn").addEventListener("change", async (e) => {
+  state.settings = await api.setSettings({ shortcutOn: e.target.checked });
+  capturingShortcut = false;
+  paintShortcutKeys();
+  renderShortcutNote();
+});
+$("shortcutKeys").addEventListener("click", () => {
+  capturingShortcut = true;
+  paintShortcutKeys();
+});
+$("shortcutKeys").addEventListener("blur", () => {
+  if (!capturingShortcut) return;
+  capturingShortcut = false;
+  paintShortcutKeys();
+});
+$("shortcutKeys").addEventListener("keydown", async (e) => {
+  if (!capturingShortcut || e.repeat) return;
+  if (e.key === "Tab" && !e.ctrlKey && !e.altKey) return; // let the focus move on; the blur ends the capture
+  e.preventDefault();
+  if (e.key === "Escape") {
+    capturingShortcut = false;
+    paintShortcutKeys();
+    return;
+  }
+  const keys = acceleratorFromEvent(e);
+  if (!keys) return; // a modifier on its own: keep waiting for the key
+  capturingShortcut = false;
+  state.settings = await api.setSettings({ shortcutKeys: keys });
+  paintShortcutKeys();
+  renderShortcutNote();
+});

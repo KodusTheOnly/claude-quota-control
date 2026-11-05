@@ -1,0 +1,34 @@
+/* Taskbar strip: always a small CRT, so it reads the same on a light or a dark taskbar.
+   Sizes are px on purpose: the window is a fixed 30px tall. */
+
+html, body { height: 100%; background: var(--scr); }
+body { display: flex; align-items: center; overflow: hidden; font: 600 13px/1 var(--mono); color: var(--st); user-select: none; cursor: default; }
+.pill {
+  display: inline-flex; flex: none; align-items: center; gap: 8px; height: 100%; min-width: 100vw; padding: 0 4px; white-space: nowrap;
+  background: var(--scr); box-shadow: inset 0 0 0 1px var(--crt-inset);
+}
+.pill:hover { background: #111A14; }
+
+/* Keys at both ends: refresh, and the arrow that opens the card */
+.sk { position: relative; display: grid; place-items: center; flex: none; width: 24px; height: 24px; margin: 0; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--sm); cursor: default; }
+.sk:hover { background: rgba(255, 255, 255, .1); color: var(--st); }
+.sk svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sk .bang { display: none; font: 700 15px/1 var(--mono); }
+.sk.busy svg { animation: spin 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .sk.busy svg { animation: none; } }
+/* A failed refresh: the key turns into a red "!" with a red edge, for a few seconds. Not color alone: the glyph changes too. */
+.sk.err { color: var(--pause); border-radius: 0; box-shadow: inset 0 -3px 0 var(--pause); }
+.sk.err svg { display: none; }
+.sk.err .bang { display: block; }
+.sd { flex: none; align-self: stretch; width: 1px; margin: 7px 0; background: var(--sline); }
+
+/* Today: label, level shape, what is left, a flag when the day is spent, and a ten-segment bar with the budget mark */
+.today { display: inline-flex; align-items: center; gap: 6px; color: var(--st); }
+.today .lb { font-weight: 500; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--sm); }
+.today .shp { width: 9px; height: 9px; }
+.today b { font-weight: 600; font-size: 13px; font-variant-numeric: tabular-nums; }
+.today .flag { font-weight: 600; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--pause); }
+.today.lv-none b, .today.lv-none .flag { color: var(--sm); }
+.hb { width: 56px; height: 7px; }
+.hb .tr { -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(10% - 2px), transparent calc(10% - 2px) 10%); mask: repeating-linear-gradient(90deg, #000 0 calc(10% - 2px), transparent calc(10% - 2px) 10%); }
+.hb .tick { top: -3px; bottom: -3px; }

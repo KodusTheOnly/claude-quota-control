@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; img-src 'self' data:; script-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Quota Control</title>
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/shell.css">
+<link rel="stylesheet" href="css/crt.css">
+<link rel="stylesheet" href="css/overview.css">
+<link rel="stylesheet" href="css/dialogs.css">
+<link rel="stylesheet" href="css/setup.css">
+<link rel="stylesheet" href="css/settings.css">
+<link rel="stylesheet" href="css/history.css">
+<link rel="stylesheet" href="css/about.css">
+</head>
+<body>
+  <div class="app">
+    <header class="hd">
+      <div class="brand">
+        <svg viewBox="0 0 22 18" aria-hidden="true"><rect class="bar-a" x="0" y="6" width="5" height="12"/><rect class="bar-b" x="8.5" y="0" width="5" height="18"/><rect class="bar-a" x="17" y="9" width="5" height="9"/></svg>
+        <span class="brand-name">CQC</span>
+      </div>
+      <span class="sepv" aria-hidden="true"></span>
+      <nav class="keys" aria-label="Sections" data-i18n-aria="nav.aria">
+        <button class="key nav-btn on" type="button" data-view="panel" aria-current="page" data-i18n="nav.overview">Overview</button>
+        <button class="key nav-btn" type="button" data-view="history" data-i18n="nav.history">History</button>
+        <button class="key nav-btn" type="button" data-view="settings" data-i18n="nav.settings">Settings</button>
+        <button class="key nav-btn" type="button" data-view="help" data-i18n="nav.help">Help</button>
+      </nav>
+      <div class="sync">
+        <span class="lamp lc lv-none" id="lamp" role="status"><span class="shp"></span><span id="lampText"></span><span id="lampAgeTxt"></span></span>
+        <span class="rd" id="lampAge"></span>
+        <button class="key hidden" type="button" id="moreBtn" aria-haspopup="true" aria-expanded="false" aria-controls="ovMenu" title="More" aria-label="More" data-i18n-title="hd.more" data-i18n-aria="hd.more">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+        </button>
+        <button class="key hidden" type="button" id="syncBtn" title="Reads Claude's usage page now" data-i18n-title="hero.syncTitle">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+          <span id="syncLabel" data-i18n="hd.refresh">Refresh</span>
+        </button>
+        <button class="key hidden" type="button" id="connectBtn" title="Connect Claude account" data-i18n-title="hero.connect"><span class="long" data-i18n="hero.connect">Connect Claude account</span><span class="short" data-i18n="hero.connectShort">Connect</span></button>
+      </div>
+      <div class="ovmenu hidden" id="ovMenu" role="group" aria-label="More" data-i18n-aria="hd.more">
+        <!-- Type it in and Math: moved to the header from 1100px up, kept in this "..." menu below that (see placeOvKeys) -->
+        <span class="pl-keys" id="ovKeys">
+          <button class="key mb" type="button" id="typeBtn" aria-haspopup="dialog" data-i18n="hero.type">Type it in</button>
+          <button class="key mb" type="button" data-math="week" aria-haspopup="dialog" data-i18n="math.key">Math</button>
+        </span>
+      </div>
+    </header>
+    <div class="rule" aria-hidden="true"></div>
+
+    <p class="toast hidden" id="toast" role="status"></p>
+
+    <main class="content">
+      <!-- Overview -->
+      <section class="view" id="view-panel">
+
+        <!-- First run -->
+        <div class="setup hidden" id="setup">
+          <article class="blk" aria-labelledby="tSetup">
+            <header class="pl"><h1 class="pn" id="tSetup"><b>01</b><span data-i18n="setup.title">Let's get you set up</span></h1></header>
+            <p class="p4" data-i18n="setup.text">Connect your Claude account and the app reads your usage in one click, whenever you ask. Or type in the numbers from the usage page.</p>
+            <div class="acts">
+              <button class="key primary" type="button" id="setupConnectBtn" data-i18n="setup.connect">Connect Claude account</button>
+              <button class="key" type="button" data-open-usage data-i18n="setup.openUsage">Open the usage page in your browser</button>
+            </div>
+          </article>
+          <article class="blk" aria-labelledby="tSetupType">
+            <header class="pl"><h2 class="pn" id="tSetupType"><b>02</b><span data-i18n="setup.or">or type them in</span></h2></header>
+            <form id="setupForm">
+              <label class="set"><span class="lb" data-i18n="setup.weeklyUsed">Weekly limit used</span>
+                <span class="input-suffix"><input class="fld" type="text" id="sUsed" inputmode="decimal" autocomplete="off" maxlength="5" required><i>%</i></span>
+              </label>
+              <label class="set"><span class="lb" data-i18n="setup.nextReset">Next weekly reset</span>
+                <input class="fld" type="datetime-local" id="sReset" required>
+              </label>
+              <div class="acts"><button class="key primary" type="submit" data-i18n="setup.start">Get started</button></div>
+            </form>
+          </article>
+        </div>
+
+        <div class="prog hidden" id="prog" role="progressbar" aria-label="Reading usage page" data-i18n-aria="state.reading"></div>
+        <div class="msg hidden" id="dataMsg" role="status">
+          <span class="lc" id="dataMsgMark"><span class="shp"></span></span>
+          <span class="bt" id="dataMsgText"></span>
+          <button class="key hidden" type="button" id="dataMsgBtn"></button>
+        </div>
+        <div class="banner hidden" id="banner"></div>
+
+        <div class="dash hidden" id="dash" data-extra="on">
+          <!-- Vertical format only: stays at the top while the page scrolls -->
+          <div class="sum" id="sum" role="group" aria-label="Summary" data-i18n-aria="sum.aria">
+            <span class="lv lv-none" id="sumLevel"><span class="shp"></span><span class="lvn"></span></span>
+            <span id="sumLeft"></span>
+            <span id="sumProj"></span>
+          </div>
+
+          <!-- The panels sit edge to edge inside one frame, separated by 1px lines -->
+          <!-- Now: will I be cut off, and how much can I use today? -->
+          <div class="now">
+            <article class="blk blk--session" id="blkSession" aria-labelledby="tSession">
+              <div class="crt" id="sScr">
+                <div class="th"><h2 class="tl" id="tSession" data-i18n="mod.sessionShort">Session</h2><span class="mu" id="sResets"></span><span class="lv lv-none" id="sLevel"><span class="shp"></span><span class="lvn"></span></span></div>
+                <div class="meter"><span class="big" id="sPct">–</span><span class="mu" id="sOf"></span>
+                  <div class="sbar t2" id="sBar" role="img"><div class="tr"><i class="fill"></i></div><b class="tick"></b><span class="bl" id="sBl"></span></div>
+                </div>
+                <p class="mu t3" id="sPace"></p>
+              </div>
+            </article>
+            <article class="blk blk--today" id="blkToday" aria-labelledby="tToday">
+              <div class="crt" id="tScr">
+                <div class="th"><h2 class="tl" id="tToday" data-i18n="card.today">Today</h2><span class="mid-num" id="tLeft"></span><span class="mu" id="tWo"></span><span class="lv lv-none" id="tLevel"><span class="shp"></span><span class="lvn"></span></span></div>
+                <div class="meter"><span class="big" id="tUsed">–</span><span class="mu" id="tUsedWord" data-i18n="today.usedWord">of today's budget</span>
+                  <div class="sbar t2" id="tBar" role="img"><div class="tr"><i class="fill"></i><i class="ov"></i></div><b class="tick"></b><span class="bl" id="tBl"></span></div>
+                </div>
+                <p class="mu t3" id="tStop"></p>
+              </div>
+            </article>
+          </div>
+
+          <!-- Week: the verdict band (verdict on the left, the week on the right), then the graph, then the optional Extra strip -->
+          <article class="blk blk--week" id="blkWeek" aria-labelledby="tWeek">
+            <h2 class="sr-only" id="tWeek" data-i18n="card.week">Week</h2>
+            <div class="band crt" id="vScr">
+              <div class="vl">
+                <p class="ans"><span id="vAns"></span><span class="face" id="vFace" aria-hidden="true"></span><span class="cur" aria-hidden="true"></span></p>
+                <div class="ruler" id="vRuler" role="img">
+                  <span class="lv-free"><span class="shp"></span><span data-i18n="level.free.name">Free</span></span>
+                  <span class="lv-moderate"><span class="shp"></span><span data-i18n="level.moderate.name">Moderate</span></span>
+                  <span class="lv-tight"><span class="shp"></span><span data-i18n="level.tight.name">Tight</span></span>
+                  <span class="lv-pause"><span class="shp"></span><span data-i18n="level.pause.name">Pause</span></span>
+                </div>
+                <span class="vnum" id="vNum"><span class="mu vwd" id="vPre"></span><span class="vbig" id="vPct">–</span><span class="mu vwd" id="vWhen"></span><span class="mu vleft" id="vLeft"></span><span class="mu vfirst" id="vFirst"></span></span>
+                <span class="lv lv-none" id="vLevel"><span class="shp"></span><span class="lvn"></span></span>
+              </div>
+              <div class="wk" id="wScr">
+                <span class="wbig" id="wUsed"></span><span class="mu" id="wUsedWord"></span>
+                <div class="sbar" id="wBar" role="img"><div class="tr"><i class="fill"></i></div><b class="tick"></b><span class="bl" id="wBl"></span></div>
+                <span class="lc lv-none" id="wLevel"><span class="shp"></span><span class="lvn"></span></span>
+              </div>
+            </div>
+            <div class="graph">
+              <!-- One grid for the chart, the hours and the days: the left gutter holds the % scale and the HRS label -->
+              <div class="gbody">
+                <div class="osc">
+                  <div class="plot" id="plot"><svg id="paceSvg" role="img"></svg></div>
+                </div>
+                <span class="hl" data-i18n="hrs.label">HRS</span>
+                <div class="hrs" id="hrs" role="img" aria-label="Usage by hour" data-i18n-aria="hrs.aria"><div class="hcells" id="hcells"></div></div>
+                <span class="dg" aria-hidden="true"></span>
+                <div class="days" id="days" role="group" aria-label="This week" data-i18n-aria="week.aria"></div>
+                <i class="todaybox hidden" id="todayBox" aria-hidden="true"></i>
+              </div>
+              <!-- Under the days: the legend on the left, how the week is planned and when it resets on the right -->
+              <div class="ghead">
+                <div class="leg" id="paceLeg"></div>
+                <span class="plan" id="planSum"></span>
+                <span class="rs" id="wResets"></span>
+              </div>
+            </div>
+            <!-- Only there when Extra usage is set up: with nothing to show, the graph takes the space -->
+            <div class="foot hidden" id="foot">
+              <div class="xcell crt" id="blkExtra">
+                <span class="xl" id="tExtra" data-i18n="card.extra">Extra usage</span>
+                <span class="mid-num" id="xSpent"></span><span class="mu" id="xMonth"></span>
+                <div class="sbar" id="xBar" role="img"><div class="tr"><i class="fill"></i></div></div>
+                <span class="mu" id="xCredits"></span><span class="mu" id="xInfo"></span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- History -->
+      <section class="view hidden" id="view-history">
+        <h1 class="sr-only" data-i18n="history.title">History</h1>
+        <div class="hist">
+          <div class="hcol">
+            <article class="blk blk--hdays" id="histDays" aria-labelledby="tHistDays">
+              <header class="pl">
+                <h2 class="pn" id="tHistDays"><b>01</b><span data-i18n="history.sec.days">Days</span></h2>
+                <div class="pl-keys" role="group" aria-label="Range" data-i18n-aria="history.rangeAria">
+                  <button class="key rk on" type="button" data-range="14" aria-pressed="true">14 days</button>
+                  <button class="key rk" type="button" data-range="30" aria-pressed="false">30 days</button>
+                  <button class="key rk" type="button" data-range="90" aria-pressed="false">90 days</button>
+                </div>
+              </header>
+              <div class="crt" id="statsBox"><div class="stats" id="stats"></div></div>
+              <div class="crt" id="chartBox">
+                <div class="chart" id="chart"></div>
+                <div class="tip hidden" id="tooltip" role="presentation"></div>
+                <div class="legend" id="legend">
+                  <span><i class="sw sw-use"></i><span data-i18n="history.legUse">Daily use</span></span>
+                  <span><i class="sw sw-today"></i><span data-i18n="history.legToday">Today</span></span>
+                  <span><i class="sw sw-over"></i><span data-i18n="history.legOver">Over budget</span></span>
+                  <span><i class="sw sw-budget"></i><span data-i18n="history.legBudget">Day budget</span></span>
+                  <span><i class="sw sw-none"></i><span data-i18n="history.legNone">No reading</span></span>
+                  <span id="legBlock"></span>
+                </div>
+              </div>
+              <div class="crt hempty hidden" id="daysEmpty">
+                <span class="lv lv-none"><span class="shp"></span><span data-i18n="level.none.name">Not rated</span></span>
+                <span class="mu" id="daysEmptyText"></span>
+              </div>
+            </article>
+            <p class="hnote" data-i18n="history.note">Each day's use is the difference between your readings, as a share of the weekly limit. Refreshing more often makes each day more accurate: usage you only record tomorrow counts toward tomorrow.</p>
+          </div>
+          <div class="hcol">
+            <article class="blk" id="histWeeks" aria-labelledby="tHistWeeks">
+              <header class="pl"><h2 class="pn" id="tHistWeeks"><b>02</b><span data-i18n="history.weeks">Previous weeks</span></h2></header>
+              <div class="crt" id="weeks"></div>
+            </article>
+            <article class="blk" id="histMap" aria-labelledby="tHistMap">
+              <header class="pl"><h2 class="pn" id="tHistMap"><b>03</b><span data-i18n="map.title">When sessions start</span></h2></header>
+              <div class="crt">
+                <div class="session-map" id="sessionMap" role="img" aria-label="Hour of day when your 5-hour sessions start" data-i18n-aria="map.aria"></div>
+                <span class="cap" id="mapNote"></span>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section class="view hidden" id="view-settings">
+        <h1 class="sr-only" data-i18n="settings.title">Settings</h1>
+        <div class="doc">
+          <nav class="toc" aria-label="Settings sections" data-i18n-aria="set.toc.aria">
+            <span class="toc-h" data-i18n="set.toc">Sections</span>
+            <button class="key toc-k on" type="button" data-target="setSources" aria-current="true"><b>01</b><span data-i18n="set.sec.sources">Sources</span></button>
+            <button class="key toc-k" type="button" data-target="setAlerts"><b>02</b><span data-i18n="alerts.title">Alerts</span></button>
+            <button class="key toc-k" type="button" data-target="setDisplay"><b>03</b><span data-i18n="set.sec.display">Display</span></button>
+            <button class="key toc-k" type="button" data-target="setSystem"><b>04</b><span data-i18n="system.title">System</span></button>
+            <button class="key toc-k" type="button" data-target="setData"><b>05</b><span data-i18n="data.title">Data</span></button>
+          </nav>
+
+          <div class="cols">
+            <div class="col">
+              <!-- 01 Sources -->
+              <article class="blk" id="setSources" aria-labelledby="tSources">
+                <header class="pl"><h2 class="pn" id="tSources"><b>01</b><span data-i18n="set.sec.sources">Sources</span></h2></header>
+
+                <div class="grp">
+                  <h3 class="grp-h" data-i18n="acct.title">Claude account</h3>
+                  <p class="gt" data-i18n="acct.text"></p>
+                  <div class="set">
+                    <span class="lamp lc lv-none" id="claudeChip" role="status"><span class="shp"></span><span id="claudeText" data-i18n="acct.off">Not connected</span></span>
+                    <span class="acts">
+                      <button class="key" type="button" id="claudeLoginBtn" data-i18n="acct.connectBtn">Connect account</button>
+                      <button class="key hidden" type="button" id="claudeLogoutBtn" data-i18n="acct.disconnectBtn">Disconnect</button>
+                    </span>
+                  </div>
+                  <p class="gt" data-i18n="acct.small"></p>
+                </div>
+
+                <form class="grp" id="anchorForm">
+                  <h3 class="grp-h" data-i18n="anchor.title">Weekly reset</h3>
+                  <p class="gt" data-i18n="anchor.text"></p>
+                  <div class="set">
+                    <label class="lb" for="aReset" data-i18n="anchor.next">Next reset</label>
+                    <span class="acts">
+                      <input class="fld" type="datetime-local" id="aReset" required>
+                      <button class="key primary" type="submit" data-i18n="anchor.save">Save reset</button>
+                    </span>
+                  </div>
+                </form>
+
+                <div class="grp">
+                  <h3 class="grp-h"><span data-i18n="coll.title">Sync with Claude Code</span><span class="opt" data-i18n="coll.optional">optional</span></h3>
+                  <p class="gt" data-i18n="coll.text"></p>
+                  <div class="set">
+                    <span class="lamp lc lv-none" id="collectorChip" role="status"><span class="shp"></span><span id="collectorText" data-i18n="coll.checking">Checking…</span></span>
+                    <span class="acts">
+                      <button class="key" type="button" id="installBtn" data-i18n="coll.install">Install collector</button>
+                      <button class="key hidden" type="button" id="uninstallBtn" data-i18n="coll.remove">Remove collector</button>
+                    </span>
+                  </div>
+                  <p class="gt hidden" id="collectorNote"></p>
+                </div>
+              </article>
+
+              <!-- 02 Alerts -->
+              <article class="blk" id="setAlerts" aria-labelledby="tAlerts">
+                <header class="pl"><h2 class="pn" id="tAlerts"><b>02</b><span data-i18n="alerts.title">Alerts</span></h2></header>
+                <div class="grp">
+                  <label class="set tgl">
+                    <span class="lb"><span data-i18n="alerts.all">Show notifications</span><small data-i18n="alerts.allNote"></small></span>
+                    <input type="checkbox" id="notifyAll">
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                  </label>
+                  <label class="set tgl sub">
+                    <span class="lb" data-i18n="alerts.notify">Notify me when my status changes</span>
+                    <input type="checkbox" id="notifyLevel">
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                  </label>
+                  <label class="set tgl sub">
+                    <span class="lb" data-i18n="alerts.resets">Notify me when my session or week resets</span>
+                    <input type="checkbox" id="notifyResets">
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                  </label>
+                  <label class="set tgl sub">
+                    <span class="lb" data-i18n="alerts.spikes">Tell me when a session is much heavier than usual</span>
+                    <input type="checkbox" id="notifySpikes">
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                  </label>
+                  <label class="set tgl sub">
+                    <span class="lb" data-i18n="alerts.extra">Warn me at 80% and 100% of the monthly spend limit</span>
+                    <input type="checkbox" id="notifyExtra">
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                  </label>
+                  <div class="set">
+                    <label class="lb" for="fiveHourThreshold"><span data-i18n="alerts.threshold">Tell me when a session resets if it had reached</span><small data-i18n="alerts.thresholdNote"></small></label>
+                    <select id="fiveHourThreshold">
+                      <option value="60">60%</option>
+                      <option value="70">70%</option>
+                      <option value="75">75%</option>
+                      <option value="80">80%</option>
+                      <option value="85">85%</option>
+                    </select>
+                  </div>
+                  <div class="set">
+                    <label class="lb" for="remindEvery"><span data-i18n="alerts.remind">Remind me to refresh</span><small data-i18n="alerts.remindNote"></small></label>
+                    <select id="remindEvery">
+                      <option value="smart" data-i18n="alerts.smart">Smart</option>
+                      <option value="0" data-i18n="alerts.never">Never</option>
+                      <option value="2" data-hours="2">Every 2 hours</option>
+                      <option value="4" data-hours="4">Every 4 hours</option>
+                      <option value="8" data-hours="8">Every 8 hours</option>
+                    </select>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <div class="col">
+              <!-- 03 Display -->
+              <article class="blk" id="setDisplay" aria-labelledby="tDisplay">
+                <header class="pl"><h2 class="pn" id="tDisplay"><b>03</b><span data-i18n="set.sec.display">Display</span></h2></header>
+                <div class="grp">
+                  <div class="set stk" role="group" aria-labelledby="langLabel">
+                    <div class="lb"><span id="langLabel" data-i18n="lang.label">App language</span><small data-i18n="lang.note"></small></div>
+                    <div class="segc" id="language" role="radiogroup" aria-labelledby="langLabel">
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="en">English</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="pt-BR">Português</button>
+                    </div>
+                  </div>
+                  <div class="set stk" role="group" aria-labelledby="themeLabel">
+                    <div class="lb"><span id="themeLabel" data-i18n="theme.label">Theme</span><small data-i18n="theme.note"></small></div>
+                    <div class="segc" id="theme" role="radiogroup" aria-labelledby="themeLabel">
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="system" data-i18n="theme.system">Match the system</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="light" data-i18n="theme.light">Light</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="dark" data-i18n="theme.dark">Dark</button>
+                    </div>
+                  </div>
+                  <label class="set tgl">
+                    <span class="lb"><span data-i18n="set.showExtra">Show the Extra usage card</span><small data-i18n="set.showExtraNote"></small></span>
+                    <input type="checkbox" id="showExtra">
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                  </label>
+                </div>
+              </article>
+
+              <!-- 04 System -->
+              <article class="blk" id="setSystem" aria-labelledby="tSystem">
+                <header class="pl"><h2 class="pn" id="tSystem"><b>04</b><span data-i18n="system.title">System</span></h2></header>
+                <div class="grp">
+                  <label class="set tgl">
+                    <span class="lb"><span data-i18n="set.mini">Show a small status on the taskbar</span><small data-i18n="set.miniNote"></small></span>
+                    <input type="checkbox" id="miniWindow">
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                  </label>
+                  <label class="set tgl">
+                    <span class="lb"><span data-i18n="system.startup">Start with Windows, minimized to the tray</span><small data-i18n="system.note"></small></span>
+                    <input type="checkbox" id="openAtLogin">
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                  </label>
+                  <label class="set tgl">
+                    <span class="lb" data-i18n="set.shortcut">Refresh from anywhere with a keyboard shortcut</span>
+                    <input type="checkbox" id="shortcutOn">
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                  </label>
+                  <div class="set">
+                    <span class="lb" id="shortcutLabel" data-i18n="set.shortcutKeys">Shortcut</span>
+                    <span class="acts">
+                      <span class="kbs" id="shortcutCaps" role="img"></span>
+                      <button class="key" type="button" id="shortcutKeys" aria-describedby="shortcutNote" data-i18n="set.shortcutChange">Change</button>
+                    </span>
+                  </div>
+                  <p class="gt" id="shortcutNote" aria-live="polite"></p>
+                </div>
+              </article>
+
+              <!-- 05 Data -->
+              <article class="blk" id="setData" aria-labelledby="tData">
+                <header class="pl"><h2 class="pn" id="tData"><b>05</b><span data-i18n="data.title">Data</span></h2></header>
+                <div class="grp">
+                  <p class="gt" data-i18n="data.text"></p>
+                  <div class="acts">
+                    <button class="key" type="button" id="exportJson" data-i18n="data.exportJson">Export backup (JSON)</button>
+                    <button class="key" type="button" id="exportCsv" data-i18n="data.exportCsv">Export days (CSV)</button>
+                    <button class="key" type="button" id="importData" data-i18n="data.import">Import backup</button>
+                  </div>
+                </div>
+                <details class="adv" id="advanced">
+                  <summary data-i18n="adv.title">Advanced</summary>
+                  <div class="grp">
+                    <label class="set tgl">
+                      <span class="lb"><span data-i18n="adv.logs">Use Claude Code logs for the hourly strip</span><small data-i18n="adv.logsNote"></small></span>
+                      <input type="checkbox" id="codeLogs">
+                      <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                    </label>
+                    <label class="set tgl">
+                      <span class="lb"><span data-i18n="adv.auto">Read usage every 5 minutes</span><small data-i18n="adv.autoNote"></small></span>
+                      <input type="checkbox" id="autoRead">
+                      <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                    </label>
+                  </div>
+                </details>
+                <div class="dz">
+                  <h3 class="grp-h" data-i18n="data.dz">Danger zone</h3>
+                  <p class="gt" data-i18n="data.deleteText"></p>
+                  <div class="acts"><button class="key dng" type="button" id="manualClear" data-i18n="data.delete">Delete my data</button></div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Help -->
+      <section class="view hidden" id="view-help">
+        <h1 class="sr-only" data-i18n="help.title">Help</h1>
+        <div class="doc">
+          <div class="doc-body">
+            <div class="lead"><span class="plate2" data-i18n="help.read">Read me</span><p data-i18n="help.intro"></p><button class="key help-about" type="button" data-goto="about" data-i18n="nav.about">About</button></div>
+
+            <!-- One tile per topic; a tile opens the topic below in the side drawer -->
+            <div class="help-tiles" id="helpTiles"></div>
+
+            <div class="help-src" hidden>
+            <!-- 01: the rules behind every number -->
+            <article class="blk" id="helpCalc" aria-labelledby="helpCalcTitle">
+              <header class="pl"><h2 class="pn" id="helpCalcTitle"><b>01</b><span data-i18n="help.g.calc">How we calculate</span></h2></header>
+              <div id="helpCalcBody"></div>
+            </article>
+
+            <div class="help-topics">
+              <article class="blk" id="helpStatus" aria-labelledby="tHelpStatus">
+                <header class="pl"><h2 class="pn" id="tHelpStatus"><b>02</b><span data-i18n="help.g.head">Status</span></h2></header>
+                <dl class="help-list">
+                  <div class="ent"><dt data-i18n="help.level.t"></dt><dd data-i18n="help.level.d"></dd></div>
+                  <div class="ent"><dt data-i18n="help.source.t"></dt><dd data-i18n="help.source.d"></dd></div>
+                  <div class="ent"><dt data-i18n="help.stale.t"></dt><dd data-i18n="help.stale.d"></dd></div>
+                  <div class="ent"><dt data-i18n="help.extra.t"></dt><dd data-i18n="help.extra.d"></dd></div>
+                </dl>
+              </article>
+              <article class="blk" id="helpSession" aria-labelledby="tHelpSession">
+                <header class="pl"><h2 class="pn" id="tHelpSession"><b>03</b><span data-i18n="help.g.session">5-hour session</span></h2></header>
+                <dl class="help-list">
+                  <div class="ent"><dt data-i18n="help.pace.t"></dt><dd data-i18n="help.pace.d"></dd></div>
+                  <div class="ent"><dt data-i18n="help.fills.t"></dt><dd data-i18n="help.fills.d"></dd></div>
+                  <div class="ent"><dt data-i18n="help.spike.t"></dt><dd data-i18n="help.spike.d"></dd></div>
+                </dl>
+              </article>
+              <article class="blk" id="helpWeek" aria-labelledby="tHelpWeek">
+                <header class="pl"><h2 class="pn" id="tHelpWeek"><b>04</b><span data-i18n="help.g.week">Week</span></h2></header>
+                <dl class="help-list">
+                  <div class="ent"><dt data-i18n="help.forecast.t"></dt><dd data-i18n="help.forecast.d"></dd></div>
+                  <div class="ent"><dt data-i18n="help.perday.t"></dt><dd data-i18n="help.perday.d"></dd></div>
+                  <div class="ent"><dt data-i18n="help.plan.t"></dt><dd data-i18n="help.plan.d"></dd></div>
+                </dl>
+              </article>
+              <article class="blk" id="helpToday" aria-labelledby="tHelpToday">
+                <header class="pl"><h2 class="pn" id="tHelpToday"><b>05</b><span data-i18n="help.g.today">Today</span></h2></header>
+                <dl class="help-list">
+                  <div class="ent"><dt data-i18n="help.budget.t"></dt><dd data-i18n="help.budget.d"></dd></div>
+                  <div class="ent"><dt data-i18n="help.spent.t"></dt><dd data-i18n="help.spent.d"></dd></div>
+                </dl>
+              </article>
+              <article class="blk" id="helpHistory" aria-labelledby="tHelpHistory">
+                <header class="pl"><h2 class="pn" id="tHelpHistory"><b>06</b><span data-i18n="help.g.history">History</span></h2></header>
+                <dl class="help-list">
+                  <div class="ent"><dt data-i18n="help.bars.t"></dt><dd data-i18n="help.bars.d"></dd></div>
+                  <div class="ent"><dt data-i18n="help.map.t"></dt><dd data-i18n="help.map.d"></dd></div>
+                  <div class="ent"><dt data-i18n="help.gaps.t"></dt><dd data-i18n="help.gaps.d"></dd></div>
+                </dl>
+              </article>
+              <article class="blk" id="helpRefresh" aria-labelledby="tHelpRefresh">
+                <header class="pl"><h2 class="pn" id="tHelpRefresh"><b>07</b><span data-i18n="help.g.refresh">Getting the numbers in</span></h2></header>
+                <dl class="help-list">
+                  <div class="ent"><dt data-i18n="help.sync.t"></dt><dd data-i18n="help.sync.d"></dd></div>
+                  <div class="ent"><dt data-i18n="help.type.t"></dt><dd data-i18n="help.type.d"></dd></div>
+                  <div class="ent"><dt data-i18n="help.reset.t"></dt><dd data-i18n="help.reset.d"></dd></div>
+                </dl>
+              </article>
+              <article class="blk" id="helpTray" aria-labelledby="tHelpTray">
+                <header class="pl"><h2 class="pn" id="tHelpTray"><b>08</b><span data-i18n="help.g.tray">Tray</span></h2></header>
+                <dl class="help-list">
+                  <div class="ent"><dt data-i18n="help.icon.t"></dt><dd data-i18n="help.icon.d"></dd></div>
+                  <div class="ent"><dt data-i18n="help.clicks.t"></dt><dd data-i18n="help.clicks.d"></dd></div>
+                </dl>
+              </article>
+            </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- About -->
+      <section class="view hidden" id="view-about">
+        <div class="about">
+          <div class="back"><button class="key" type="button" data-goto="help" aria-label="Back to Help" data-i18n-aria="about.back"><span aria-hidden="true">&#8249;</span><span data-i18n="nav.help">Help</span></button></div>
+
+          <div class="crt np">
+            <span class="mark" aria-hidden="true"><svg viewBox="0 0 22 18"><rect class="bar-a" x="0" y="6" width="5" height="12"/><rect class="bar-b" x="8.5" y="0" width="5" height="18"/><rect class="bar-a" x="17" y="9" width="5" height="9"/></svg></span>
+            <div class="np-text">
+              <h1 data-i18n="app.name">Claude Quota Control</h1>
+              <span class="ver" id="aboutVersion"></span>
+              <p class="tag2" data-i18n="about.tagline"></p>
+              <span class="by" data-i18n="about.by"></span>
+              <div class="con hidden" id="updateLine"><b data-i18n="about.updateTag">Update</b><span id="updateResult" role="status"></span><span class="cur" aria-hidden="true"></span></div>
+            </div>
+          </div>
+
+          <div class="keys2">
+            <a class="key primary" href="https://github.com/KodusTheOnly/claude-quota-control" target="_blank" rel="noopener">
+              <svg class="gh" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+              <span data-i18n="about.repo">Source code</span>
+            </a>
+            <a class="key" href="https://github.com/KodusTheOnly" target="_blank" rel="noopener" data-i18n="about.github">GitHub profile</a>
+            <button class="key" type="button" id="updateBtn" data-i18n="about.update">Check for updates</button>
+          </div>
+
+          <div class="plates4">
+            <article class="blk" aria-labelledby="tAbPrivacy"><header class="pl"><h2 class="pn" id="tAbPrivacy"><b>01</b><span data-i18n="about.privacy.t">Privacy</span></h2></header><p class="p4" data-i18n="about.privacy.d"></p></article>
+            <article class="blk" aria-labelledby="tAbBuilt"><header class="pl"><h2 class="pn" id="tAbBuilt"><b>02</b><span data-i18n="about.built.t">Built with</span></h2></header><p class="p4" data-i18n="about.built.d"></p></article>
+            <article class="blk" aria-labelledby="tAbLicense"><header class="pl"><h2 class="pn" id="tAbLicense"><b>03</b><span data-i18n="about.license.t">License</span></h2></header><p class="p4" data-i18n="about.license.d"></p></article>
+            <article class="blk" aria-labelledby="tAbUnofficial"><header class="pl"><h2 class="pn" id="tAbUnofficial"><b>04</b><span data-i18n="about.unofficial.t">Unofficial</span></h2></header><p class="p4" data-i18n="about.unofficial.d"></p></article>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Show the math: one drawer, one section per block -->
+  <dialog class="drawer" id="mathDrawer" aria-labelledby="mathTitle">
+    <div class="dh">
+      <button class="key" type="button" id="mathClose"><span data-i18n="math.close">Close</span><span aria-hidden="true">&#10005;</span></button>
+      <h2 id="mathTitle" data-i18n="math.title">Show the math</h2>
+    </div>
+    <div class="db" id="mathBody"></div>
+  </dialog>
+
+  <!-- Help topics open in the same kind of drawer -->
+  <dialog class="drawer" id="helpDrawer" aria-labelledby="helpDrawerTitle">
+    <div class="dh">
+      <button class="key" type="button" id="helpClose"><span data-i18n="math.close">Close</span><span aria-hidden="true">&#10005;</span></button>
+      <h2 id="helpDrawerTitle"></h2>
+    </div>
+    <div class="db" id="helpBody"></div>
+  </dialog>
+
+  <!-- Type it in: for when Claude's usage page is not connected, or you simply want to key in a reading -->
+  <dialog class="modal" id="typeDlg" aria-labelledby="typeTitle">
+    <form id="typeForm" novalidate>
+      <h2 id="typeTitle" data-i18n="type.title">Type in your usage</h2>
+      <div class="fields">
+        <label><span data-i18n="q.weekly">Weekly</span>
+          <span class="input-suffix"><input type="text" id="qWeekly" inputmode="decimal" autocomplete="off" maxlength="5"><i>%</i></span>
+        </label>
+        <label><span><span data-i18n="q.session">Session</span> <em data-i18n="q.optional">optional</em></span>
+          <span class="input-suffix"><input type="text" id="qSession" inputmode="decimal" autocomplete="off" maxlength="5"><i>%</i></span>
+        </label>
+        <label><span><span data-i18n="q.sessionResets">Session resets at</span> <em data-i18n="q.optional">optional</em></span>
+          <input type="time" id="qSessionReset">
+        </label>
+      </div>
+      <div class="foot-keys">
+        <button class="key" type="button" data-open-usage title="Opens claude.ai/settings/usage in your browser" data-i18n="q.viewOnClaude" data-i18n-title="q.viewOnClaudeTitle">View on Claude</button>
+        <button class="key" type="button" id="typeClose" data-i18n="hero.close">Close</button>
+        <button class="key primary" type="submit" id="saveBtn" data-i18n="q.save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Plan of one day (opens when you click a day of the week) -->
+  <div class="planmenu" id="planMenu" popover aria-label="Plan for the selected day" data-i18n-aria="plan.aria"></div>
+
+  <script src="i18n.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/compute.js"></script>
+  <script src="js/hourly.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/chrome.js"></script>
+  <script src="js/blocks/verdict.js"></script>
+  <script src="js/blocks/today.js"></script>
+  <script src="js/blocks/session.js"></script>
+  <script src="js/blocks/extra.js"></script>
+  <script src="js/blocks/pace-chart.js"></script>
+  <script src="js/blocks/week.js"></script>
+  <script src="js/blocks/hours.js"></script>
+  <script src="js/math-drawer.js"></script>
+  <script src="js/help-calc.js"></script>
+  <script src="js/help-tiles.js"></script>
+  <script src="js/toc.js"></script>
+  <script src="js/type-in.js"></script>
+  <script src="js/plan-menu.js"></script>
+  <script src="js/overview.js"></script>
+  <script src="js/history.js"></script>
+  <script src="js/tray.js"></script>
+  <script src="js/alerts.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/account.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/init.js"></script>
+</body>
+</html>
