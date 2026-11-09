@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.1.0
 
 - The weekly goal is gone: the plan always aims at 100% at the reset. A goal under 100% only left quota unused at the reset. The emergency reserve stays, and is the way to keep a cushion: it is released before the reset, so it does not go to waste. The section in Settings is now called Reserve, and a goal saved by an older version is ignored.
 - The verdict, the hours locked out and "slow down" now count to 100%, where Claude stops (they counted to 97%). The chart's line at the top has no label of its own, since the scale already says 100%.

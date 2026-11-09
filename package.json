@@ -1,7 +1,7 @@
 {
   "name": "claude-quota-control",
   "productName": "Claude Quota Control",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Windows app that shows how much room you have left on your Claude plan, from the 5-hour session and weekly limits.",
   "main": "main.js",
   "author": "Kodus",
