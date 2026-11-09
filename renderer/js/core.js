@@ -143,12 +143,66 @@ function dayShare(ms, resetsAt, w = weights()) {
   const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
   return weightedDays(Math.max(startOfDay(ms), resetsAt - WEEK), Math.min(next, resetsAt), w);
 }
+// A day whose plan weight is Off. Its budget is 0 by design, so it has no ratio and no day level.
+const isDayOff = (ms, w = weights()) => w[new Date(ms).getDay()] === 0;
+// What an Off today shows as its number: the use as a share of the week, or a dash when nothing was used
+const offDayNumber = (spent) => (Math.round(spent) > 0 ? `${Math.round(spent)}%` : "–");
 // Today's budget: today's share of what is left, counting the week from the start of the day
 function dayBudget(remaining, resetsAt, now, w = weights()) {
   const share = dayShare(now, resetsAt, w);
   if (share <= 0) return 0;
   const from = Math.max(startOfDay(now), resetsAt - WEEK);
   return (Math.max(remaining, 0) * share) / Math.max(weightedDays(from, resetsAt, w), share);
+}
+// The week's plan and the emergency reserve (Settings, Reserve).
+// goal: where the plan ends at the reset. It is always 100%: a goal under 100% only left quota unused.
+// reserve: kept out of the daily plan, for when something comes up. release: the hours before the
+// reset over which what is left of the reserve joins the plan, so it does not go to waste (0 = never).
+const GOAL = 100;
+const RESERVE_MAX = 20; // the largest choice in Settings
+const RELEASE_CHOICES = [24, 48, 72, 0];
+const RELEASE_DEFAULT = 48;
+// How far under the plan's ceiling the pace has to end (in points of the week) for the verdict to say there is room to spend
+const ROOM_GAP = 8;
+// The plan with no reserve: the whole limit
+const FULL_WEEK = { goal: GOAL, reserve: 0, release: 0 };
+
+// The reserve and its release from the settings, each one checked and kept in range.
+// A goal saved by an older version is ignored.
+function goalSettings(s = state.settings) {
+  const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const reserve = Math.max(Math.min(Math.round(num(s && s.reserve) ?? 0), RESERVE_MAX), 0);
+  const rel = num(s && s.reserveRelease);
+  return { goal: GOAL, reserve, release: RELEASE_CHOICES.includes(rel) ? rel : RELEASE_DEFAULT };
+}
+// How much of the reserve is still held back at `ms`: all of it until the release starts, then less and
+// less (in a straight line) until the reset, when none is held. Without a release it is held to the end.
+function reserveHeld(ms, resetsAt, g) {
+  if (!g.reserve) return 0;
+  if (!g.release) return g.reserve;
+  return g.reserve * Math.min(Math.max((resetsAt - ms) / (g.release * HOUR), 0), 1);
+}
+// The plan's ceiling at `ms`: the goal minus the reserve still held. Use above it comes from the reserve.
+const planCeiling = (ms, resetsAt, g) => g.goal - reserveHeld(ms, resetsAt, g);
+// What is left of the reserve after `used`% of the week: use above goal - reserve was taken from it
+const reserveLeft = (used, g) => Math.min(Math.max(g.goal - Math.max(used, g.goal - g.reserve), 0), g.reserve);
+// The part of the reserve left (`left`) that the release hands to the plan between a and b, counted from
+// `from` (the start of today): it spreads over the release still to come, in proportion to time.
+function reserveReleased(left, a, b, from, resetsAt, g) {
+  const held = reserveHeld(from, resetsAt, g);
+  if (!(left > 0) || held <= 0) return 0;
+  return (left * Math.max(reserveHeld(a, resetsAt, g) - reserveHeld(b, resetsAt, g), 0)) / held;
+}
+// Today's budget with the goal and the reserve: today's share of the plan (goal - reserve) left at the
+// start of the day, plus the part of the reserve that today's release hands over. An Off day stays at 0.
+// With FULL_WEEK it is dayBudget(100 - usedStart).
+function planBudget(usedStart, resetsAt, now, g, w = weights()) {
+  const plan = dayBudget(g.goal - g.reserve - usedStart, resetsAt, now, w);
+  if (dayShare(now, resetsAt, w) <= 0) return plan;
+  const from = Math.max(startOfDay(now), resetsAt - WEEK);
+  const d = new Date(now);
+  const to = Math.min(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime(), resetsAt);
+  return plan + reserveReleased(reserveLeft(usedStart, g), from, to, from, resetsAt, g);
 }
 // How much fits in a normal day from now until the reset
 function perNormalDay(remaining, resetsAt, now, w = weights()) {
@@ -164,36 +218,38 @@ function projectWeek(used, resetsAt, now, w = weights()) {
   const rate = used / elapsed; // % per weighted day
   const left = weightedDays(now, resetsAt, w);
   const projected = used + rate * left;
-  let eta = null;
-  if (projected > 100) {
-    // Walk forward until the weighted days used up the remaining percent
-    let need = (100 - used) / rate;
-    let cur = now;
-    while (cur < resetsAt && need > 0) {
-      const d = new Date(cur);
-      const next = Math.min(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime(), resetsAt);
-      const weight = w[d.getDay()];
-      const avail = ((next - cur) / DAY) * weight;
-      if (weight > 0 && avail >= need) {
-        eta = cur + (need / weight) * DAY;
-        break;
-      }
-      need -= avail;
-      cur = next;
-    }
-  }
+  const eta = projected > 100 ? paceReaches(100, used, rate, now, resetsAt, w) : null;
   return { rate, projected, eta };
+}
+
+// When the pace so far reaches `target`% of the week: walk forward day by day, since the weights change the
+// slope at every midnight. The same walk draws the dashed projection on the chart. null when it does not get
+// there before the reset; now when it is already there.
+function paceReaches(target, used, rate, now, resetsAt, w = weights()) {
+  if (used >= target) return now;
+  if (!(rate > 0)) return null;
+  let need = (target - used) / rate; // weighted days
+  let cur = now;
+  while (cur < resetsAt) {
+    const d = new Date(cur);
+    const next = Math.min(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime(), resetsAt);
+    const weight = w[d.getDay()];
+    const avail = ((next - cur) / DAY) * weight;
+    if (weight > 0 && avail >= need) return cur + (need / weight) * DAY;
+    need -= avail;
+    cur = next;
+  }
+  return null;
 }
 
 // Levels
 
 // 0 Free, 1 Moderate, 2 Tight, 3 Pause. null means "not rated yet".
 // Today and the days come from a ratio (used / budget): up to 0.7, 1.0 and 1.4.
-// The projection has its own scale (PROJECTION_CUTS, below), and the week follows it (weekLevel).
+// The projection has its own scale (hours locked out, LOCK_CUTS below), and the week follows it (weekLevel).
 // The 5-hour session is rated on its own % used, not on pace: up to 50, 75 and 90.
 // Every level rates the number the screen shows next to it, so the two never disagree: percents
-// are shown whole, so a percent is rated rounded to a whole number and a ratio to two decimals
-// (79.6% projected is shown as 80% and rated as 80%).
+// are shown whole, so a percent is rated rounded to a whole number and a ratio to two decimals.
 const RATIO_CUTS = [0.7, 1.0, 1.4];
 const SESSION_CUTS = [50, 75, 90];
 const WEEK_PAUSE_AT = 95; // a week this far gone reads Pause, whatever the pace
@@ -210,42 +266,73 @@ function levelByCuts(x, cuts) {
 const levelFromRatio = (r) => levelByCuts(asShownRatio(r), RATIO_CUTS);
 const levelFromSession = (used) => levelByCuts(asShownPct(used), SESSION_CUTS);
 
-// The projection (where the week ends at the pace so far, as a share of the limit: projected / 100)
-// has a scale of its own. The other scales only measure the risk of running out; this one also counts
-// what would go unused. More than 20% left at the reset is quota that goes to waste, so it reads Free;
-// 20% or less left means ease up (Moderate). From there: Tight above 1.00, Pause above 1.40.
-// The first cutoff breaks the usual rule of levelByCuts on purpose: exactly 0.80 (20% left) is
-// already Moderate, not Free. Why: Free is the band where quota would go to waste, and the decision
-// was that 20% or less left at the reset already asks to ease up, so the edge belongs to Moderate.
-// The other two cutoffs keep the usual rule (1.00 is Moderate, 1.40 is Tight).
-const PROJECTION_CUTS = [0.8, 1.0, 1.4];
-// r is rated as shown: the projection is shown as a whole percent, so r to two decimals.
-function levelFromProjection(r) {
-  if (r === null || r === undefined || !Number.isFinite(r)) return null;
-  r = asShownRatio(r);
-  if (r < PROJECTION_CUTS[0]) return 0;
-  return Math.max(1, levelByCuts(r, PROJECTION_CUTS));
+// The projection's level measures how many hours you would be left without Claude before the reset if the
+// pace so far holds. The projection counts up to LOCK_AT (the whole limit), at the time T it
+// gets there; the hours locked out are the reset minus T. Free at 0 h (or no T at all), Moderate up to 5 h
+// (one session), Tight up to 24 h, Pause above. A value exactly on a cutoff stays in the lower level.
+const LOCK_AT = GOAL; // the level counts to the end of the limit, where Claude stops
+const LOCK_CUTS = [0, 5, 24];
+const LOCK_HOURS_SHOWN = 48; // up to 48 h the time is shown in whole hours, above that in whole days
+
+// The hours locked out as the screen shows them: { n, unit: "h" | "d", hours } (hours is what n stands for).
+function lockShown(hours) {
+  if (!Number.isFinite(hours) || hours <= 0) return { n: 0, unit: "h", hours: 0 };
+  const h = Math.round(hours);
+  if (h <= LOCK_HOURS_SHOWN) return { n: h, unit: "h", hours: h };
+  const d = Math.round(hours / 24);
+  return { n: d, unit: "d", hours: d * 24 };
+}
+// Rated as shown: 4.6 h is shown as 5 h, so it is Moderate. null while there is no projection.
+function levelFromLockout(hours) {
+  if (hours === null || hours === undefined || !Number.isFinite(hours)) return null;
+  return levelByCuts(lockShown(hours).hours, LOCK_CUTS);
+}
+// When the pace reaches LOCK_AT (at, or null) and the hours from then to the reset (0 without a T)
+function weekLockout(used, rate, now, resetsAt, w = weights(), target = LOCK_AT) {
+  const at = paceReaches(target, used, rate, now, resetsAt, w);
+  return { at, hours: at === null ? 0 : Math.max(resetsAt - at, 0) / HOUR };
+}
+// How much the pace of the days left has to drop for the projection to end at LOCK_AT at the reset, as a
+// whole percent rounded up: 1 - (LOCK_AT - used) / (projected - used). null when the pace adds nothing.
+function slowDownPct(used, projected, target = LOCK_AT) {
+  const ahead = projected - used;
+  if (!Number.isFinite(ahead) || ahead <= 0) return null;
+  const n = (1 - (target - used) / ahead) * 100;
+  return Math.min(Math.max(Math.ceil(n - 1e-9), 0), 100);
 }
 
 // A week this far gone reads Pause, whatever the pace. The verdict and the week level both ask here.
 // Rated as shown: 94.6% is shown as 95%, so it is Pause.
 const weekAtPause = (used) => asShownPct(used) >= WEEK_PAUSE_AT;
 
-// The week's level: the projection's level once there is a projection, and before that (the first
+// The week's level: the hours locked out once there is a projection, and before that (the first
 // MIN_WEIGHTED_DAYS) used / expected on the ratio scale. A week at WEEK_PAUSE_AT or more is Pause either way.
-// projRatio: projected / 100, or null while there is no projection. weekRatio: used / expected, or null.
-function weekLevel(used, projRatio, weekRatio) {
+// lockHours: the hours locked out (0 when the pace never reaches LOCK_AT), or null while there is no projection.
+// weekRatio: used / expected, or null.
+function weekLevel(used, lockHours, weekRatio) {
   if (weekAtPause(used)) return 3;
-  if (projRatio !== null && projRatio !== undefined) return levelFromProjection(projRatio);
+  if (lockHours !== null && lockHours !== undefined) return levelFromLockout(lockHours);
   return levelFromRatio(weekRatio);
 }
 
 // How much of the week's limit the plan expects to be used by now: the share of the plan's
 // weighted days that already went by, counting the part of today that has passed.
-function expectedUsed(resetsAt, now, w = weights()) {
+// The plan ends at the goal (100%): the plan part (goal - reserve) follows the weights,
+// and the reserve joins as it is released. g defaults to FULL_WEEK (no reserve).
+function expectedUsed(resetsAt, now, w = weights(), g = FULL_WEEK) {
   const total = weightedDays(resetsAt - WEEK, resetsAt, w);
   if (total <= 0) return 0;
-  return (100 * weightedDays(resetsAt - WEEK, Math.min(now, resetsAt), w)) / total;
+  const at = Math.min(now, resetsAt);
+  return ((g.goal - g.reserve) * weightedDays(resetsAt - WEEK, at, w)) / total + (g.reserve - reserveHeld(at, resetsAt, g));
+}
+
+// The plan's own share of the day at `ms` (the rise of the expected line over that day, inside the week), with no
+// carry-over: today's budget minus this is what earlier days left behind and the rolling budget moved into today.
+function planDayShare(ms, resetsAt, w = weights(), g = FULL_WEEK) {
+  const d = new Date(ms);
+  const from = Math.max(startOfDay(ms), resetsAt - WEEK);
+  const to = Math.min(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime(), resetsAt);
+  return Math.max(expectedUsed(resetsAt, to, w, g) - expectedUsed(resetsAt, from, w, g), 0);
 }
 
 // Data sources
@@ -257,6 +344,12 @@ function manualSource() {
 function autoSource() {
   const a = state.data;
   return a && a.weekly && a.weekly.resetsAt ? { kind: "auto", data: a } : null;
+}
+// Settings > Sources: the reset form is for manual use. With the account connected, each reading brings the reset
+// time, so the form only shows when the account has not given one (a reading without a reset time sends you there).
+function needsAnchorForm(s) {
+  if (!s || !s.claudeConnected) return true;
+  return !(s.manual && s.manual.anchor && s.manual.anchorVia === "sync");
 }
 // The latest reading wins
 function pickSource() {
@@ -356,6 +449,21 @@ async function backfillSessions() {
   let sessions = [...(s.sessions || [])];
   for (const r of s.readings || []) sessions = upsertSession(sessions, r.sr, r.s);
   state.settings = await api.setSettings({ sessions, sessionsV1: true });
+}
+
+// How fast the week rose lately, in % of the week per ms, from the readings of the last 3 hours.
+// null when there are not enough of them or nothing rose. Used to say how long the reserve lasts.
+function weekPaceRecent(now, readings = (state.settings && state.settings.readings) || []) {
+  const pts = readings
+    .flatMap((r) => (r.to ? [r, { ...r, at: r.to }] : [r]))
+    .filter((r) => Number.isFinite(r.w) && r.at <= now && now - r.at < 3 * HOUR)
+    .sort((a, b) => a.at - b.at);
+  if (pts.length < 2) return null;
+  const first = pts[0];
+  const last = pts[pts.length - 1];
+  if (last.at - first.at < 10 * MIN) return null;
+  const rate = (last.w - first.w) / (last.at - first.at);
+  return rate > 0 ? rate : null;
 }
 
 // Session pace: compares readings from the same 5-hour window

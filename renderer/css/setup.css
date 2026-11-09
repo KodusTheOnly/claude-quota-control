@@ -1,7 +1,7 @@
 /* First run: shown while the app has no reading yet. Two numbered plates: connect the account, or type the numbers in. */
 
 .setup { display: flex; flex-direction: column; gap: .8rem; width: 100%; max-width: 40rem; margin: 1.5rem auto; padding-inline: 1rem; }
-.setup .p4 { max-width: none; margin: 0; padding: .1rem .3rem; font-size: .95rem; line-height: 1.5; }
+.setup .p4 { max-width: none; margin: 0; padding: .1rem .3rem; font-size: var(--fs-md); line-height: 1.5; }
 .setup .acts { padding: .2rem; }
 .setup .input-suffix .fld { width: 8rem; }
 .setup .set .lb { flex-basis: 10rem; }

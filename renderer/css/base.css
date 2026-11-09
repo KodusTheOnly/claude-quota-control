@@ -7,13 +7,13 @@ body {
   margin: 0;
   background: var(--win);
   color: var(--ink);
-  font: 14px/1.45 var(--sans);
+  font: var(--fs-md)/1.45 var(--sans);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
 h1, h2, p { margin: 0; }
-h1 { font-size: 22px; font-weight: 600; }
-h2 { font-size: 14px; font-weight: 600; color: var(--ink); }
+h1 { font-size: var(--fs-2xl); font-weight: 600; }
+h2 { font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
 button, input, select { font: inherit; color: inherit; }
 button { font-family: var(--sans); }
 :focus-visible { outline: 2px solid var(--fc); outline-offset: 2px; }
@@ -21,7 +21,7 @@ button { font-family: var(--sans); }
 .hidden { display: none !important; }
 .sr-only { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-.eng { font: 600 .75rem/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink2); }
+.eng { font: 600 var(--fs-xs)/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink2); }
 
 /* Levels. One bright palette in both themes. A level is never color alone: it always has a shape and a word too.
    On a CRT screen it is plain text (.lv). On a light or dark panel it sits on its own CRT chip (.lc), so the
@@ -31,24 +31,28 @@ button { font-family: var(--sans); }
 .lv-tight { --c: var(--tight); }
 .lv-pause { --c: var(--pause); }
 .lv-none { --c: var(--sm); }
+/* Two modes of the verdict, not levels: room to spend and on the reserve. Both take the accent. */
+.lv-room, .lv-reserve { --c: var(--crt-accent); }
 .shp { display: inline-block; flex: none; width: .85em; height: .85em; background: var(--c); }
 .lv-free .shp { border-radius: 50%; }
 .lv-moderate .shp { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 .lv-tight .shp { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.lv-room .shp { clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.lv-reserve .shp { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); background: transparent; border: 2px solid var(--c); }
 .lv-none .shp { background: transparent; border: 1.5px dashed var(--c); }
 /* .lv is plain text on a CRT; .lc is the chip for a light or dark surface */
-.lv, .lc { display: inline-flex; align-items: center; gap: .4em; white-space: nowrap; font: 600 .8125rem/1.2 var(--mono); color: var(--c); letter-spacing: .06em; text-transform: uppercase; }
-.lc { padding: .15em .6em .15em .5em; background: var(--scr); border: 1px solid var(--sline); border-radius: 3px; font-size: .75rem; }
+.lv, .lc { display: inline-flex; align-items: center; gap: .4em; white-space: nowrap; font: 600 var(--fs-sm)/1.2 var(--mono); color: var(--c); letter-spacing: .06em; text-transform: uppercase; }
+.lc { padding: .15em .6em .15em .5em; background: var(--scr); border: 1px solid var(--sline); border-radius: var(--r-sm); font-size: var(--fs-xs); }
 .lv-none.lv, .lv-none.lc { font-style: normal; }
 
 /* Keys: the buttons of the console */
 .key {
-  position: relative; min-height: 2rem; padding: .3rem .9rem; font: 600 .8125rem/1.2 var(--mono); letter-spacing: .02em;
-  background: var(--keybg); color: var(--ink); border: 1px solid var(--edge); border-bottom-width: 3px; border-radius: 3px; cursor: pointer;
+  position: relative; min-height: 2rem; padding: .3rem .9rem; font: 600 var(--fs-sm)/1.2 var(--mono); letter-spacing: .02em;
+  background: var(--keybg); color: var(--ink); border: 1px solid var(--edge); border-bottom-width: 3px; border-radius: var(--r-sm); cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: .5rem; white-space: nowrap;
 }
 .key:hover { background: var(--keyhi); }
-.key:disabled { opacity: .6; cursor: progress; }
+.key:disabled { opacity: .5; cursor: progress; }
 .key.primary { background: var(--card); border-bottom-color: var(--cobalt); }
 .key.primary:hover { background: var(--keyhi); }
 .key.on { background: var(--keyon); border-bottom-width: 1px; margin-top: 2px; box-shadow: inset 0 2px 0 rgba(0, 0, 0, .25); padding-left: 1.4rem; }

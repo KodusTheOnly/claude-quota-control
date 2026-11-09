@@ -21,10 +21,11 @@ $("anchorForm").addEventListener("submit", async (e) => {
   const manual = state.settings.manual;
   if (manual && manual.weekly) {
     manual.anchor = anchor;
+    manual.anchorVia = "manual";
     manual.weekly.resetsAt = nextReset(anchor);
     state.settings = await api.setSettings({ manual });
   } else {
-    state.settings = await api.setSettings({ manual: { ...(manual || {}), anchor } });
+    state.settings = await api.setSettings({ manual: { ...(manual || {}), anchor, anchorVia: "manual" } });
   }
   toast(t("anchor.saved", { when: fmtWhen(nextReset(anchor)) }));
   render();
@@ -87,14 +88,26 @@ function bindChoice(group, onPick) {
 
 const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
 function applyTheme() {
-  const choice = (state.settings && state.settings.theme) || "system";
+  const choice = (state.settings && state.settings.theme) || "dark";
   const dark = choice === "dark" || (choice === "system" && darkQuery.matches);
   document.documentElement.dataset.theme = dark ? "dark" : "light";
+  // The data screens: in the light theme, light paper (the default) or dark CRT. The dark theme is always CRT.
+  document.documentElement.dataset.screens = !dark && (state.settings && state.settings.screens) !== "crt" ? "paper" : "crt";
 }
-darkQuery.addEventListener("change", applyTheme);
+// The chart is drawn with the screen colors, so a change of the system theme draws it again
+darkQuery.addEventListener("change", () => {
+  applyTheme();
+  render();
+});
 bindChoice($("theme"), async (value) => {
   state.settings = await api.setSettings({ theme: value });
   setChoice($("theme"), value);
+  applyTheme();
+  render();
+});
+bindChoice($("screens"), async (value) => {
+  state.settings = await api.setSettings({ screens: value });
+  setChoice($("screens"), value);
   applyTheme();
   render();
 });
@@ -212,6 +225,28 @@ function syncNotifyGroup() {
   }
 }
 
+// Reserve: the reserve and its release are key groups. The plan always ends at 100%.
+// The preview bar shows the plan and the reserve with the values as they will be used (see goalSettings).
+function renderGoalSettings() {
+  const g = goalSettings();
+  setChoice($("reserve"), String(g.reserve));
+  setChoice($("release"), String(g.release));
+  $("releaseSet").classList.toggle("hidden", !g.reserve);
+  const bar = $("goalPrev");
+  bar.style.setProperty("--fill", `${g.goal - g.reserve}%`);
+  bar.style.setProperty("--rz-l", `${g.goal - g.reserve}%`);
+  bar.style.setProperty("--rz-w", `${g.reserve}%`);
+  const text = t(g.reserve ? "goal.previewText" : "goal.previewNoReserve", { plan: g.goal - g.reserve, reserve: g.reserve });
+  bar.setAttribute("aria-label", text);
+  $("goalPrevText").textContent = text;
+}
+async function saveGoal(patch) {
+  await saveSetting(patch);
+  renderGoalSettings();
+}
+bindChoice($("reserve"), (value) => saveGoal({ reserve: Number(value) }));
+bindChoice($("release"), (value) => saveGoal({ reserveRelease: Number(value) }));
+
 async function saveSetting(patch) {
   state.settings = await api.setSettings(patch);
   render();
@@ -222,6 +257,7 @@ function bindSettings() {
   $("notifyAll").checked = s.notifyAll !== false;
   syncNotifyGroup();
   $("notifyLevel").checked = s.notifyLevel !== false;
+  renderGoalSettings();
   $("fiveHourThreshold").value = String(warnAt());
   $("remindEvery").value = String(s.remindEvery ?? "smart");
   $("notifyResets").checked = s.notifyResets !== false;
@@ -236,9 +272,11 @@ function bindSettings() {
   paintShortcutKeys();
   renderShortcutNote();
   setChoice($("language"), I18N.getLang());
-  setChoice($("theme"), s.theme || "system");
+  setChoice($("theme"), s.theme || "dark");
+  setChoice($("screens"), s.screens === "crt" ? "crt" : "paper");
   const anchor = (s.manual && s.manual.anchor) || (autoSource() && autoSource().data.weekly.resetsAt);
   if (anchor && document.activeElement !== $("aReset")) $("aReset").value = toLocalInput(nextReset(anchor));
+  $("anchorForm").classList.toggle("hidden", !needsAnchorForm(s));
 }
 
 $("notifyAll").addEventListener("change", (e) => {

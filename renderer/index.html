@@ -52,6 +52,13 @@
     </header>
     <div class="rule" aria-hidden="true"></div>
 
+    <!-- Errors: a strip that pushes the content down, on every screen. Short confirmations use the floating toast. -->
+    <div class="msg err hidden" id="errMsg" role="alert">
+      <span class="lc err-mark"><span class="shp"></span></span>
+      <span class="bt" id="errMsgText"></span>
+      <button class="key hidden" type="button" id="errMsgAct"></button>
+      <button class="key" type="button" id="errMsgClose" data-i18n="hero.close">Close</button>
+    </div>
     <p class="toast hidden" id="toast" role="status"></p>
 
     <main class="content">
@@ -86,7 +93,6 @@
         <div class="msg hidden" id="dataMsg" role="status">
           <span class="lc" id="dataMsgMark"><span class="shp"></span></span>
           <span class="bt" id="dataMsgText"></span>
-          <button class="key hidden" type="button" id="dataMsgBtn"></button>
         </div>
         <div class="banner hidden" id="banner"></div>
 
@@ -98,49 +104,53 @@
             <span id="sumProj"></span>
           </div>
 
-          <!-- The panels sit edge to edge inside one frame, separated by 1px lines -->
-          <!-- Now: will I be cut off, and how much can I use today? -->
-          <div class="now">
-            <article class="blk blk--session" id="blkSession" aria-labelledby="tSession">
-              <div class="crt" id="sScr">
-                <div class="th"><h2 class="tl" id="tSession" data-i18n="mod.sessionShort">Session</h2><span class="mu" id="sResets"></span><span class="lv lv-none" id="sLevel"><span class="shp"></span><span class="lvn"></span></span></div>
-                <div class="meter"><span class="big" id="sPct">–</span><span class="mu" id="sOf"></span>
-                  <div class="sbar t2" id="sBar" role="img"><div class="tr"><i class="fill"></i></div><b class="tick"></b><span class="bl" id="sBl"></span></div>
-                </div>
-                <p class="mu t3" id="sPace"></p>
-              </div>
-            </article>
-            <article class="blk blk--today" id="blkToday" aria-labelledby="tToday">
-              <div class="crt" id="tScr">
-                <div class="th"><h2 class="tl" id="tToday" data-i18n="card.today">Today</h2><span class="mid-num" id="tLeft"></span><span class="mu" id="tWo"></span><span class="lv lv-none" id="tLevel"><span class="shp"></span><span class="lvn"></span></span></div>
-                <div class="meter"><span class="big" id="tUsed">–</span><span class="mu" id="tUsedWord" data-i18n="today.usedWord">of today's budget</span>
-                  <div class="sbar t2" id="tBar" role="img"><div class="tr"><i class="fill"></i><i class="ov"></i></div><b class="tick"></b><span class="bl" id="tBl"></span></div>
-                </div>
-                <p class="mu t3" id="tStop"></p>
-              </div>
-            </article>
-          </div>
-
-          <!-- Week: the verdict band (verdict on the left, the week on the right), then the graph, then the optional Extra strip -->
+          <!-- Week: the verdict band (verdict on the left, the week on the right), then Session | Today, then the graph, then the optional Extra strip -->
           <article class="blk blk--week" id="blkWeek" aria-labelledby="tWeek">
             <h2 class="sr-only" id="tWeek" data-i18n="card.week">Week</h2>
             <div class="band crt" id="vScr">
               <div class="vl">
-                <p class="ans"><span id="vAns"></span><span class="face" id="vFace" aria-hidden="true"></span><span class="cur" aria-hidden="true"></span></p>
+                <div class="vtop" id="vTop">
+                <p class="ans"><span class="face" id="vFace" aria-hidden="true"></span><span id="vAns"></span><span class="cur" aria-hidden="true"></span></p>
                 <div class="ruler" id="vRuler" role="img">
+                  <span class="lv-room"><span class="shp"></span><span data-i18n="level.room.name">Room</span></span>
                   <span class="lv-free"><span class="shp"></span><span data-i18n="level.free.name">Free</span></span>
                   <span class="lv-moderate"><span class="shp"></span><span data-i18n="level.moderate.name">Moderate</span></span>
                   <span class="lv-tight"><span class="shp"></span><span data-i18n="level.tight.name">Tight</span></span>
                   <span class="lv-pause"><span class="shp"></span><span data-i18n="level.pause.name">Pause</span></span>
                 </div>
-                <span class="vnum" id="vNum"><span class="mu vwd" id="vPre"></span><span class="vbig" id="vPct">–</span><span class="mu vwd" id="vWhen"></span><span class="mu vleft" id="vLeft"></span><span class="mu vfirst" id="vFirst"></span></span>
+                </div>
+                <!-- The second line: a few chips, each an icon, a word or two and the value (the full sentence is its title) -->
+                <div class="chips" id="vChips"></div>
                 <span class="lv lv-none" id="vLevel"><span class="shp"></span><span class="lvn"></span></span>
               </div>
               <div class="wk" id="wScr">
                 <span class="wbig" id="wUsed"></span><span class="mu" id="wUsedWord"></span>
-                <div class="sbar" id="wBar" role="img"><div class="tr"><i class="fill"></i></div><b class="tick"></b><span class="bl" id="wBl"></span></div>
+                <div class="sbar" id="wBar" role="img"><div class="tr"><i class="rz"></i><i class="fill"></i><i class="rf"></i></div><i class="rm"></i><i class="pj"></i><b class="tick"></b><span class="bl" id="wBl"></span></div>
+                <!-- The pace: three named zones, the lit one is where the pace is, the needle where in it -->
+                <span class="pl" id="pLab" data-i18n="pace.label">Pace</span>
+                <div class="gauge" id="pGauge" role="img"><span class="z z0" data-i18n="pace.slow">slow</span><span class="z z1" data-i18n="pace.ok">on pace</span><span class="z z2" data-i18n="pace.fast">fast</span><b class="ndl"></b></div>
                 <span class="lc lv-none" id="wLevel"><span class="shp"></span><span class="lvn"></span></span>
               </div>
+            </div>
+            <!-- Now: will I be cut off, and how much can I use today? One slim row: the title and its note on the left, the number and the bar on the right -->
+            <div class="now">
+              <article class="blk blk--session" id="blkSession" aria-labelledby="tSession">
+                <div class="crt" id="sScr">
+                  <div class="th"><h2 class="tl" id="tSession" data-i18n="mod.sessionShort">Session</h2><span class="lv lv-none" id="sLevel"><span class="shp"></span><span class="lvn"></span></span><span class="mu sub" id="sResets"></span></div>
+                  <div class="meter"><span class="big" id="sPct">–</span><span class="mu" id="sOf"></span>
+                    <div class="sbar t2" id="sBar" role="img"><div class="tr"><i class="fill"></i></div><b class="tick"></b></div>
+                  </div>
+                  <p class="mu t3" id="sPace"></p>
+                </div>
+              </article>
+              <article class="blk blk--today" id="blkToday" aria-labelledby="tToday">
+                <div class="crt" id="tScr">
+                  <div class="th"><h2 class="tl" id="tToday" data-i18n="card.today">Today</h2><span class="lv lv-none" id="tLevel"><span class="shp"></span><span class="lvn"></span></span><span class="mu sub" id="tLeft"></span></div>
+                  <div class="meter"><span class="big" id="tUsed">–</span><span class="mu" id="tUsedWord" data-i18n="today.usedWord">used</span>
+                    <div class="sbar t2" id="tBar" role="img"><div class="tr"><i class="cf"></i><i class="fill"></i><i class="ov"></i></div><b class="tick"></b></div>
+                  </div>
+                </div>
+              </article>
             </div>
             <div class="graph">
               <!-- One grid for the chart, the hours and the days: the left gutter holds the % scale and the HRS label -->
@@ -181,7 +191,7 @@
           <div class="hcol">
             <article class="blk blk--hdays" id="histDays" aria-labelledby="tHistDays">
               <header class="pl">
-                <h2 class="pn" id="tHistDays"><b>01</b><span data-i18n="history.sec.days">Days</span></h2>
+                <h2 class="pn" id="tHistDays"><span data-i18n="history.sec.days">Days</span></h2>
                 <div class="pl-keys" role="group" aria-label="Range" data-i18n-aria="history.rangeAria">
                   <button class="key rk on" type="button" data-range="14" aria-pressed="true">14 days</button>
                   <button class="key rk" type="button" data-range="30" aria-pressed="false">30 days</button>
@@ -210,11 +220,11 @@
           </div>
           <div class="hcol">
             <article class="blk" id="histWeeks" aria-labelledby="tHistWeeks">
-              <header class="pl"><h2 class="pn" id="tHistWeeks"><b>02</b><span data-i18n="history.weeks">Previous weeks</span></h2></header>
+              <header class="pl"><h2 class="pn" id="tHistWeeks"><b>01</b><span data-i18n="history.weeks">Previous weeks</span></h2></header>
               <div class="crt" id="weeks"></div>
             </article>
             <article class="blk" id="histMap" aria-labelledby="tHistMap">
-              <header class="pl"><h2 class="pn" id="tHistMap"><b>03</b><span data-i18n="map.title">When sessions start</span></h2></header>
+              <header class="pl"><h2 class="pn" id="tHistMap"><b>02</b><span data-i18n="map.title">When sessions start</span></h2></header>
               <div class="crt">
                 <div class="session-map" id="sessionMap" role="img" aria-label="Hour of day when your 5-hour sessions start" data-i18n-aria="map.aria"></div>
                 <span class="cap" id="mapNote"></span>
@@ -231,10 +241,11 @@
           <nav class="toc" aria-label="Settings sections" data-i18n-aria="set.toc.aria">
             <span class="toc-h" data-i18n="set.toc">Sections</span>
             <button class="key toc-k on" type="button" data-target="setSources" aria-current="true"><b>01</b><span data-i18n="set.sec.sources">Sources</span></button>
-            <button class="key toc-k" type="button" data-target="setAlerts"><b>02</b><span data-i18n="alerts.title">Alerts</span></button>
-            <button class="key toc-k" type="button" data-target="setDisplay"><b>03</b><span data-i18n="set.sec.display">Display</span></button>
-            <button class="key toc-k" type="button" data-target="setSystem"><b>04</b><span data-i18n="system.title">System</span></button>
-            <button class="key toc-k" type="button" data-target="setData"><b>05</b><span data-i18n="data.title">Data</span></button>
+            <button class="key toc-k" type="button" data-target="setGoal"><b>02</b><span data-i18n="goal.title">Reserve</span></button>
+            <button class="key toc-k" type="button" data-target="setAlerts"><b>03</b><span data-i18n="alerts.title">Alerts</span></button>
+            <button class="key toc-k" type="button" data-target="setDisplay"><b>04</b><span data-i18n="set.sec.display">Display</span></button>
+            <button class="key toc-k" type="button" data-target="setSystem"><b>05</b><span data-i18n="system.title">System</span></button>
+            <button class="key toc-k" type="button" data-target="setData"><b>06</b><span data-i18n="data.title">Data</span></button>
           </nav>
 
           <div class="cols">
@@ -282,34 +293,66 @@
                 </div>
               </article>
 
-              <!-- 02 Alerts -->
+              <!-- 02 Reserve -->
+              <article class="blk" id="setGoal" aria-labelledby="tGoal">
+                <header class="pl"><h2 class="pn" id="tGoal"><b>02</b><span data-i18n="goal.title">Reserve</span></h2></header>
+                <div class="grp">
+                  <p class="gt" data-i18n="goal.text"></p>
+                  <div class="set stk" role="group" aria-labelledby="reserveLabel">
+                    <div class="lb"><span id="reserveLabel" data-i18n="goal.reserve">Emergency reserve</span><small data-i18n="goal.reserveNote"></small></div>
+                    <div class="segc" id="reserve" role="radiogroup" aria-labelledby="reserveLabel">
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="0" data-i18n="goal.off">Off</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="5">5%</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="10">10%</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="15">15%</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="20">20%</button>
+                    </div>
+                  </div>
+                  <div class="set stk" role="group" aria-labelledby="releaseLabel" id="releaseSet">
+                    <div class="lb"><span id="releaseLabel" data-i18n="goal.release">Release the reserve</span><small data-i18n="goal.releaseNote"></small></div>
+                    <div class="segc" id="release" role="radiogroup" aria-labelledby="releaseLabel">
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="24">24 h</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="48">48 h</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="72">72 h</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="0" data-i18n="goal.never">Never</button>
+                    </div>
+                  </div>
+                  <div class="set stk">
+                    <div class="lb"><span data-i18n="goal.preview">Preview</span></div>
+                    <div class="sbar lv-free goal-prev" id="goalPrev" role="img"><div class="tr"><i class="rz"></i><i class="fill"></i></div></div>
+                    <p class="gt" id="goalPrevText"></p>
+                  </div>
+                </div>
+              </article>
+
+              <!-- 03 Alerts -->
               <article class="blk" id="setAlerts" aria-labelledby="tAlerts">
-                <header class="pl"><h2 class="pn" id="tAlerts"><b>02</b><span data-i18n="alerts.title">Alerts</span></h2></header>
+                <header class="pl"><h2 class="pn" id="tAlerts"><b>03</b><span data-i18n="alerts.title">Alerts</span></h2></header>
                 <div class="grp">
                   <label class="set tgl">
                     <span class="lb"><span data-i18n="alerts.all">Show notifications</span><small data-i18n="alerts.allNote"></small></span>
                     <input type="checkbox" id="notifyAll">
-                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
                   </label>
                   <label class="set tgl sub">
-                    <span class="lb" data-i18n="alerts.notify">Notify me when my status changes</span>
+                    <span class="lb" data-i18n="alerts.notify">Notify me when the week gets Tight or Pause</span>
                     <input type="checkbox" id="notifyLevel">
-                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
                   </label>
                   <label class="set tgl sub">
                     <span class="lb" data-i18n="alerts.resets">Notify me when my session or week resets</span>
                     <input type="checkbox" id="notifyResets">
-                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
                   </label>
                   <label class="set tgl sub">
                     <span class="lb" data-i18n="alerts.spikes">Tell me when a session is much heavier than usual</span>
                     <input type="checkbox" id="notifySpikes">
-                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
                   </label>
                   <label class="set tgl sub">
                     <span class="lb" data-i18n="alerts.extra">Warn me at 80% and 100% of the monthly spend limit</span>
                     <input type="checkbox" id="notifyExtra">
-                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
                   </label>
                   <div class="set">
                     <label class="lb" for="fiveHourThreshold"><span data-i18n="alerts.threshold">Tell me when a session resets if it had reached</span><small data-i18n="alerts.thresholdNote"></small></label>
@@ -336,9 +379,9 @@
             </div>
 
             <div class="col">
-              <!-- 03 Display -->
+              <!-- 04 Display -->
               <article class="blk" id="setDisplay" aria-labelledby="tDisplay">
-                <header class="pl"><h2 class="pn" id="tDisplay"><b>03</b><span data-i18n="set.sec.display">Display</span></h2></header>
+                <header class="pl"><h2 class="pn" id="tDisplay"><b>04</b><span data-i18n="set.sec.display">Display</span></h2></header>
                 <div class="grp">
                   <div class="set stk" role="group" aria-labelledby="langLabel">
                     <div class="lb"><span id="langLabel" data-i18n="lang.label">App language</span><small data-i18n="lang.note"></small></div>
@@ -355,32 +398,39 @@
                       <button class="key" type="button" role="radio" aria-checked="false" data-value="dark" data-i18n="theme.dark">Dark</button>
                     </div>
                   </div>
+                  <div class="set stk" role="group" aria-labelledby="screensLabel">
+                    <div class="lb"><span id="screensLabel" data-i18n="screens.label">Screens</span><small data-i18n="screens.note"></small></div>
+                    <div class="segc" id="screens" role="radiogroup" aria-labelledby="screensLabel">
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="paper" data-i18n="screens.paper">Paper</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="crt" data-i18n="screens.crt">CRT</button>
+                    </div>
+                  </div>
                   <label class="set tgl">
                     <span class="lb"><span data-i18n="set.showExtra">Show the Extra usage card</span><small data-i18n="set.showExtraNote"></small></span>
                     <input type="checkbox" id="showExtra">
-                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
                   </label>
                 </div>
               </article>
 
-              <!-- 04 System -->
+              <!-- 05 System -->
               <article class="blk" id="setSystem" aria-labelledby="tSystem">
-                <header class="pl"><h2 class="pn" id="tSystem"><b>04</b><span data-i18n="system.title">System</span></h2></header>
+                <header class="pl"><h2 class="pn" id="tSystem"><b>05</b><span data-i18n="system.title">System</span></h2></header>
                 <div class="grp">
                   <label class="set tgl">
                     <span class="lb"><span data-i18n="set.mini">Show a small status on the taskbar</span><small data-i18n="set.miniNote"></small></span>
                     <input type="checkbox" id="miniWindow">
-                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
                   </label>
                   <label class="set tgl">
                     <span class="lb"><span data-i18n="system.startup">Start with Windows, minimized to the tray</span><small data-i18n="system.note"></small></span>
                     <input type="checkbox" id="openAtLogin">
-                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
                   </label>
                   <label class="set tgl">
                     <span class="lb" data-i18n="set.shortcut">Refresh from anywhere with a keyboard shortcut</span>
                     <input type="checkbox" id="shortcutOn">
-                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
                   </label>
                   <div class="set">
                     <span class="lb" id="shortcutLabel" data-i18n="set.shortcutKeys">Shortcut</span>
@@ -393,9 +443,9 @@
                 </div>
               </article>
 
-              <!-- 05 Data -->
+              <!-- 06 Data -->
               <article class="blk" id="setData" aria-labelledby="tData">
-                <header class="pl"><h2 class="pn" id="tData"><b>05</b><span data-i18n="data.title">Data</span></h2></header>
+                <header class="pl"><h2 class="pn" id="tData"><b>06</b><span data-i18n="data.title">Data</span></h2></header>
                 <div class="grp">
                   <p class="gt" data-i18n="data.text"></p>
                   <div class="acts">
@@ -410,12 +460,12 @@
                     <label class="set tgl">
                       <span class="lb"><span data-i18n="adv.logs">Use Claude Code logs for the hourly strip</span><small data-i18n="adv.logsNote"></small></span>
                       <input type="checkbox" id="codeLogs">
-                      <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                      <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
                     </label>
                     <label class="set tgl">
                       <span class="lb"><span data-i18n="adv.auto">Read usage every 5 minutes</span><small data-i18n="adv.autoNote"></small></span>
                       <input type="checkbox" id="autoRead">
-                      <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                      <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
                     </label>
                   </div>
                 </details>

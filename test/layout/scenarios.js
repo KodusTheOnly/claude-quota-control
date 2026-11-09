@@ -12,7 +12,10 @@ const key = (ms) => {
 };
 const TODAY = new Date(2026, 9, 28).getTime();
 
-// A week that is a little under the plan's pace ("Moderate")
+// The week started Monday 15:00, so 2.125 plan days have passed and 4.875 are left. The level counts the hours the
+// pace so far would leave without Claude before the reset (it reaches 100% at T, hours = reset - T): 0 h Free, up to
+// 5 h Moderate, up to 24 h Tight, above that Pause. The base week is at 31%: T is about 3 h before the reset (Moderate).
+// LEVEL_OF says which level each level scenario must read; the layout run checks it on the page.
 function base() {
   return {
     language: "en",
@@ -24,13 +27,13 @@ function base() {
       anchor: RESETS_AT,
       updatedAt: NOW - 2 * 60000,
       via: "sync",
-      weekly: { used: 26, resetsAt: RESETS_AT },
+      weekly: { used: 31, resetsAt: RESETS_AT },
       fiveHour: { used: 58, resetsAt: NOW + 2 * HOUR + 10 * 60000, at: NOW - 2 * 60000 },
       dayStart: { day: key(NOW), at: NOW - 9 * HOUR, used: 19 },
       days: {
         [key(TODAY - 2 * DAY)]: { spent: 8, budget: 14.3, endUsed: 8 },
         [key(TODAY - 1 * DAY)]: { spent: 11, budget: 13.9, endUsed: 19 },
-        [key(TODAY)]: { spent: 7, budget: 14, endUsed: 26 },
+        [key(TODAY)]: { spent: 12, budget: 14, endUsed: 31 },
       },
     },
     readings: [],
@@ -40,9 +43,9 @@ function base() {
 }
 
 const SCENARIOS = {
-  // Where the week is heading: 86% of the limit at the reset
+  // 31% used: the pace reaches 100% about 3 h before the reset
   moderate: (s) => s,
-  // Well under the pace
+  // 14% used: the pace never reaches 100% before the reset
   free: (s) => {
     s.manual.weekly.used = 14;
     s.manual.dayStart.used = 9;
@@ -52,17 +55,17 @@ const SCENARIOS = {
     s.manual.fiveHour.used = 22;
     return s;
   },
-  // Over the pace, and Tuesday went past its budget
+  // 33% used, and Tuesday went past its budget: the pace reaches 100% about 13 h before the reset
   tight: (s) => {
-    s.manual.weekly.used = 38;
+    s.manual.weekly.used = 33;
     s.manual.dayStart.used = 25;
     s.manual.days[key(TODAY - DAY)] = { spent: 19, budget: 13.9, endUsed: 25 };
     s.manual.days[key(TODAY - 2 * DAY)] = { spent: 6, budget: 14.3, endUsed: 6 };
-    s.manual.days[key(TODAY)] = { spent: 13, budget: 12.9, endUsed: 38 };
+    s.manual.days[key(TODAY)] = { spent: 8, budget: 12.9, endUsed: 33 };
     s.manual.fiveHour.used = 81;
     return s;
   },
-  // The week is almost used up
+  // The week is almost used up: 96% reads Pause on its own (95% or more)
   pause: (s) => {
     s.manual.weekly.used = 96;
     s.manual.dayStart.used = 70;
@@ -70,6 +73,19 @@ const SCENARIOS = {
     s.manual.days[key(TODAY - 2 * DAY)] = { spent: 30, budget: 14.3, endUsed: 30 };
     s.manual.days[key(TODAY)] = { spent: 26, budget: 6, endUsed: 96 };
     s.manual.fiveHour.used = 93;
+    return s;
+  },
+  // The last day: the reset is 20 h away and the pace ends far under the goal, so the week turns to the accent
+  lastday: (s) => {
+    const resetsAt = NOW + 20 * HOUR;
+    s.manual.anchor = resetsAt;
+    s.manual.weekly = { used: 70, resetsAt };
+    s.manual.dayStart.used = 62;
+    s.manual.days = {};
+    [10, 22, 34, 41, 50, 58, 62].forEach((end, i, all) => {
+      s.manual.days[key(TODAY - (7 - i) * DAY)] = { spent: end - (all[i - 1] || 0), budget: 14, endUsed: end };
+    });
+    s.manual.days[key(TODAY)] = { spent: 8, budget: 30, endUsed: 70 };
     return s;
   },
   // No session reading: the session cannot be rated
@@ -142,4 +158,8 @@ function settingsFor(name, language = "en") {
   return s;
 }
 
-module.exports = { NOW, SCENARIOS: Object.keys(SCENARIOS), settingsFor };
+// The level the verdict must read in each level scenario (the week's level, from the hours locked out).
+// Free with room to spend lights the Room mark of the ruler instead of Free.
+const LEVEL_OF = { free: "room", moderate: "moderate", tight: "tight", pause: "pause" };
+
+module.exports = { NOW, SCENARIOS: Object.keys(SCENARIOS), LEVEL_OF, settingsFor };

@@ -18,20 +18,20 @@
   -webkit-app-region: drag; user-select: none;
 }
 .hd button, .hd a { -webkit-app-region: no-drag; }
-.brand { grid-area: brand; display: flex; align-items: center; gap: .55rem; font: 600 1.1rem/1 var(--mono); letter-spacing: .08em; }
+.brand { grid-area: brand; display: flex; align-items: center; gap: .55rem; font: 600 var(--fs-lg)/1 var(--mono); letter-spacing: .08em; }
 .brand svg { width: 1.4rem; height: 1.15rem; flex: none; }
 .brand .bar-a { fill: var(--ink); }
 .brand .bar-b { fill: var(--cobalt); }
 .sepv { grid-area: sep; width: 1px; height: 1.6rem; background: var(--edge); }
 .keys { grid-area: keys; display: flex; gap: .4rem; min-width: 0; }
 .sync { grid-area: sync; display: flex; align-items: center; gap: .7rem; min-width: 0; }
-.lamp { padding: .25rem .6rem; color: var(--st); font-size: .75rem; } /* a chip with bone text; only the shape carries the state color */
+.lamp { padding: .25rem .6rem; color: var(--st); font-size: var(--fs-xs); } /* a chip with bone text; only the shape carries the state color */
 #lampAgeTxt { text-transform: none; } /* "3m", not "3M" */
 @media (max-width: 1039px) { #lampAgeTxt { display: none; } } /* the header has no room for it (measured) */
 .lamp.is-updating .shp { animation: lamp-pulse 1s ease-in-out infinite; }
 @keyframes lamp-pulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .lamp.is-updating .shp { animation: none; } }
-.rd { font: 500 .75rem var(--mono); color: var(--ink2); white-space: nowrap; }
+.rd { font: 500 var(--fs-xs) var(--mono); color: var(--ink2); white-space: nowrap; }
 #syncBtn { min-width: 6rem; }
 #connectBtn .short { display: none; }
 .rule { flex: none; height: .5rem; margin: .1rem 0 0; background: repeating-linear-gradient(0deg, var(--cobalt) 0 2px, transparent 2px 4px); }
@@ -77,24 +77,28 @@
 @media (prefers-reduced-motion: reduce) { .prog::after { animation: none; width: 100%; } }
 .msg, .banner {
   flex: none; display: flex; align-items: center; gap: .8rem; margin: .5rem .7rem 0; padding: .45rem .7rem;
-  background: var(--card); border-top: 2px solid var(--ink); font-size: .9rem; line-height: 1.35;
+  background: var(--card); border-top: 2px solid var(--ink); font-size: var(--fs-md); line-height: 1.35;
 }
 .msg .bt { flex: 1 1 auto; min-width: 0; }
 .msg .key { flex: none; }
+/* The error strip sits between the header and the content, so the content moves down instead of being covered.
+   Its mark is a red triangle, like the old error toast: shape and color, never color alone. */
+.msg.err { flex-wrap: wrap; border-top-color: var(--danger); }
+.msg.err .bt { flex-basis: 16rem; }
+.err-mark { --c: var(--pause); }
+.err-mark .shp { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 
-/* Floating notice: a line on a small CRT that shows over the content and pushes nothing. The mark is the
-   shape of the kind (a circle for done, a triangle for a problem), so it never relies on color alone. */
+/* Floating notice: a short confirmation on a small CRT that shows over the content and pushes nothing.
+   Errors never use it: they go to the error strip (.msg.err). */
 .toast {
   position: fixed; top: 3.2rem; left: 50%; transform: translateX(-50%); z-index: 20;
   display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .6rem; width: max-content; max-width: calc(100vw - 2rem); margin: 0; padding: .45rem .8rem;
-  background: var(--scr); color: var(--st); border: 1px solid var(--sline); border-radius: 3px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, .35); font: 500 .8125rem/1.35 var(--mono);
+  background: var(--scr); color: var(--st); border: 1px solid var(--sline); border-radius: var(--r-sm);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .35); font: 500 var(--fs-sm)/1.35 var(--mono);
   transition: opacity .45s ease, transform .45s ease;
   animation: toast-in .22s ease-out;
 }
 .toast::before { content: ""; flex: none; width: .75rem; height: .75rem; border-radius: 50%; background: var(--free); }
-.toast.error::before { border-radius: 0; background: var(--pause); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 .toast.fade { opacity: 0; transform: translate(-50%, -6px); }
 .toast .tmsg { flex: 1 1 12rem; min-width: 0; }
-.toast .link { min-height: 2rem; margin-left: auto; padding: 0 .5rem; color: var(--crt-accent); white-space: nowrap; }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, -8px); } }

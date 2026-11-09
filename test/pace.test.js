@@ -98,7 +98,7 @@ test("the pace chart is measured in days from the midnight that starts the plan"
   assert.equal(s.todayIdx, 2);
 });
 
-test("the expected line rises from 0 to 100 and never goes backwards", () => {
+test("the expected line rises from 0 to 100% and never goes backwards", () => {
   const s = run(reading(), "paceSeries(__m)");
   assert.deepEqual([s.expected[0].x, s.expected[0].y], [s.s0, 0]);
   const last = s.expected[s.expected.length - 1];
@@ -140,14 +140,26 @@ test("a pace that fits the week leads to the reset, with what is projected there
   assert.ok(out.s.proj[0].y === 30 && Math.abs(out.s.proj[0].x - out.s.nowX) < 1e-9);
 });
 
-test("a pace that does not fit stops at 100 on the day it runs out", () => {
+test("a pace that leaves hours without Claude stops at 100% at T, and the lock runs on from T to the reset", () => {
   const r = reading({ used: 70, days: { "2026-10-28": { spent: 30, budget: 14.3, endUsed: 30 }, "2026-10-29": { spent: 20, budget: 14.3, endUsed: 50 }, "2026-10-30": { spent: 20, budget: 14.3, endUsed: 70 } } });
   const s = run(r, "paceSeries(__m)");
-  assert.equal(s.end.kind, "limit");
+  const lv = run(r, "__m.lv");
+  assert.equal(s.end.kind, "lock");
+  assert.equal(s.end.ms, lv.lock.at, "the same T as the level");
   assert.ok(s.end.ms > at(2026, 10, 30, 20) && s.end.ms < RESET);
   const tip = s.proj[s.proj.length - 1];
   assert.equal(tip.y, 100);
   assert.ok(tip.x < s.span);
+  assert.equal(s.lock.length, 2);
+  assert.deepEqual(s.lock.map((p) => p.y), [100, 100]);
+  assert.equal(s.lock[0].x, tip.x);
+  assert.equal(s.lock[1].x, s.span);
+});
+
+test("a pace that never reaches 100% runs to the reset with no lock", () => {
+  const s = run(reading({ used: 20 }), "paceSeries(__m)");
+  assert.equal(s.end.kind, "reset");
+  assert.equal(s.lock, null);
 });
 
 test("a week already at 100 has no projection", () => {
@@ -200,4 +212,50 @@ test("when every day ahead is Off they get no budget, and nothing divides by zer
   const ahead = plan.slice(3); // Sat, Sun, Mon, Tue
   assert.ok(ahead.every((d) => d.budget === 0 && d.kind === "off" && d.level === null), JSON.stringify(ahead));
   assert.ok(plan.every((d) => d.budget === null || Number.isFinite(d.budget)));
+});
+
+test("the room box runs from now to the reset, from what is used to the goal", () => {
+  const s = run(reading(), "paceSeries(__m)");
+  assert.ok(Math.abs(s.room.x0 - s.nowX) < 1e-9);
+  assert.equal(s.room.x1, s.span);
+  assert.equal(s.room.y0, 33);
+  assert.equal(s.room.y1, 100);
+  assert.equal(run(reading({ used: 100 }), "paceSeries(__m).room"), null, "nothing left: no box");
+});
+
+test("the room box stops at the plan's ceiling at the reset when the reserve is never released", () => {
+  const settings = { reserve: 10, reserveRelease: 0 };
+  assert.equal(run(reading({ settings }), "paceSeries(__m).room.y1"), 90);
+  const released = { reserve: 10, reserveRelease: 48 };
+  assert.equal(run(reading({ settings: released }), "paceSeries(__m).room.y1"), 100);
+});
+
+test("today's own share of the plan is the rise of the expected line over today", () => {
+  const exp = (ms) => `expectedUsed(${RESET}, ${ms}, weights(), __m.g)`;
+  const out = run(reading(), `({ share: __m.planToday, a: ${exp(at(2026, 10, 31))}, b: ${exp(at(2026, 10, 30))} })`);
+  assert.ok(Math.abs(out.share - (out.a - out.b)) < 1e-9);
+  assert.ok(Math.abs(out.share - 100 / 7) < 1e-9, "seven even days: a seventh of the week");
+});
+
+test("the week turns to the accent only on its last day, and only with room to spend", () => {
+  // Tue 11-03 12:00, 20 h before the reset, at 40%: the pace ends far under the goal
+  const days = { "2026-11-03": { spent: 5, budget: 14, endUsed: 40 } };
+  const last = reading({ used: 40, days, now: at(2026, 11, 3, 12) });
+  last.src.data.dayStart = { day: "2026-11-03", at: at(2026, 11, 3), used: 35 };
+  assert.equal(run(last, "__m.head.room"), true);
+  assert.equal(run(last, "__m.endRoom"), true);
+  assert.equal(run(reading({ used: 10 }), "__m.endRoom"), false, "days before the reset: the level's color");
+  const tight = reading({ used: 95, days, now: at(2026, 11, 3, 12) });
+  tight.src.data.dayStart = { day: "2026-11-03", at: at(2026, 11, 3), used: 90 };
+  assert.equal(run(tight, "__m.endRoom"), false, "no room: the level's color");
+});
+
+test("the strong part of the room box starts where the projection ends, and its number is the band's to spend", () => {
+  const out = run(reading({ used: 20 }), "({ room: paceSeries(__m).room, proj: __m.lv.proj.projected, ceil: __m.ceiling })");
+  assert.ok(Math.abs(out.room.mid - out.proj) < 1e-9);
+  assert.equal(out.room.spend, Math.round(out.ceil) - Math.round(out.proj));
+  // A pace that reaches the goal leaves nothing extra to spend: no strong part, no number
+  const fast = run(reading({ used: 60 }), "paceSeries(__m).room");
+  assert.equal(fast.mid, null);
+  assert.equal(fast.spend, 0);
 });

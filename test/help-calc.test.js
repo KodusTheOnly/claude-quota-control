@@ -62,13 +62,14 @@ test("English: the table and the rules show the real cutoffs, weights and the 95
   assert.ok(text.includes("Off 0; Light 0.5; Normal 1; Heavy 2"), "plan weights");
   assert.ok(text.includes("95%"), "a week at 95% reads Pause");
   assert.ok(text.includes("first 1.5 plan days"), "no projection before 1.5 plan days");
-  for (const s of ["80%", "100%", "140%"]) assert.ok(text.includes(s), `projection tick ${s}`);
-  assert.ok(text.includes("below 80% of the limit is Free, 80% to 100% is Moderate, up to 140% is Tight and above 140% is Pause"), "projection rule");
-  assert.ok(text.includes("scale of its own"), "says the projection is rated differently");
-  assert.ok(text.includes("exactly 80% is already Moderate"), "the edge exception");
-  assert.ok(text.includes("Free is the band where quota would go to waste, and 20% or less left at the reset already asks you to ease up"), "and why");
+  for (const s of ["0 h", "5 h", "24 h"]) assert.ok(text.includes(s), `hours tick ${s}`);
+  assert.ok(text.includes("The level counts how many hours you would be without Claude before the reset if you keep the pace of now: 0 h is Free, up to 5 h is Moderate, up to 24 h is Tight and above 24 h is Pause"), "hours rule");
+  assert.ok(text.includes("5 h is one session"));
+  assert.ok(text.includes("counts up to 100% of the limit, where Claude stops"));
+  assert.ok(text.includes("Cut pace ~N% says how much the pace of the days left has to drop for the week to end at 100% at the reset"), "cut pace");
+  assert.ok(text.includes("the verdict reads Warming up"));
   assert.ok(text.includes("Today and days (used ÷ budget)"), "the ratio scale is only for Today and the days");
-  assert.ok(text.includes("Projection and week"), "the week is on the projection scale");
+  assert.ok(text.includes("Week (hours without Claude before the reset)"), "the week is on the hours scale");
   assert.ok(text.includes("The week is rated on this same scale"));
   assert.equal(body.find("tr").length, 5, "a header row and the four levels");
   assert.equal(body.find("dt").length, 6);
@@ -81,23 +82,38 @@ test("Portuguese: same page, with decimal commas and the Portuguese names", () =
   assert.ok(text.includes("Folga 0; Leve 0,5; Normal 1; Pesado 2"), "plan weights");
   assert.ok(text.includes("primeiros 1,5 dias do plano"));
   assert.ok(text.includes("Pare"), "the Pause level is called Pare");
-  assert.ok(text.includes("abaixo de 80% do limite é Livre"), "projection rule");
-  assert.ok(text.includes("exatamente 80% já é Moderado"));
-  assert.ok(text.includes("sobrar 20% ou menos no reset já pede para segurar"), "and why");
+  assert.ok(text.includes("O nível conta quantas horas você ficaria sem Claude antes do reset se mantiver o ritmo de agora: 0 h é Livre, até 5 h é Moderado, até 24 h é Apertado e acima de 24 h é Pare"), "hours rule");
+  assert.ok(text.includes("5 h é uma sessão"));
+  assert.ok(text.includes("conta até 100% do limite, onde o Claude para"));
+  assert.ok(text.includes("Reduza o ritmo ~N% diz quanto o ritmo dos dias que faltam precisa cair"));
+  assert.ok(text.includes("o veredito fica Acordando"));
   assert.ok(text.includes("Hoje e dias (usado ÷ orçamento)"));
   assert.ok(text.includes("A semana usa essa mesma escala"));
 });
 
 test("the page follows the code: change a cutoff and Help changes with it", () => {
   const { run, draw } = render("en");
-  run("RATIO_CUTS[0] = 0.5; SESSION_CUTS[2] = 85; PROJECTION_CUTS[0] = 0.75;");
+  run("RATIO_CUTS[0] = 0.5; SESSION_CUTS[2] = 85; LOCK_CUTS[1] = 4;");
   const text = draw();
-  assert.ok(text.includes("below 75% of the limit is Free"));
-  assert.ok(text.includes("exactly 75% is already Moderate"));
-  assert.ok(text.includes("25% or less left"), "the reason follows the cutoff too");
+  assert.ok(text.includes("up to 4 h is Moderate"));
+  assert.ok(text.includes("4 h is one session"));
   assert.ok(text.includes("up to 0.5"));
   assert.ok(text.includes("above 85%"));
   assert.ok(!text.includes("up to 0.7"));
+});
+
+test("no text in Help or the Math rows still cites the old 80% cutoff or quota left over as waste", () => {
+  for (const lang of ["en", "pt-BR"]) {
+    const { draw } = render(lang);
+    const text = draw();
+    assert.ok(!/\b80%/.test(text), `${lang}: no 80%`);
+    assert.ok(!/\b20%/.test(text), `${lang}: no 20% left over`);
+    assert.ok(!/waste|desperdi/i.test(text), `${lang}: nothing about waste`);
+  }
+  for (const lang of ["en", "pt-BR"]) {
+    const bad = Object.entries(i18n.DICT[lang]).filter(([k, v]) => (k.startsWith("calc.") || k.startsWith("math.")) && (/\b80%|\b20%|waste|desperdi/i.test(v)));
+    assert.deepEqual(bad, [], lang);
+  }
 });
 
 test("drawing it twice does not pile up content", () => {

@@ -388,11 +388,12 @@ const FULL = {
   sessions: [{ sr: T0, peak: 30 }],
   weights: [1, 1, 2, 0.5, 1, 0, 1],
   extra: { currency: "USD", symbol: "$", balance: 15.8, spent: 4.2, limit: 20, autoReload: false, at: T0 },
-  language: "pt-BR", theme: "dark", showExtra: false, miniWindow: false, codeLogs: false,
+  language: "pt-BR", theme: "light", screens: "crt", showExtra: false, miniWindow: false, codeLogs: false,
   shortcutOn: true, shortcutKeys: "Ctrl+Alt+Y", fiveHourThreshold: 80, remindEvery: 4,
   notifyAll: true, notifyLevel: false, notifyResets: true, notifySpikes: false, notifyExtra: true,
+  reserve: 10, reserveRelease: 24,
 };
-const EXPORTED_KEYS = ["manual", "readings", "sessions", "weights", "extra", "language", "theme", "showExtra", "miniWindow", "codeLogs", "shortcutOn", "shortcutKeys", "fiveHourThreshold", "remindEvery", "notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra"];
+const EXPORTED_KEYS = ["manual", "readings", "sessions", "weights", "extra", "language", "theme", "screens", "showExtra", "miniWindow", "codeLogs", "shortcutOn", "shortcutKeys", "fiveHourThreshold", "remindEvery", "notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "reserve", "reserveRelease"];
 const backups = (dir) => (fs.existsSync(path.join(dir, "backups")) ? fs.readdirSync(path.join(dir, "backups")).sort() : []);
 const readBackup = (dir, name) => JSON.parse(fs.readFileSync(path.join(dir, "backups", name), "utf8"));
 const tmpFile = (t, name) => {
@@ -444,7 +445,8 @@ test("an import keeps what has the right shape and drops the rest", async (t) =>
   const file = backupFile(t, "broken", {
     manual: { ...MANUAL, fiveHour: "broken", days: { [NOW_DAY]: { spent: 5, budget: 12.5 }, "2026-01-02": null, "not-a-day": { spent: 1 }, "2026-01-03": { spent: "x" } } },
     extra: { balance: "lots", spent: 3, limit: 10, currency: "a very long string", autoReload: "yes" },
-    theme: "neon", fiveHourThreshold: 3, remindEvery: -1, weights: [1, 1, 1, 1, 1, 1, 9], shortcutKeys: "R", miniWindow: "yes",
+    theme: "neon", screens: "glass", fiveHourThreshold: 3, remindEvery: -1, weights: [1, 1, 1, 1, 1, 1, 9], shortcutKeys: "R", miniWindow: "yes",
+    goal: 120, reserve: 7, reserveRelease: 12,
   });
   const app = await loadMain(t, { settings: GOOD, dialog: importer(file) });
   assert.equal((await app.ipc.handle["import-data"]({})).ok, true);
@@ -452,12 +454,16 @@ test("an import keeps what has the right shape and drops the rest", async (t) =>
   assert.deepEqual(Object.keys(s.manual.days), [NOW_DAY], "only the good day");
   assert.equal(s.manual.fiveHour, null);
   assert.deepEqual(s.extra, { currency: null, symbol: null, balance: null, spent: 3, limit: 10, autoReload: null, at: 0 });
-  assert.equal(s.theme, "system");
+  assert.equal(s.theme, "dark");
+  assert.equal(s.screens, "paper");
   assert.equal(s.fiveHourThreshold, 75);
   assert.equal(s.remindEvery, "smart");
   assert.deepEqual(s.weights, GOOD.weights, "bad weights leave the plan as it was");
   assert.equal(s.shortcutKeys, "Ctrl+Alt+R");
   assert.equal(s.miniWindow, undefined);
+  assert.equal(s.goal, undefined, "a goal from an older version is not imported");
+  assert.equal(s.reserve, 0, "a reserve that is not one of the choices is dropped");
+  assert.equal(s.reserveRelease, 48);
   assert.deepEqual(s.readings, GOOD.readings, "readings not in the file stay as they were");
 });
 

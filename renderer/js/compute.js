@@ -18,19 +18,20 @@ function compute(src) {
 
   const days = mergedDays();
   const entry = !rolled && days[today];
-  let budget;
-  let spent;
-  if (ds && ds.day === today) {
-    // The budget uses the current weights; spend comes from the day record
-    budget = dayBudget(100 - ds.used, w.resetsAt, now);
-    spent = entry ? entry.spent : Math.max(w.used - ds.used, 0);
-  } else {
-    // No reading yet today: the budget starts from what is left
-    budget = dayBudget(100 - w.used, w.resetsAt, now);
-    spent = 0;
-  }
-  const leftAtDayStart = 100 - (ds && ds.day === today ? ds.used : w.used);
-  const todayRatio = budget > 0 ? spent / budget : spent > 0 ? 2 : 0;
+  const g = goalSettings();
+  // Where the week stood when today began. Without a reading yet today, the budget starts from what is left now.
+  const usedStart = ds && ds.day === today ? ds.used : w.used;
+  // The budget uses the current weights, goal and reserve; spend comes from the day record
+  const budget = planBudget(usedStart, w.resetsAt, now, g);
+  const spent = ds && ds.day === today ? (entry ? entry.spent : Math.max(w.used - ds.used, 0)) : 0;
+  const leftAtDayStart = 100 - usedStart;
+  // Above the plan's ceiling the use comes from the emergency reserve: the reserve mode, until the goal
+  const ceiling = planCeiling(now, w.resetsAt, g);
+  const reserveMode = g.reserve > 0 && asShownPct(w.used) > asShownPct(ceiling) && asShownPct(w.used) < g.goal;
+  // An Off day has no budget, so no ratio: it is not rated, whatever was used. Nor is a day on the reserve:
+  // its plan is spent, so it shows what came from the reserve instead.
+  const dayOff = isDayOff(now);
+  const todayRatio = dayOff || reserveMode ? 0 : budget > 0 ? spent / budget : spent > 0 ? 2 : 0;
   const perDay = perNormalDay(100 - w.used, w.resetsAt, now);
 
   let five = null;
@@ -40,9 +41,13 @@ function compute(src) {
   }
   const pace = sessionPace(five, now);
   const forecast = forecastWeek(w, now);
-  const m = { now, today, budget, spent, todayRatio, leftAtDayStart, w, perDay, five, pace, days, rolled, forecast };
+  const m = { now, today, g, usedStart, ceiling, reserveMode, budget, spent, dayOff, todayRatio, leftAtDayStart, w, perDay, five, pace, days, rolled, forecast };
   m.lv = computeLevels(m);
   m.head = headroom(m);
+  // The last day with room to spend: the risk is leaving it unused, not running out, so the week takes the accent
+  m.endRoom = Boolean(m.head.room) && w.resetsAt - now <= DAY;
+  // Today's own share of the plan; the rest of today's budget was carried over from earlier days
+  m.planToday = planDayShare(now, w.resetsAt, weights(), g);
   m.math = mathRows(m);
   m.week = weekPlan(m);
   return m;
@@ -80,18 +85,29 @@ function projection(w, now) {
 
 // One level per module, from the cutoffs in core.js, plus the numbers behind them
 function computeLevels(m) {
-  const expected = expectedUsed(m.w.resetsAt, m.now);
+  const expected = expectedUsed(m.w.resetsAt, m.now, weights(), m.g);
   const weekRatio = expected > 0 ? m.w.used / expected : null;
   const proj = projection(m.w, m.now);
-  // As shown: the projection appears as a whole percent, and its level rates that number
+  // As shown: the projection appears as a whole percent
   const projRatio = proj ? asShownPct(proj.projected) / 100 : null;
+  // The same pace as the projection and the dashed line: when it reaches LOCK_AT and how long before the reset
+  const lock = proj ? weekLockout(m.w.used, proj.rate, m.now, m.w.resetsAt, weights(), m.g.goal) : null;
+  const lockLevel = lock ? levelFromLockout(lock.hours) : null;
   const lv = {
     session: m.five ? levelFromSession(m.five.used) : null,
-    week: weekLevel(m.w.used, projRatio, weekRatio), // the projection's scale, see core.js
-    today: m.budget > 0 || m.spent > 0 ? levelFromRatio(m.todayRatio) : null,
-    projection: m.w.used >= 100 ? 3 : levelFromProjection(projRatio),
+    week: weekLevel(m.w.used, lock ? lock.hours : null, weekRatio), // the hours locked out, see core.js
+    today: m.dayOff || m.reserveMode ? null : m.budget > 0 || m.spent > 0 ? levelFromRatio(m.todayRatio) : null,
+    projection: m.w.used >= 100 ? 3 : lockLevel,
   };
-  return { ...lv, expected, weekRatio, proj, projRatio };
+  // How much to slow down: only once the hours locked out reach Moderate
+  const slow = lockLevel >= 1 ? slowDownPct(m.w.used, proj.projected, m.g.goal) : null;
+  // The pace the plan asks for (to end at the ceiling at the reset) and the pace so far, both in % per weighted day
+  const need = proj && proj.left > 0.05 ? Math.max(m.ceiling - m.w.used, 0) / proj.left : null;
+  const doing = proj ? proj.rate : null;
+  // Room to spend: no lockout ahead, but the pace ends well under the plan's ceiling (more than ROOM_GAP points)
+  const room = !m.reserveMode && lockLevel === 0 && m.w.used < 100 && m.forecast.kind !== "early"
+    && asShownPct(proj.projected) < asShownPct(m.ceiling) - ROOM_GAP;
+  return { ...lv, expected, weekRatio, proj, projRatio, lock, slow, need, doing, room };
 }
 
 // The answer to "can I use Claude until the reset?" follows the projection (the week's level while
@@ -102,8 +118,7 @@ function headroom(m) {
 
   const base = m.lv.projection ?? m.lv.week ?? 0;
   if (weekAtPause(m.w.used)) add(3, t("reason.weekAt", { pct: pct(m.w.used) }), m.w.resetsAt);
-  else if (base > 0 && m.forecast.kind === "short") add(base, t("reason.weekRunsOut", { when: fmtWhen(m.forecast.eta, m.now) }), m.w.resetsAt);
-  else if (base > 0 && m.forecast.kind === "fits") add(base, t("reason.weekFits", { pct: pct(m.forecast.spare) }), m.w.resetsAt);
+  else if (base > 0 && m.lv.lock && m.lv.lock.at !== null) add(base, t("reason.weekLocked", { goal: m.g.goal, when: fmtWhen(m.lv.lock.at, m.now), dur: lockDur(m.lv.lock.hours) }), m.w.resetsAt);
   else if (base > 0) add(base, t("reason.weekRatio", { ratio: m.lv.weekRatio === null ? "–" : fmtNum(m.lv.weekRatio, 2, 2) }), m.w.resetsAt);
 
   const level = Math.max(base, ...signals.map((s) => s.level));
@@ -117,6 +132,8 @@ function headroom(m) {
     : "";
   return {
     level,
+    room: level === 0 && m.lv.room,
+    reserve: m.reserveMode,
     name: levelName(level),
     guide: levelGuide(level),
     reason: (level === 0 ? freeReason(m) : top.map((s) => s.reason).join(" ")) + credits,
@@ -132,19 +149,24 @@ function freeReason(m) {
   if (m.budget > 0) parts.push(t("reason.free.today", { pct: pct(m.todayRatio * 100) }));
   const text = parts.join(", ");
   const sentence = text.charAt(0).toUpperCase() + text.slice(1) + ".";
-  // Free because more than 20% would be left at the reset: say how much, as a plain fact. Not while the
-  // verdict still reads "still early" (forecastWeek waits for 1% used), so the two never disagree.
+  // With a projection, say how much would be left at the reset, as a plain fact. Not while the verdict
+  // still reads "warming up" (forecastWeek waits for 1% used), so the two never disagree.
   const L = m.lv;
-  if (m.forecast.kind !== "early" && L.proj && L.projRatio !== null && L.projRatio < PROJECTION_CUTS[0]) {
-    return `${sentence} ${t("reason.free.leftAtReset", { pct: pct(100 - L.proj.projected) })}`;
+  if (m.forecast.kind !== "early" && L.proj && L.projection === 0 && L.proj.projected < m.ceiling) {
+    return `${sentence} ${t("reason.free.leftAtReset", { pct: pct(m.ceiling - L.proj.projected) })}`;
   }
   return sentence;
 }
 
-// The projection cutoffs as % of the weekly limit ({ a: "80%", b: "100%", c: "140%" }), read from
-// PROJECTION_CUTS so the Math drawer and Help say what the code does
-function projectionCutoffs() {
-  const [a, b, c] = PROJECTION_CUTS.map((x) => pct(x * 100));
+// The hours locked out as the screen writes them: "12 h", or "2 d" above 48 h (see lockShown)
+function lockDur(hours) {
+  const s = lockShown(hours);
+  return t(s.unit === "d" ? "dur.lockDays" : "dur.lockHours", { n: s.n });
+}
+// The cutoffs of the hours locked out ({ a: "0 h", b: "5 h", c: "24 h" }), read from LOCK_CUTS so the
+// Math drawer and Help say what the code does
+function lockCutoffs() {
+  const [a, b, c] = LOCK_CUTS.map((h) => t("dur.lockHours", { n: h }));
   return { a, b, c };
 }
 
@@ -163,18 +185,33 @@ function mathRows(m) {
         ...(m.five.resetsAt ? [["math.resetsIn", fmtDur(m.five.resetsAt - m.now)]] : []),
       ]
     : [["math.noReading", "–"]];
+  // When the pace reaches LOCK_AT, the hours that leaves without Claude, and how much to slow down
+  const lockRows = L.lock
+    ? [
+        ["math.hitsLock", L.lock.at === null ? t("math.notBeforeReset") : fmtWhen(L.lock.at, m.now)],
+        ["math.hoursLocked", lockDur(L.lock.hours)],
+        ["math.slowNeeded", L.slow === null ? "–" : `~${L.slow}%`],
+      ]
+    : [];
   const elapsed = weightedDays(m.w.resetsAt - WEEK, m.now);
   const total = weightedDays(m.w.resetsAt - WEEK, m.w.resetsAt);
   rows.week = [
     ["math.used", pct(m.w.used)],
     ["math.expected", `${pct(L.expected)} (${fmtNum(elapsed)} / ${fmtNum(total)})`],
     ["math.usedOverExpected", f2(L.weekRatio)],
-    // The level: the projection's scale once there is one, used / expected before that (see weekLevel)
+    // The reserve and the plan's ceiling now (100% minus the reserve still held)
+    ...(m.g.reserve
+      ? [
+          ["math.reserve", t("math.reserveValue", { left: pct(reserveLeft(m.w.used, m.g)), size: pct(m.g.reserve) })],
+          ["math.ceiling", pct(m.ceiling)],
+        ]
+      : []),
+    ...(L.need !== null ? [["math.need", t("math.perDayValue", { pct: fmtNum(L.need, 0, 1) })], ["math.doing", t("math.perDayValue", { pct: fmtNum(L.doing, 0, 1) })]] : []),
+    // The level: the hours locked out once there is a projection, used / expected before that (see weekLevel)
     ...(L.proj
       ? [
-          ["math.weekScale", t("math.weekScaleProj")],
-          ["math.projectedOverLimit", f2(L.projRatio)],
-          ["math.cutoffsProjection", t("math.cutoffsProjectionValue", projectionCutoffs())],
+          ...lockRows,
+          ["math.cutoffsProjection", t("math.cutoffsProjectionValue", lockCutoffs())],
         ]
       : [
           ["math.weekScale", t("math.weekScaleRatio")],
@@ -195,11 +232,11 @@ function mathRows(m) {
         ["math.pace", t("math.paceValue", { rate: fmtNum(L.proj.rate) })],
         ["math.daysLeft", fmtNum(L.proj.left)],
         ["math.projected", pct(L.proj.projected)],
-        ["math.projectedOverLimit", f2(L.projRatio)],
-        ["math.cutoffsProjection", t("math.cutoffsProjectionValue", projectionCutoffs())],
+        ...lockRows,
+        ["math.cutoffsProjection", t("math.cutoffsProjectionValue", lockCutoffs())],
         ["math.level", lvName(L.projection)],
       ]
-    : [["math.tooEarly", t("forecast.early")]];
+    : [["math.tooEarly", t("hero.ans.early")]];
   return rows;
 }
 
@@ -232,23 +269,42 @@ function weekPlan(m, w = weights()) {
         spent = rec.spent;
       }
     } else {
-      // A day's share is its weight inside the week (the last day may end at the reset)
+      // A day's share is its weight inside the week (the last day may end at the reset), of the plan left at the
+      // start of today, plus the part of the reserve its hours release (see planBudget)
       const share = dayShare(ms, m.w.resetsAt, w);
-      budget = share > 0 ? (m.leftAtDayStart * share) / Math.max(totalW, share) : 0;
+      const planLeft = Math.max(m.g.goal - m.g.reserve - m.usedStart, 0);
+      const end = Math.min(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime(), m.w.resetsAt);
+      budget = share > 0
+        ? (planLeft * share) / Math.max(totalW, share) + reserveReleased(reserveLeft(m.usedStart, m.g), Math.max(ms, from), end, from, m.w.resetsAt, m.g)
+        : 0;
     }
     const known = spent !== null && budget !== null;
     const ratio = known ? (budget > 0 ? spent / budget : spent > 0 ? 2 : 0) : null;
-    // A day off with nothing spent reads as off, whatever came before
-    const off = wt === 0 && !(spent > 0);
+    // A day off with nothing spent reads as off, whatever came before. Today off is always off, even
+    // with use: it has no budget to rate it against (it shows what was used instead, see week.js)
+    const off = wt === 0 && (isToday || !(spent > 0));
     const kind = off ? "off" : when;
+    // Today on the reserve is not rated either: its plan is spent (see compute)
+    const rated = (off && isToday) || (isToday && m.reserveMode) ? null : ratio;
     out.push({
       i, ms, dow, weight: wt, name: WEIGHT_NAME[wt] || "normal", kind, when, isToday,
-      budget, spent, ratio,
-      level: kind === "past" || kind === "today" ? levelFromRatio(ratio) : null,
-      fill: ratio === null ? 0 : Math.min(ratio / 1.5, 1) * 100,
+      budget, spent, ratio: rated,
+      level: kind === "past" || kind === "today" ? levelFromRatio(rated) : null,
+      fill: rated === null ? 0 : Math.min(rated / 1.5, 1) * 100,
     });
   }
   return out;
+}
+
+// What a past day shows on its last line, "used / budget%": both as % of the weekly limit, whole numbers as on screen.
+// Used is the recorded spend; when the record has none it is worked out from the day's ratio and its budget.
+// The budget is the one recorded with the day (the rolling budget of its last reading), null when none was recorded.
+// Returns null for a day with no reading at all. d is an entry of weekPlan().
+function pastDayFigures(d) {
+  const budget = Number.isFinite(d.budget) && d.budget > 0 ? d.budget : null;
+  const spent = Number.isFinite(d.spent) ? d.spent : budget !== null && Number.isFinite(d.ratio) ? d.ratio * budget : null;
+  if (spent === null) return null;
+  return { used: Math.round(spent) || 0, budget: budget === null ? null : Math.round(budget) };
 }
 
 // The budget a day would have if its weight were wt, with every other day as it is now. Today's budget and the
@@ -258,7 +314,7 @@ function previewBudget(m, i, wt) {
   const day = m.week[i];
   const w = weights();
   w[day.dow] = wt;
-  return day.when === "today" ? dayBudget(m.leftAtDayStart, m.w.resetsAt, m.now, w) : weekPlan(m, w)[i].budget;
+  return day.when === "today" ? planBudget(m.usedStart, m.w.resetsAt, m.now, m.g, w) : weekPlan(m, w)[i].budget;
 }
 
 // The hard limit that would block you first, before the reset: { kind: "session" | "week", ms } or null.
@@ -282,8 +338,14 @@ function limitsFirst(m) {
 //             set of steps instead of a straight piece; a point with est: true ends a piece placed by estimated cells
 //   starts    when 5-hour sessions started so far this week: [{ ms, x }]
 //   over      the parts of the used line that went past the day's budget (that spend is "borrowed" from other days)
-//   proj      where the pace so far leads, until the reset or until it reaches 100%
-//   end       what the projection says at its end: { kind: "reset", pct } or { kind: "limit", ms }
+//   proj      where the pace so far leads: until the reset, or until T when the level counts hours locked out (it reaches 100%)
+//   lock      from T to the reset along the 100% line, the time without Claude (null when there is none)
+//   end       what the projection says at its end: { kind: "reset", pct }, { kind: "lock", ms } (T) or { kind: "limit", ms }
+//   room      what is still free before the reset: a box from now to the reset, from what is used to the plan's
+//             ceiling at the reset ({ x0, x1, y0, y1 }), null when nothing is left or on the reserve. With a projection that
+//             ends inside it, mid is where it ends (the pace so far uses the box up to there) and spend is what is left
+//             above it, the same number as the band's "to spend" chip; otherwise (no projection yet, or a pace that reaches the
+//             goal) mid is null and spend is 0: nothing extra to spend
 function paceSeries(m, cells = null, starts = []) {
   const w = weights();
   const first = startOfDay(m.w.resetsAt - WEEK);
@@ -302,9 +364,19 @@ function paceSeries(m, cells = null, starts = []) {
   for (let k = 1; k <= 8; k++) {
     const ms = midnight(k);
     if (ms >= m.w.resetsAt) break;
-    if (ms > weekStart) expected.push({ x: toX(ms), y: expectedUsed(m.w.resetsAt, ms, w) });
+    if (ms > weekStart) expected.push({ x: toX(ms), y: expectedUsed(m.w.resetsAt, ms, w, m.g) });
   }
-  expected.push({ x: span, y: 100 });
+  // The released reserve bends the line in its last hours: a point where the release starts
+  const relStart = m.g.reserve && m.g.release ? m.w.resetsAt - m.g.release * HOUR : null;
+  if (relStart !== null && relStart > weekStart) {
+    expected.push({ x: toX(relStart), y: expectedUsed(m.w.resetsAt, relStart, w, m.g) });
+    expected.sort((a, b) => a.x - b.x);
+  }
+  expected.push({ x: span, y: m.g.goal });
+  // The reserve, between the plan's ceiling and the goal: its lower edge rises while it is released
+  const reserve = m.g.reserve
+    ? [{ x: s0, y: m.g.goal - m.g.reserve }, ...(relStart !== null && relStart > weekStart ? [{ x: toX(relStart), y: m.g.goal - m.g.reserve }] : []), { x: span, y: planCeiling(m.w.resetsAt, m.w.resetsAt, m.g) }]
+    : null;
 
   // Past days, from what was recorded. A day without a record keeps the line flat.
   const todayIdx = dayIdx(m.now);
@@ -348,12 +420,16 @@ function paceSeries(m, cells = null, starts = []) {
     } else {
       used.push({ x: nowX, y: m.w.used });
     }
-    addOver(Math.max(todayIdx, s0), nowX, y0, m.spent, m.budget, steps);
+    // An Off day has no budget, so nothing it uses is "over" it
+    if (!m.dayOff && !m.reserveMode) addOver(Math.max(todayIdx, s0), nowX, y0, m.spent, m.budget, steps);
   }
 
   // Where the pace so far leads: walk forward day by day, since weights change the slope at every midnight
   let proj = null;
+  let lock = null;
   let endLabel = null;
+  // T, the same one the level counts (core.js weekLockout), once it leaves hours locked out
+  const lockAt = m.lv.lock && m.lv.lock.at !== null && m.lv.projection >= 1 ? m.lv.lock.at : null;
   if (m.w.used >= 100) {
     endLabel = { kind: "out" };
   } else if (m.lv.proj) {
@@ -363,6 +439,12 @@ function paceSeries(m, cells = null, starts = []) {
     let y = m.w.used;
     while (cur < m.w.resetsAt) {
       const next = Math.min(midnight(dayIdx(cur) + 1), m.w.resetsAt);
+      if (lockAt !== null && next >= lockAt) {
+        if (lockAt > m.now) proj.push({ x: toX(lockAt), y: m.g.goal });
+        lock = [{ x: lockAt > m.now ? toX(lockAt) : nowX, y: m.g.goal }, { x: span, y: m.g.goal }];
+        endLabel = { kind: "lock", ms: lockAt };
+        break;
+      }
       const dy = rate * weightedDays(cur, next, w);
       if (dy > 0 && y + dy >= 100) {
         const ms = cur + ((100 - y) / dy) * (next - cur);
@@ -376,8 +458,17 @@ function paceSeries(m, cells = null, starts = []) {
     }
     if (!endLabel) endLabel = { kind: "reset", pct: y };
   }
-  const startsOut = starts.filter((ms) => ms >= weekStart && ms <= m.now && toX(ms) < 7).map((ms) => ({ ms, x: toX(ms) }));
-  return { s0, span, nowX, todayIdx, expected, used, over, proj, end: endLabel, usedNow: m.w.used, starts: startsOut };
+  const startsOut = starts.filter((ms) => ms >= weekStart && ms <= m.now && toX(ms) <= span).map((ms) => ({ ms, x: toX(ms) }));
+  if (proj && proj.length < 2) proj = null; // already past 100%: nothing left to project
+  const top = planCeiling(m.w.resetsAt, m.w.resetsAt, m.g);
+  let room = null;
+  if (!m.reserveMode && m.w.used < top && nowX < span) {
+    const pEnd = endLabel && endLabel.kind === "reset" ? endLabel.pct : null;
+    const mid = pEnd !== null && pEnd > m.w.used && pEnd < top ? pEnd : null;
+    const spend = mid !== null ? asShownPct(m.ceiling) - asShownPct(m.lv.proj.projected) : 0;
+    room = { x0: nowX, x1: span, y0: m.w.used, y1: top, mid, spend: Math.max(spend, 0) };
+  }
+  return { s0, span, nowX, todayIdx, expected, used, over, proj, lock, reserve, room, goal: m.g.goal, end: endLabel, usedNow: m.w.used, starts: startsOut };
 }
 
 // Saving a reading (typed in or read from Claude)
@@ -408,7 +499,7 @@ async function saveManual({ weekly, session, sessionReset, sessionResetAt, ancho
   const entry = (sameWeek && days[today]) || {};
   days[today] = {
     spent: round2((entry.spent || 0) + delta),
-    budget: round2(dayBudget(100 - dayStart.used, resetsAt, now)),
+    budget: round2(planBudget(dayStart.used, resetsAt, now, goalSettings())),
     endUsed: weekly,
   };
   const cutoff = dayKey(now - 120 * DAY);
@@ -427,7 +518,9 @@ async function saveManual({ weekly, session, sessionReset, sessionResetAt, ancho
     fiveHour = { used: session, resetsAt: sr, at: now };
   }
 
-  const manual = { anchor: anchorMs, updatedAt: now, via, weekly: { used: weekly, resetsAt }, fiveHour, dayStart, days };
+  // Where the reset time came from: "sync" when the account's reading brought it. Settings hides its own form then.
+  const anchorVia = anchor ? via : prev.anchorVia;
+  const manual = { anchor: anchorMs, anchorVia, updatedAt: now, via, weekly: { used: weekly, resetsAt }, fiveHour, dayStart, days };
   state.settings = await api.setSettings({ manual });
   await logReading({
     at: now,

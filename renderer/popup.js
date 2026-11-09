@@ -66,6 +66,7 @@ function render(s) {
     document.documentElement.lang = s.lang;
   }
   document.documentElement.dataset.theme = s.dark ? "dark" : "light";
+  document.documentElement.dataset.screens = s.paper ? "paper" : "crt";
   $("card").classList.toggle("is-stale", Boolean(s.notice));
 
   // The state of the data

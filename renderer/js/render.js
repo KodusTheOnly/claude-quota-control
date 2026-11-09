@@ -6,6 +6,7 @@ function render(opts = {}) {
   banner.classList.add("hidden");
   const st = renderChrome(src);
   renderDataMsg(st);
+  $("anchorForm").classList.toggle("hidden", !needsAnchorForm(state.settings)); // connecting, a reading or disconnecting can change it
 
   if (!src) {
     $("setup").classList.remove("hidden");
@@ -29,7 +30,7 @@ function render(opts = {}) {
   $("dash").classList.remove("hidden");
   $("dash").classList.toggle("is-stale", st === "stale");
   $("dash").classList.toggle("is-offline", st === "offline");
-  renderOverview(m);
+  renderOverview(m, Boolean(opts.fresh));
   placeOvKeys();
   if (state.view === "history") renderHistory();
   updateTray(m);
@@ -42,6 +43,8 @@ function render(opts = {}) {
 function go(view) {
   const changed = state.view !== view;
   state.view = view;
+  if (view === "panel") faceResume();
+  else faceStop(); // the verdict's face only plays on the Overview
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("hidden", v.id !== `view-${view}`));
   renderChrome(pickSource());
   placeOvKeys();

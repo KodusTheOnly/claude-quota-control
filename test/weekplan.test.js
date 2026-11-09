@@ -96,6 +96,7 @@ test("on the reset day, today and the days ahead split the week by the weighted 
   };
   const sb = load(now, { manual: src.data, weights: [0.5, 1, 1, 1, 2, 2, 0] });
   const m = JSON.parse(vm.runInContext(`JSON.stringify(compute(${JSON.stringify(src)}))`, sb));
+  // The plan aims at the whole week, 100%
   assert.ok(Math.abs(m.budget - (100 * (16 / 24)) / 7.5) < 1e-9, String(m.budget));
   const today = m.week.find((d) => d.isToday);
   const thu = m.week.find((d) => d.dow === 4);
@@ -104,4 +105,46 @@ test("on the reset day, today and the days ahead split the week by the weighted 
   // The seven cards hold the whole week except the 8 hours of next Tuesday before the reset
   const sum = m.week.reduce((a, d) => a + d.budget, 0);
   assert.ok(Math.abs(sum - (100 - (100 * (8 / 24)) / 7.5)) < 1e-9, String(sum));
+});
+
+// What a past day shows on its last line, "used / budget%"
+function figures(day) {
+  const sb = load(at(2026, 10, 30, 20));
+  return JSON.parse(vm.runInContext(`JSON.stringify(pastDayFigures(${JSON.stringify(day)}))`, sb));
+}
+
+test("a past day shows what it used against the budget recorded for it", () => {
+  const w = week();
+  assert.deepEqual(figures(w[0]), { used: 15, budget: 14 });
+  assert.deepEqual(figures(w[1]), { used: 20, budget: 14 });
+  // 54% of a budget of 17 is 9.18, shown as 9
+  assert.deepEqual(figures({ budget: 17, spent: 9.18, ratio: 0.54 }), { used: 9, budget: 17 });
+});
+
+test("the use comes from the recorded spend, and from ratio x budget only when the record has none", () => {
+  assert.deepEqual(figures({ budget: 17, spent: 4, ratio: 0.54 }), { used: 4, budget: 17 }); // the record wins
+  assert.deepEqual(figures({ budget: 17, spent: null, ratio: 0.54 }), { used: 9, budget: 17 });
+  assert.deepEqual(figures({ budget: 20, spent: undefined, ratio: 1.5 }), { used: 30, budget: 20 });
+});
+
+test("a past day with no budget recorded has only its use", () => {
+  assert.deepEqual(figures({ budget: null, spent: 6.4, ratio: null }), { used: 6, budget: null });
+  assert.deepEqual(figures({ budget: 0, spent: 3, ratio: 2 }), { used: 3, budget: null });
+  assert.deepEqual(figures({ budget: undefined, spent: 0, ratio: null }), { used: 0, budget: null });
+});
+
+test("a past day with no reading has no figures", () => {
+  assert.equal(figures({ budget: null, spent: null, ratio: null }), null);
+  assert.equal(figures({ budget: 17, spent: null, ratio: null }), null);
+  // Through the plan: a past day with no record has neither a budget nor a spend
+  const sb = load(at(2026, 10, 30, 20), { manual: { days: {} } });
+  const src = { kind: "manual", data: { updatedAt: at(2026, 10, 30, 20), weekly: { used: 40, resetsAt: at(2026, 11, 4, 8) }, fiveHour: null, dayStart: { day: "2026-10-30", at: at(2026, 10, 30), used: 35 }, days: {} } };
+  const wk = JSON.parse(vm.runInContext(`JSON.stringify(compute(${JSON.stringify(src)}).week.map(pastDayFigures))`, sb));
+  assert.deepEqual(wk.slice(0, 2), [null, null]);
+});
+
+test("the figures are whole numbers, rounded as on screen", () => {
+  assert.deepEqual(figures({ budget: 16.5, spent: 9.5, ratio: 0.5757 }), { used: 10, budget: 17 });
+  assert.deepEqual(figures({ budget: 16.49, spent: 9.49, ratio: 0.5755 }), { used: 9, budget: 16 });
+  assert.deepEqual(figures({ budget: 14.3, spent: 0.2, ratio: 0.014 }), { used: 0, budget: 14 });
 });

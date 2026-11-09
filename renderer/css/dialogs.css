@@ -6,12 +6,12 @@ dialog { max-width: none; max-height: none; padding: 0; border: 0; color: var(--
 dialog::backdrop { background: rgba(10, 15, 12, .55); }
 
 /* CRT dressing shared by the dialogs */
-.drawer, .modal { position: fixed; overflow: hidden; font-size: .875rem; line-height: 1.4; }
-.drawer::after, .modal::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .03) 0 1px, transparent 1px 3px); }
+.drawer, .modal { position: fixed; overflow: hidden; font-size: var(--fs-md); line-height: 1.4; }
+.drawer::after, .modal::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, var(--crt-scan) 0 1px, transparent 1px 3px); }
 .drawer .key, .modal .key { background: transparent; color: var(--st); border-color: var(--crt-line); }
 .drawer .key:hover, .modal .key:hover { background: var(--crt-hover); }
 .drawer .key.primary, .modal .key.primary { background: var(--st); color: var(--scr); border-color: var(--st); }
-.drawer .key.primary:hover, .modal .key.primary:hover { background: #fff; }
+.drawer .key.primary:hover, .modal .key.primary:hover { background: var(--crt-bright); }
 
 /* ---- Show the math ---- */
 .drawer { inset: 0 0 0 auto; margin: 0; width: min(24rem, 100%); height: 100%; border-left: 3px solid var(--crt-accent); box-shadow: -12px 0 30px rgba(0, 0, 0, .4); }
@@ -21,45 +21,45 @@ dialog::backdrop { background: rgba(10, 15, 12, .55); }
   @keyframes drawer-in { from { transform: translateX(2rem); opacity: 0; } }
 }
 .dh { flex: none; display: flex; align-items: center; gap: 1rem; padding: .6rem 1rem; border-bottom: 1px solid var(--sline); }
-.dh h2 { font: 600 .875rem/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--st); }
-.dh .key { min-height: 2rem; padding: .2rem .6rem; font-size: .75rem; }
+.dh h2 { font: 600 var(--fs-md)/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--st); }
+.dh .key { min-height: 2rem; padding: .2rem .6rem; font-size: var(--fs-xs); }
 .db { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: .3rem 1rem 1.2rem; }
 .db::-webkit-scrollbar { width: 10px; }
 .db::-webkit-scrollbar-thumb { background: var(--crt-thumb); border: 2px solid var(--scr); }
 .ds { padding: 0 0 .4rem; }
-.ds.act { margin-left: -.8rem; padding-left: .65rem; border-left: 3px solid var(--crt-accent); }
-.ds h3 { display: flex; align-items: center; gap: .5rem; margin: 1rem 0 .4rem; font: 600 .75rem/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--sm); }
+.ds.act { margin-left: -.8rem; padding-left: var(--sp-3); border-left: 3px solid var(--crt-accent); }
+.ds h3 { display: flex; align-items: center; gap: .5rem; margin: 1rem 0 .4rem; font: 600 var(--fs-xs)/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--sm); }
 .ds.act h3 { color: var(--st); }
 .ds h3 b { padding: 0 .4rem; background: var(--st); color: var(--scr); font-weight: 600; }
 .dr { display: flex; justify-content: space-between; gap: .8rem; padding: .3rem 0; border-bottom: 1px dotted var(--sline); }
 .dr span:first-child { flex: 1 1 auto; min-width: 0; color: var(--crt-hi); }
 .dr span:last-child { flex: none; max-width: 60%; font-family: var(--mono); text-align: right; overflow-wrap: anywhere; }
 .dr.long { flex-direction: column; gap: .15rem; }
-.dr.long span:last-child { max-width: none; text-align: left; font-size: .8125rem; color: var(--sm); }
+.dr.long span:last-child { max-width: none; text-align: left; font-size: var(--fs-sm); color: var(--sm); }
 
 /* ---- Type it in ---- */
-.modal { inset: 0; margin: auto; width: min(28rem, calc(100% - 2rem)); height: fit-content; border: 2px solid var(--bezel); border-radius: 6px; }
+.modal { inset: 0; margin: auto; width: min(28rem, calc(100% - 2rem)); height: fit-content; border: 2px solid var(--bezel); border-radius: var(--r-lg); }
 .modal[open] { display: block; }
 .modal form { position: relative; z-index: 1; display: grid; gap: .9rem; padding: 1rem 1.1rem 1.1rem; }
-.modal h2 { font: 600 .875rem/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--st); }
+.modal h2 { font: 600 var(--fs-md)/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--st); }
 .modal .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
-.modal label { display: grid; gap: .3rem; color: var(--sm); font-size: .8125rem; }
+.modal label { display: grid; gap: .3rem; color: var(--sm); font-size: var(--fs-sm); }
 .modal label em { font-style: normal; opacity: .75; }
-.modal input { min-height: 2.2rem; padding: .35rem .6rem; background: var(--crt-field); border: 1px solid var(--sm); color: var(--st); border-radius: 4px; font: 500 .9rem var(--mono); color-scheme: dark; }
+.modal input { min-height: 2.2rem; padding: var(--sp-2) .6rem; background: var(--crt-field); border: 1px solid var(--sm); color: var(--st); border-radius: var(--r-sm); font: 500 var(--fs-md) var(--mono); color-scheme: dark; }
 .modal input::placeholder { color: var(--sm); opacity: 1; }
 .modal .fields > label:last-child { grid-column: 1 / -1; }
-.modal .input-suffix input { width: 100%; font: 600 1rem var(--mono); }
+.modal .input-suffix input { width: 100%; font: 600 var(--fs-lg) var(--mono); }
 .modal .input-suffix i { color: var(--sm); }
 .modal .foot-keys { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: flex-end; }
 
 /* ---- Plan menu (click a day) ---- */
 .planmenu {
   position: fixed; inset: auto; margin: 0; width: min(18rem, calc(100vw - 1rem)); padding: .7rem .8rem; overflow: visible;
-  background: var(--card); color: var(--ink); border: 1px solid var(--edge); border-top: 2px solid var(--ink); box-shadow: 0 8px 24px rgba(0, 0, 0, .35); font-size: .875rem;
+  background: var(--card); color: var(--ink); border: 1px solid var(--edge); border-top: 2px solid var(--ink); box-shadow: 0 8px 24px rgba(0, 0, 0, .35); font-size: var(--fs-md);
 }
 .planmenu .eng { display: block; margin-bottom: .5rem; color: var(--ink); }
 .planmenu .keyset { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
 .planmenu .key { justify-content: flex-start; min-height: 2.25rem; }
 .planmenu .key.on { padding-left: 1.4rem; }
-.planmenu .hint { display: block; margin-top: .6rem; font-size: .8125rem; line-height: 1.4; color: var(--ink2); }
+.planmenu .hint { display: block; margin-top: .6rem; font-size: var(--fs-sm); line-height: 1.4; color: var(--ink2); }
 .planmenu .reset { margin-top: .6rem; width: 100%; }

@@ -12,7 +12,7 @@ async function summaryOf(browser, { scenario, language, theme }) {
   const { page, close } = await openOverview(browser, { w: 1280, h: 720, scenario, language, theme });
   const summary = await page.evaluate(() => window.__summary);
   await close();
-  return { ...summary, dark: theme === "dark" };
+  return { ...summary, dark: theme === "dark", paper: theme !== "dark" && process.env.LAYOUT_SCREENS !== "crt" };
 }
 
 function installCard(summary) {

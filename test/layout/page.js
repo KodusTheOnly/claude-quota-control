@@ -75,7 +75,8 @@ async function openOverview(browser, opts) {
   });
   await page.addInitScript(installBridge, {
     now: NOW,
-    settings: { ...settingsFor(scenario, language), ...(shortcut === "off" ? {} : { shortcutOn: true }) },
+    // Screens (CRT or paper) for the whole run come in with the settings, as in the app: npm run test:layout -- --screens=crt
+    settings: { ...settingsFor(scenario, language), theme, screens: process.env.LAYOUT_SCREENS || "paper", ...(shortcut === "off" ? {} : { shortcutOn: true }) },
     offline: scenario === "offline",
     hangSync: scenario === "updating",
     shortcut,
@@ -89,7 +90,8 @@ async function openOverview(browser, opts) {
   if (interaction === "math") { await openMenu(); await page.click('[data-math="week"]'); }
   if (interaction === "type") { await openMenu(); await page.click("#typeBtn"); }
   if (interaction === "plan") await page.click(".day:nth-child(3)");
-  if (interaction === "toast") await page.evaluate(() => toast(t("sync.err.format"), "error", { label: t("sync.openPage"), run: () => {} })); // the longest message, with its action
+  // The longest error, with its action: it goes to the error strip, which pushes the Overview down
+  if (interaction === "toast") await page.evaluate(() => toast(t("sync.err.format"), "error", { label: t("sync.openPage"), run: () => {} }));
   if (view === "about") await page.evaluate(() => go("about")); // About has no key of its own: it opens from Help
   else if (view !== "panel") await page.click(`.nav-btn[data-view="${view}"]`);
   if (view === "about" && update) {

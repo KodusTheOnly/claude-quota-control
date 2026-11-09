@@ -1,7 +1,10 @@
 /* Design tokens: fonts, colors, themes and the one rule that scales the whole app.
    Claude Quota Control 2.0 is a mainframe console: data sits on dark CRT screens, the frame is warm grey.
    Text is IBM Plex Sans, numbers and labels are IBM Plex Mono (SIL Open Font License, see renderer/fonts).
-   Every level is color + shape + word: Free = circle, Moderate = diamond, Tight = triangle, Pause = square. */
+   Every level is color + shape + word: Free = circle, Moderate = diamond, Tight = triangle, Pause = square.
+   Two choices set the look: the theme paints the frame (light or dark panel), and Screens paints the data
+   (in the light theme: light paper, the default, or dark CRT; the dark theme is always CRT). The app opens dark.
+   The taskbar strip and the tray icon are always CRT. */
 
 @font-face { font-family: "IBM Plex Mono"; src: url("../fonts/ibm-plex-mono-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "IBM Plex Mono"; src: url("../fonts/ibm-plex-mono-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
@@ -28,9 +31,12 @@ html { font-size: 16px; }
   --keyhi: #F0EDE3;
   --keyon: #B7B3A7;
   --bezel: #1A1A18;
+  /* Where a screen sits in the panel: a dark lip inside its top edge and a light lip under it, so it reads as set in */
+  --well-hi: #E2DED3;
+  --well-lo: rgba(0, 0, 0, .45);
   --fc: #1F3FA6;
   --danger: #B3201F; /* error and delete text and marks, 5.4:1 on the card */
-  /* CRT screens, the same in both themes */
+  /* Data screens: CRT (the dark theme, and the light theme when CRT is chosen). Paper below. */
   --scr: #0A0F0C;
   --crt-accent: #86A2FF;
   --st: #E4EFE6;
@@ -44,6 +50,16 @@ html { font-size: 16px; }
   --tight: #F28C38;
   --pause: #F2575A;
   --tick: #FFFFFF;
+  --crt-bright: #FFFFFF; /* hover of a bone key on a CRT */
+  --crt-reserve: #1B2236; /* dark base of the hatched reserve zone */
+  --crt-grid: #1E2A23; --crt-grid-day: #26332B; /* chart grid: percent lines and day dividers */
+  --crt-border: #000; /* the edge of a screen */
+  --crt-glow: rgba(70, 192, 127, .06); /* faint phosphor glow inside a screen */
+  --crt-scan: rgba(255, 255, 255, .035); /* scanlines */
+  --crt-cell: rgba(255, 255, 255, .045); /* an empty hour on the HRS strip */
+  --crt-cell-mark: rgba(255, 255, 255, .16); /* the 6 a.m. mark on the HRS strip */
+  --crt-shade: rgba(0, 0, 0, .35); /* the part of the chart before the week started */
+  --crt-band: rgba(255, 255, 255, .03); /* every other day on the chart */
 
   /* Room the native window buttons take in the top-right corner (Electron's title bar overlay).
      Outside Electron the variable falls back to a typical 140px. */
@@ -51,6 +67,38 @@ html { font-size: 16px; }
 
   --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --mono: "IBM Plex Mono", Consolas, monospace;
+
+  /* Type scale (rem, so it follows the one rule on html). 12px is the floor: nothing in the app is smaller.
+     xs labels and captions, sm keys and small mono text, md body text (the page default), lg strong text and
+     numbers in a row, xl to 5xl numbers and titles. Pick a step; do not write a new size. */
+  --fs-xs: .75rem;
+  --fs-sm: .8125rem;
+  --fs-md: .875rem;
+  --fs-lg: 1rem;
+  --fs-xl: 1.25rem;
+  --fs-2xl: 1.5rem;
+  --fs-3xl: 1.75rem;
+  --fs-4xl: 2rem;
+  --fs-5xl: 3rem;
+
+  /* Corners. Three: square (0, text fields and the cut-in day cards), small (keys, chips, menus, notices) and
+     large (CRT screens and the cards of the tray). Circles use 50% and stay as they are. */
+  --r-sm: 3px;
+  --r-lg: 5px;
+
+  /* Spacing steps for gaps and padding. New CSS picks from these. The older rules still hold their own values
+     where a tight layout was tuned and tested to the pixel (the Overview, the CRT screens, the header). */
+  --sp-1: .25rem;
+  --sp-2: .4rem;
+  --sp-3: .6rem;
+  --sp-4: .8rem;
+  --sp-5: 1rem;
+  --sp-6: 1.5rem;
+
+  /* Old data (stale or offline): the numbers, levels, bars and chart lose some color and light, so they do not
+     read as current. The screens, labels and the STALE chip keep theirs. */
+  --stale-fade: .72;
+  --stale-sat: .35;
   color-scheme: light;
 }
 
@@ -69,5 +117,37 @@ html[data-theme="dark"] {
   --bezel: #5B626A;
   --fc: #86A2FF;
   --danger: #F2575A;
+  --well-hi: #34383C;
+  --well-lo: rgba(0, 0, 0, .6);
   color-scheme: dark;
+}
+
+/* Paper screens, the light theme's default (Settings, Screens): the data printed on light stock, like a console printout.
+   The dark theme always keeps the CRT, whatever the choice. Same structure as the CRT,
+   darker inks so every level still reads at 4.5:1 or more on the paper (free 5.2, moderate 5.1, tight 5.2, pause 5.8). */
+html[data-screens="paper"]:not([data-theme="dark"]) {
+  --scr: #F3EFE2;
+  --crt-accent: #1F3FA6;
+  --st: #1A1A18;
+  --sm: #57544A;
+  --sl: #E2DBC8;
+  --sline: #BDB5A0;
+  --crt-inset: #D9D2BF;
+  --crt-hi: #33322D; --crt-line: #8F8875; --crt-hover: #E9E4D4; --crt-field: #FBF9F2; --crt-thumb: #B5AD97;
+  --free: #1C7243;
+  --moderate: #80600A;
+  --tight: #A34A08;
+  --pause: #B3201F;
+  --tick: #1A1A18;
+  --crt-bright: #3E3C35;
+  --crt-reserve: #DCE1F2;
+  --crt-grid: #DED7C5; --crt-grid-day: #CFC7B1;
+  --crt-border: #8F8875;
+  --crt-glow: transparent;
+  --crt-scan: rgba(0, 0, 0, .018);
+  --crt-cell: rgba(0, 0, 0, .06);
+  --crt-cell-mark: rgba(0, 0, 0, .22);
+  --crt-shade: rgba(90, 80, 60, .14);
+  --crt-band: rgba(90, 80, 60, .04);
+  --well-lo: rgba(0, 0, 0, .18);
 }

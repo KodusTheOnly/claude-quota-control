@@ -23,17 +23,17 @@ Claude's usage page shows a percentage for the 5-hour session and one for the we
 - **History.** Daily use against each day's budget over 14, 30 or 90 days, previous weeks, and the hours of day when your sessions start.
 - **Tray card and taskbar strip.** A tray icon with a ring for the session, a quick card on click, and an optional small strip near the taskbar with what is left of today's budget.
 
-English by default, Brazilian Portuguese in Settings. Light, dark or system theme.
+English by default, Brazilian Portuguese in Settings. Dark (the default), light or system theme. The light theme prints the data on paper screens, or on CRT ones if you prefer.
 
 ![History](docs/screenshots/history.png)
 
 ## How we calculate
 
 - **Rolling daily budget.** Today's budget is what was left of the week when the day began, times today's weight, divided by the sum of the weights from today until the reset (Heavy 2, Normal 1, Light 0.5, Off 0). Spend less and the next days grow; spend more and they shrink.
-- **Projection.** Your average pace per plan day since the reset, carried to the next reset, as a share of the limit. Below 80% is Free, 80 to 100% is Moderate, up to 140% is Tight, above that is Pause. Exactly 80% already counts as Moderate: Free means quota would go to waste, and 20% or less left at the reset is a reason to ease up. The verdict follows this level. A week at 95% or more always reads Pause. The first day and a half of plan days has no projection yet.
+- **Projection.** Your average pace per plan day since the reset, carried to the next reset. The level counts the hours you would be without Claude before the reset if that pace holds (counting up to 100% of the limit, where Claude stops): 0 h is Free, up to 5 h (one session) Moderate, up to 24 h Tight, above that Pause. The verdict follows this level. A week at 95% or more always reads Pause. The first day and a half of plan days has no projection yet.
 - **Session cuts.** The session level uses the share used: up to 50% Free, up to 75% Moderate, up to 90% Tight, above that Pause.
 - **Today and the days.** Used divided by budget: up to 0.7 Free, up to 1.0 Moderate, up to 1.4 Tight, above that Pause.
-- **Numbers as shown.** Levels are rated on the number as it appears on screen, so 79.6% shown as 80% is rated as 80%.
+- **Numbers as shown.** Levels are rated on the number as it appears on screen, so 4.6 h shown as 5 h is rated as 5 h.
 
 The in-app Help ("How we calculate") and the Math drawer have the details.
 

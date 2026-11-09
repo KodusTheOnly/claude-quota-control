@@ -19,8 +19,8 @@ const CONFIG_FILE = path.join(CLAUDE_DIR, "claude-quota-control-config.json");
 
 // Status line text (same language choice as the app)
 const TEXT = {
-  en: { noData: "quota: no data yet", week: "week", today: "today" },
-  "pt-BR": { noData: "quota: sem dados ainda", week: "semana", today: "hoje" },
+  en: { noData: "quota: no data yet", week: "week", today: "today", off: "off" },
+  "pt-BR": { noData: "quota: sem dados ainda", week: "semana", today: "hoje", off: "folga" },
 };
 const DAY_MS = 24 * 60 * 60 * 1000;
 const KEEP_DAYS = 120;
@@ -141,7 +141,7 @@ function record(input) {
   // New week mid-day: today's spend restarts along with the limit
   const entry = (continuing && days[today]) || {};
   const config = readJson(CONFIG_FILE) || {};
-  const w = Array.isArray(config.weights) && config.weights.length === 7 ? config.weights.map(Number) : [1, 1, 1, 1, 1, 1, 1];
+  const w = weightsOf(config);
   days[today] = {
     spent: Math.round(((entry.spent || 0) + delta) * 100) / 100,
     budget: Math.round(dayBudget(100 - dayStart.used, weekly.resetsAt, now, w) * 100) / 100,
@@ -181,8 +181,19 @@ function ownLine(input, data, lang) {
   }
   const today = data.days[dayKey(now)];
   parts.push(`${text.week} ${Math.round(data.weekly.used)}%`);
-  if (today) parts.push(`${text.today} ${Math.round(today.spent)}/${Math.round(today.budget)}%`);
+  if (today) parts.push(todayText(text, today, now, weightsOf(readJson(CONFIG_FILE))));
   return parts.join(" | ");
+}
+
+// On an Off day (plan weight 0) there is no budget to print, so show the use as a share of the week
+function todayText(text, today, now, w) {
+  if (w[new Date(now).getDay()] !== 0) return `${text.today} ${Math.round(today.spent)}/${Math.round(today.budget)}%`;
+  const used = Math.round(today.spent);
+  return used > 0 ? `${text.today} ${used}% (${text.off})` : `${text.today} ${text.off}`;
+}
+
+function weightsOf(config) {
+  return config && Array.isArray(config.weights) && config.weights.length === 7 ? config.weights.map(Number) : [1, 1, 1, 1, 1, 1, 1];
 }
 
 function main(raw) {

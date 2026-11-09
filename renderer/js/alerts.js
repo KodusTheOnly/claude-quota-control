@@ -43,20 +43,15 @@ function checkAlerts(m, fresh, src) {
     }
   }
 
-  // Notify when the status changes, only on a fresh reading
-  if (fresh && s.notifyLevel !== false && s.lastLevel !== m.head.level) {
-    const firstTime = s.lastLevel === undefined || s.lastLevel === null;
-    api.setSettings({ lastLevel: m.head.level }).then((next) => {
-      state.settings = next;
-    });
-    if (!firstTime) {
-      const better = m.head.level < s.lastLevel;
-      api.notify({
-        key: `level-${lastUpdate()}`,
-        title: better ? t("alert.backTo", { level: m.head.name }) : t("alert.level", { level: m.head.name }),
-        body: `${m.head.guide} ${m.head.reason}`,
+  // The week's level went up to Tight or Pause, only on a fresh reading
+  if (fresh && s.notifyLevel !== false) {
+    const { level, note } = levelAlert(m, s.lastLevel, now);
+    if (level !== s.lastLevel) {
+      api.setSettings({ lastLevel: level }).then((next) => {
+        state.settings = next;
       });
     }
+    if (note) api.notify(note);
   }
 
   const hour = new Date(now).getHours();
@@ -75,6 +70,20 @@ function checkAlerts(m, fresh, src) {
       syncOnClick: connected,
     });
   }
+}
+
+// The week's level, as the verdict shows it (not rated while warming up, unless the week is at Pause already).
+// Only a rise to Tight or Pause is worth a notification; Free and Moderate say nothing. The key holds the level and
+// the local day, and the main process shows a key only once (it keeps them in the settings, `notified`), so each
+// level notifies at most once a day, even after going down and up again or a restart.
+// prev: the level of the last fresh reading (settings.lastLevel). Returns the level to keep and the note, or null.
+function levelAlert(m, prev, now) {
+  const level = verdictLevel(m);
+  const rose = level !== null && level >= 2 && (prev === null || prev === undefined || level > prev);
+  const note = rose
+    ? { key: `week-level-${LEVEL_KEYS[level]}-${dayKey(now)}`, title: t("alert.level", { level: levelName(level) }), body: `${m.head.guide} ${m.head.reason}` }
+    : null;
+  return { level, note };
 }
 
 // Typical session peak: the median of the last sessions

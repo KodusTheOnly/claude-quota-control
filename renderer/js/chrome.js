@@ -39,7 +39,7 @@ function renderChrome(src) {
   return st;
 }
 
-// The strip under the header for the updating, stale and offline states
+// The strip under the header for the updating, stale and offline states. It only explains: Refresh is in the header.
 function renderDataMsg(st) {
   $("prog").classList.toggle("hidden", st !== "updating");
   const box = $("dataMsg");
@@ -49,6 +49,4 @@ function renderDataMsg(st) {
   box.className = "msg";
   setLevelClass(box, STATE_LEVEL[st]);
   setText($("dataMsgText"), t(`msg.${st}`, { dur: fmtDur(Date.now() - lastUpdate()), time: fmtTime(lastUpdate()) }));
-  $("dataMsgBtn").classList.toggle("hidden", st === "updating");
-  $("dataMsgBtn").textContent = st === "offline" ? t("msg.retry") : t("hd.refresh");
 }

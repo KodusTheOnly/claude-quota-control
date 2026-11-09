@@ -9,6 +9,7 @@
 //   npm run test:layout -- --only=1280x720,420x540   limit to some sizes
 //   npm run test:layout -- --lang=pt-BR --theme=dark --scenario=stale   limit to a language, theme or state
 //   npm run test:layout -- --view=settings   only one screen (panel, settings, help, history, about or tray)
+//   npm run test:layout -- --screens=crt     the light theme on CRT screens (paper, its default, when left out)
 //
 // Needs the Playwright browser once:  npx playwright install chromium
 
@@ -16,7 +17,7 @@ const fs = require("fs");
 const path = require("path");
 const { chromium } = require("playwright");
 const { SIZES, SCROLLS } = require("./sizes");
-const { SCENARIOS } = require("./scenarios");
+const { SCENARIOS, LEVEL_OF } = require("./scenarios");
 const { openOverview } = require("./page");
 const { checkPage } = require("./checks");
 const { checkCard, checkStrip } = require("./tray-checks");
@@ -29,12 +30,16 @@ const quick = flag("quick");
 const shots = flag("shots");
 const only = option("only") ? option("only").split(",") : null;
 const OUT = path.join(__dirname, "out");
+process.env.LAYOUT_SCREENS = option("screens") === "crt" ? "crt" : "paper";
 
 function buildCases() {
   const pick = (wanted, fallback) => (wanted ? [wanted] : fallback);
   const languages = pick(option("lang"), quick ? ["en"] : ["en", "pt-BR"]);
   const themes = pick(option("theme"), quick ? ["light"] : ["light", "dark"]);
   const scenarios = pick(option("scenario"), quick ? ["moderate", "pause", "stale"] : SCENARIOS);
+  // --quick covers every level: Free and Tight too, but only at one size per format, to keep it light
+  const quickLevels = quick && !option("scenario") ? ["free", "tight"] : [];
+  const QUICK_LEVEL_SIZES = ["1280x720", "760x900", "420x540"];
   const views = pick(option("view"), ["panel", "settings", "help", "history", "about", "tray"]);
   // Settings and Help: the usual state, and one with no account and a shortcut that another app already uses (the longest texts)
   const docStates = quick ? [["moderate", "off"]] : [["moderate", "off"], ["noaccount", "taken"]];
@@ -45,6 +50,7 @@ function buildCases() {
       for (const theme of themes) {
         if (views.includes("panel")) {
           for (const scenario of scenarios) cases.push({ ...size, language, theme, scenario, interaction: null, view: "panel" });
+          if (QUICK_LEVEL_SIZES.includes(`${size.w}x${size.h}`)) for (const scenario of quickLevels) cases.push({ ...size, language, theme, scenario, interaction: null, view: "panel" });
           for (const interaction of ["math", "type", "plan", "toast"]) cases.push({ ...size, language, theme, scenario: "moderate", interaction, view: "panel" });
         }
         for (const view of views.filter((v) => v !== "panel" && v !== "tray" && v !== "history" && v !== "about")) {
@@ -65,7 +71,7 @@ function buildCases() {
   if (views.includes("tray") && !only) {
     for (const language of languages) {
       for (const theme of themes) {
-        for (const scenario of scenarios) cases.push({ view: "tray", language, theme, scenario });
+        for (const scenario of [...scenarios, ...quickLevels]) cases.push({ view: "tray", language, theme, scenario });
         cases.push({ view: "tray", language, theme, scenario: "moderate", patch: "failed" });
         cases.push({ view: "tray", language, theme, scenario: "stale", patch: "failed" });
       }
@@ -74,7 +80,8 @@ function buildCases() {
   return cases;
 }
 
-const label = (c) => c.view === "tray" ? `tray ${c.language} ${c.theme} ${c.scenario}${c.patch ? ` +${c.patch}` : ""}` : `${c.view === "panel" ? "" : `${c.view} `}${c.w}x${c.h} ${c.language} ${c.theme} ${c.scenario}${c.interaction ? ` +${c.interaction}` : ""}${c.update ? ` update-${c.update}` : ""}${c.shortcut && c.shortcut !== "off" ? ` shortcut-${c.shortcut}` : ""}`;
+const label = (c) => (process.env.LAYOUT_SCREENS === "crt" ? "crt " : "") + labelOf(c);
+const labelOf = (c) => c.view === "tray" ? `tray ${c.language} ${c.theme} ${c.scenario}${c.patch ? ` +${c.patch}` : ""}` : `${c.view === "panel" ? "" : `${c.view} `}${c.w}x${c.h} ${c.language} ${c.theme} ${c.scenario}${c.interaction ? ` +${c.interaction}` : ""}${c.update ? ` update-${c.update}` : ""}${c.shortcut && c.shortcut !== "off" ? ` shortcut-${c.shortcut}` : ""}`;
 
 // The card and the strip, one after the other. Then a click on each key must reach the main process.
 async function runTrayCase(browser, c) {
@@ -155,6 +162,14 @@ async function runCase(browser, c) {
   try {
     const problems = await page.evaluate(checkPage, { format: c.format, scrolls: SCROLLS.includes(c.format), view: c.view });
     if (c.view === "history") problems.push(...(await checkTooltip(page)));
+    // A level scenario must read its level, so a change in the rules cannot quietly leave a level untested
+    if (c.view === "panel" && LEVEL_OF[c.scenario]) {
+      const lit = await page.evaluate(() => {
+        const on = document.querySelector("#vRuler > span.on");
+        return on ? on.className.replace(/\s*\bon\b\s*/, "") : "none";
+      });
+      if (lit !== `lv-${LEVEL_OF[c.scenario]}`) problems.push(`scenario ${c.scenario} reads ${lit}, expected lv-${LEVEL_OF[c.scenario]}`);
+    }
     if (shots) {
       fs.mkdirSync(OUT, { recursive: true });
       await page.screenshot({ path: path.join(OUT, `${label(c).replace(/[ +]/g, "_")}.png`) });

@@ -3,16 +3,20 @@
 
 // How far past the last week cutoff the ruler goes, so the Pause stretch has some room
 const RATIO_RULER_PAST = 0.2;
+// The hours ruler: Free (exactly 0 h) gets a sliver before 0, and the Pause stretch runs a third past 24 h
+const LOCK_RULER_FREE = 0.12;
+const LOCK_RULER_PAST = 4 / 3;
 
 // A ruler on the CRT: one stretch per level, sized by its cutoffs, with the cutoffs written under it.
-// It repeats what the table says, so assistive technology skips it.
-function levelScale(parent, label, cuts, end, fmt) {
+// It repeats what the table says, so assistive technology skips it. The ruler runs from start to end; a
+// start below the first cutoff gives a level that is a single value (Free at 0 h) some room.
+function levelScale(parent, label, cuts, end, fmt, start = 0) {
   const name = node("div", "scale-name", label);
   const bar = node("div", "scale");
   const ticks = node("div", "scale-ticks");
   for (const part of [name, bar, ticks]) part.setAttribute("aria-hidden", "true");
   for (let lv = 0; lv < LEVEL_KEYS.length; lv++) {
-    const from = lv === 0 ? 0 : cuts[lv - 1];
+    const from = lv === 0 ? start : cuts[lv - 1];
     const to = lv < cuts.length ? cuts[lv] : end;
     const stretch = node("i");
     stretch.style.flex = String(to - from);
@@ -22,7 +26,7 @@ function levelScale(parent, label, cuts, end, fmt) {
   }
   for (const cut of cuts) {
     const tick = node("span", "", fmt(cut));
-    tick.style.left = `${(cut / end) * 100}%`;
+    tick.style.left = `${((cut - start) / (end - start)) * 100}%`;
     ticks.appendChild(tick);
   }
   parent.append(name, bar, ticks);
@@ -66,12 +70,11 @@ function renderHelpCalc() {
   ladder.appendChild(table);
   levelScale(ladder, t("calc.col.session"), SESSION_CUTS, 100, fmtPct);
   levelScale(ladder, t("calc.col.ratio"), RATIO_CUTS, RATIO_CUTS[RATIO_CUTS.length - 1] + RATIO_RULER_PAST, fmtRatio);
-  // The projection has a scale of its own (see PROJECTION_CUTS in core.js), shown as % of the weekly limit
-  const fmtProj = (n) => fmtPct(n * 100);
-  levelScale(ladder, t("calc.col.proj"), PROJECTION_CUTS, PROJECTION_CUTS[PROJECTION_CUTS.length - 1] + RATIO_RULER_PAST, fmtProj);
+  // The week has a scale of its own (LOCK_CUTS in core.js): the hours without Claude before the reset
+  const lockEnd = LOCK_CUTS[LOCK_CUTS.length - 1];
+  levelScale(ladder, t("calc.col.proj"), LOCK_CUTS, lockEnd * LOCK_RULER_PAST, (h) => t("dur.lockHours", { n: h }), -lockEnd * LOCK_RULER_FREE);
   ladder.appendChild(node("p", "edge", t("calc.edge", { ratio: fmtRatio(RATIO_CUTS[0]), pct: fmtPct(SESSION_CUTS[0]) })));
-  // Why the edge goes up: Free means quota would go to waste, so what is left at the first cutoff already asks to ease up
-  ladder.appendChild(node("p", "edge", t("calc.edgeProj", { a: fmtProj(PROJECTION_CUTS[0]), left: fmtPct(100 - PROJECTION_CUTS[0] * 100) })));
+  ladder.appendChild(node("p", "edge", t("calc.lockNote", { ...lockCutoffs(), lock: goalSettings().goal })));
   body.appendChild(ladder);
 
   // What a plan day weighs, from the weights the plan really uses: Off 0, Light 0.5, Normal 1, Heavy 2
@@ -90,7 +93,7 @@ function renderHelpCalc() {
   add("session");
   add("expected", { weights });
   add("budget");
-  add("proj", { weekPause: WEEK_PAUSE_AT, days: fmtNum(MIN_WEIGHTED_DAYS), ...projectionCutoffs() });
+  add("proj", { weekPause: WEEK_PAUSE_AT, days: fmtNum(MIN_WEIGHTED_DAYS), lock: goalSettings().goal, room: ROOM_GAP, shown: LOCK_HOURS_SHOWN, ...lockCutoffs() });
   add("red");
   add("round");
   body.appendChild(dl);

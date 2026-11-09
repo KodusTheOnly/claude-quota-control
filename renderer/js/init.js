@@ -27,13 +27,13 @@ async function ingestAuto(data) {
 }
 
 // The settings file could not be read at start: say what happened and where the damaged copy is.
-// The notice stays until it is closed.
+// The notice stays in the error strip until it is closed.
 async function showSettingsRecovery() {
   const rec = api.settingsRecovery ? await api.settingsRecovery() : null;
   if (!rec) return;
   const file = String(rec.copy || "").split(/[\\/]/).pop();
   const key = rec.kind === "restored" ? "data.recoveredRestored" : "data.recoveredReset";
-  toast(t(key, { file }), "error", { label: t("hero.close"), run: () => $("toast").classList.add("hidden") });
+  showError(t(key, { file }));
 }
 
 async function init() {

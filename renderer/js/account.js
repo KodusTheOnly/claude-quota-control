@@ -2,37 +2,54 @@
 
 const SYNC_ERROR_CODES = ["need-login", "challenge", "format", "offline", "closed"];
 
-// Floating notice at the top: shows over the content, pushes nothing
+// Short confirmation at the top: floats over the content, pushes nothing, fades after 4 s.
+// An error goes to the error strip instead: it can be long, and a floating line would cover the numbers.
 function toast(text, kind, action) {
+  if (kind === "error") {
+    showError(text, action);
+    return;
+  }
   const f = $("toast");
   f.textContent = "";
   const msg = document.createElement("span");
   msg.className = "tmsg";
   msg.textContent = text;
   f.appendChild(msg);
-  f.className = `toast ${kind || "ok"}`;
-  // Sit just under the header, whatever its height (one row or two)
-  const rule = document.querySelector(".rule");
-  f.style.top = rule ? `${Math.round(rule.getBoundingClientRect().bottom + 6)}px` : "";
-  if (action) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "link";
-    b.textContent = action.label;
-    b.addEventListener("click", action.run);
-    f.appendChild(b);
-  }
+  f.className = "toast";
+  // Sit just under the header and the error strip, whatever their height
+  const above = $("errMsg").classList.contains("hidden") ? document.querySelector(".rule") : $("errMsg");
+  f.style.top = above ? `${Math.round(above.getBoundingClientRect().bottom + 6)}px` : "";
   clearTimeout(f.__t);
   clearTimeout(f.__t2);
-  if (!action) {
-    f.__t = setTimeout(() => f.classList.add("fade"), 3500);
-    f.__t2 = setTimeout(() => f.classList.add("hidden"), 4000);
-  }
+  f.__t = setTimeout(() => f.classList.add("fade"), 3500);
+  f.__t2 = setTimeout(() => f.classList.add("hidden"), 4000);
 }
+
+// Error strip under the header, on every screen: pushes the content down and stays until it is closed,
+// its action is used, a newer error replaces it or a reading succeeds
+function showError(text, action) {
+  setText($("errMsgText"), text);
+  const act = $("errMsgAct");
+  act.classList.toggle("hidden", !action);
+  act.textContent = action ? action.label : "";
+  act.onclick = action
+    ? () => {
+        hideError();
+        action.run();
+      }
+    : null;
+  $("errMsg").classList.remove("hidden");
+}
+function hideError() {
+  $("errMsg").classList.add("hidden");
+  $("errMsgAct").onclick = null;
+}
+$("errMsgClose").addEventListener("click", hideError);
 
 function syncFeedback(text, kind, action) {
   // The tray card shows the result too
   state.syncMsg = { text, kind: kind || "ok", at: Date.now() };
+  if (kind !== "error") hideError(); // a reading that worked clears the last error
   render();
   toast(text, kind, action);
 }
@@ -129,6 +146,7 @@ async function connectClaude() {
   bindAccount();
   render();
   if (res.ok) {
+    hideError();
     toast(t("acct.connected"));
     // First reading right after connecting: still the same user action
     runSync();

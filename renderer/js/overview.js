@@ -6,13 +6,13 @@ let lastM = null; // the last numbers drawn, for the things that open on a click
 // The summary line the vertical format keeps at the top while the page scrolls
 function renderSummary(m) {
   paintLevel($("sumLevel"), m.head.level, m.head.name);
-  $("sumLeft").textContent = t("sum.left", { pct: r0(m.budget > 0 ? Math.max(1 - m.todayRatio, 0) * 100 : 0) });
+  $("sumLeft").textContent = m.dayOff ? t("today.dayOff") : t("sum.left", { pct: r0(m.budget > 0 ? Math.max(1 - m.todayRatio, 0) * 100 : 0) });
   $("sumProj").textContent = m.lv.proj ? t("sum.projected", { pct: r0(m.lv.proj.projected) }) : t("sum.early");
 }
 
-function renderOverview(m) {
+function renderOverview(m, fresh = false) {
   lastM = m;
-  renderVerdict(m);
+  renderVerdict(m, fresh);
   renderToday(m);
   renderSession(m);
   renderExtra();

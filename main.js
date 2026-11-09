@@ -28,7 +28,8 @@ const SETTINGS_FILE = path.join(app.getPath("userData"), "settings.json");
 
 const DEFAULT_SETTINGS = {
   language: "en",
-  theme: "system",
+  theme: "dark", // a new install opens dark
+  screens: "paper", // the data screens in the light theme: light paper (default) or dark CRT. The dark theme is always CRT.
   openAtLogin: false,
   notifyAll: true,
   notifyLevel: true,
@@ -42,6 +43,8 @@ const DEFAULT_SETTINGS = {
   notified: {},
   codeLogs: true, // the hourly strip may use Claude Code's local logs (timestamps and token counts only)
   autoRead: false, // opt-in timer that reads usage every few minutes (see the warning in Settings)
+  reserve: 0, // emergency reserve, % of the week kept out of the daily plan (off by default)
+  reserveRelease: 48, // hours before the reset over which what is left of the reserve joins the plan (0 = never)
 };
 
 // Window frame colors (same as --win and --ink in renderer/css/tokens.css), one set per theme
@@ -50,6 +53,7 @@ const FRAME = {
   dark: { color: "#17191B", symbol: "#E8E6DE" },
 };
 const THEMES = ["system", "light", "dark"];
+const SCREENS = ["crt", "paper"];
 const frameColors = () => FRAME[nativeTheme.shouldUseDarkColors ? "dark" : "light"];
 
 // The title bar buttons are drawn by the system, so they have to be recolored with the theme
@@ -192,7 +196,7 @@ function isWebLink(url) {
 
 function createWindow() {
   const savedTheme = loadSettings().theme;
-  nativeTheme.themeSource = THEMES.includes(savedTheme) ? savedTheme : "system";
+  nativeTheme.themeSource = THEMES.includes(savedTheme) ? savedTheme : "dark";
   const frame = frameColors();
   win = new BrowserWindow({
     width: 1100,
@@ -763,12 +767,14 @@ ipcMain.handle("app-info", () => ({ version: app.getVersion(), electron: process
 
 const BACKUP_KEYS = [
   "manual", "readings", "sessions", "weights", "extra",
-  "language", "theme", "notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "fiveHourThreshold", "remindEvery",
-  "showExtra", "miniWindow", "codeLogs", "shortcutOn", "shortcutKeys",
+  "language", "theme", "screens", "notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "fiveHourThreshold", "remindEvery",
+  "showExtra", "miniWindow", "codeLogs", "shortcutOn", "shortcutKeys", "reserve", "reserveRelease",
 ];
 const BOOLEAN_KEYS = ["notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "showExtra", "miniWindow", "codeLogs", "shortcutOn"];
 const THRESHOLDS = [60, 70, 75, 80, 85]; // the choices in Settings
 const REMIND_HOURS = [0, 2, 4, 8];
+const RESERVE_CHOICES = [0, 5, 10, 15, 20]; // the choices in Settings, Reserve
+const RELEASE_HOURS = [0, 24, 48, 72];
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 const isPct = (v) => isNum(v) && v >= 0 && v <= 100;
 const numOrNull = (v) => (isNum(v) ? v : null);
@@ -841,9 +847,12 @@ function cleanBackupSettings(st) {
   if (Array.isArray(st.weights) && st.weights.length === 7 && st.weights.every((w) => [0, 0.5, 1, 2].includes(w))) next.weights = st.weights;
   if (typeof st.language === "string") next.language = i18n.normalize(st.language);
   if (THEMES.includes(st.theme)) next.theme = st.theme;
+  if (SCREENS.includes(st.screens)) next.screens = st.screens;
   for (const k of BOOLEAN_KEYS) if (typeof st[k] === "boolean") next[k] = st[k];
   if (THRESHOLDS.includes(st.fiveHourThreshold)) next.fiveHourThreshold = st.fiveHourThreshold;
   if (st.remindEvery === "smart" || REMIND_HOURS.includes(st.remindEvery)) next.remindEvery = st.remindEvery;
+  if (RESERVE_CHOICES.includes(st.reserve)) next.reserve = st.reserve;
+  if (RELEASE_HOURS.includes(st.reserveRelease)) next.reserveRelease = st.reserveRelease;
   if (typeof st.shortcutKeys === "string" && normalizeAccelerator(st.shortcutKeys)) next.shortcutKeys = normalizeAccelerator(st.shortcutKeys);
   return next;
 }
@@ -996,9 +1005,10 @@ function applySettings(patch) {
     applyLanguage(next.language);
   }
   if ("theme" in patch) {
-    next.theme = THEMES.includes(patch.theme) ? patch.theme : "system";
+    next.theme = THEMES.includes(patch.theme) ? patch.theme : "dark";
     nativeTheme.themeSource = next.theme;
   }
+  if ("screens" in patch) next.screens = SCREENS.includes(patch.screens) ? patch.screens : "paper";
   if ("shortcutOn" in patch || "shortcutKeys" in patch) {
     // Only a combination that passes the check is kept, so the settings file never holds a bad one
     const keys = normalizeAccelerator(next.shortcutKeys);

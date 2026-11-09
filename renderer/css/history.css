@@ -1,4 +1,4 @@
-/* History: three numbered console blocks. Days (stats and column chart), Previous weeks, When sessions start.
+/* History: three console blocks. Days (stats and column chart, no number: its header holds the range keys), 01 Previous weeks, 02 When sessions start.
    Data sits on CRT screens like the Overview. Columns carry no level color. The accent colors the columns, bone marks today,
    a white tick is the day's budget and red is what went past it. */
 
@@ -10,18 +10,18 @@
 #view-history .pl { flex-wrap: wrap; row-gap: .3rem; }
 #view-history .pn { min-width: 0; white-space: normal; align-items: flex-start; } /* a long heading wraps under its number instead of running out of the block */
 #view-history .pn b { flex: none; }
-.rk { min-height: 2rem; padding-inline: .7rem; font-size: .75rem; }
+.rk { min-height: 2rem; padding-inline: .7rem; font-size: var(--fs-xs); }
 .rk.on { padding-left: 1.3rem; }
 .rk.on::before { left: .5rem; }
-.hnote { max-width: 62rem; padding: 0 .4rem; font-size: .85rem; line-height: 1.45; color: var(--ink2); }
+.hnote { max-width: 62rem; padding: 0 .4rem; font-size: var(--fs-sm); line-height: 1.45; color: var(--ink2); }
 
 /* Stats row */
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; }
 .stat { display: flex; flex-direction: column; gap: .15rem; min-width: 0; padding-left: .7rem; border-left: 1px dotted var(--sline); }
 .stat:first-child { padding-left: .2rem; border-left: 0; }
-.stat .big { font-size: 1.9rem; line-height: 1.05; }
+.stat .big { font-size: var(--fs-3xl); line-height: 1.05; }
 .stat .big small { margin-left: .2rem; font-size: .5em; color: var(--sm); }
-.stat .lab { font: 500 .75rem/1.3 var(--mono); color: var(--sm); overflow-wrap: anywhere; }
+.stat .lab { font: 500 var(--fs-xs)/1.3 var(--mono); color: var(--sm); overflow-wrap: anywhere; }
 @container (max-width: 34rem) {
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: .7rem; }
   .stat:nth-child(odd) { padding-left: .2rem; border-left: 0; }
@@ -30,7 +30,7 @@
 /* Column chart */
 .chart { width: 100%; }
 .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
-.chart .axis { fill: var(--sm); font: 500 .75rem var(--mono); }
+.chart .axis { fill: var(--sm); font: 500 var(--fs-xs) var(--mono); }
 .chart .axis.td { fill: var(--st); font-weight: 600; }
 .chart .h-grid { stroke: var(--sline); stroke-width: 1; stroke-dasharray: 2 4; }
 .chart .h-grid.is-base { stroke-dasharray: none; }
@@ -41,15 +41,15 @@
 .chart .h-none { fill: var(--sline); }
 .chart .h-zero { fill: var(--sm); }
 .chart .hit { fill: transparent; cursor: default; }
-.chart .hit:hover { fill: rgba(228, 239, 230, .07); }
+.chart .hit:hover { fill: color-mix(in srgb, var(--st) 7%, transparent); }
 .crt > .tip {
   position: absolute; z-index: 5; display: flex; transform: translateX(-50%); flex-direction: column; padding: .3rem .6rem; pointer-events: none; white-space: nowrap;
-  background: var(--scr); border: 1px solid var(--crt-accent); color: var(--st); font: 500 .75rem/1.4 var(--mono);
+  background: var(--scr); border: 1px solid var(--crt-accent); color: var(--st); font: 500 var(--fs-xs)/1.4 var(--mono);
 }
 .tip b { font-weight: 600; }
-.legend { display: flex; flex-wrap: wrap; gap: .2rem 1.1rem; font: 500 .75rem/1.3 var(--mono); color: var(--sm); }
+.legend { display: flex; flex-wrap: wrap; gap: .2rem 1.1rem; font: 500 var(--fs-xs)/1.3 var(--mono); color: var(--sm); }
 .legend span { display: inline-flex; align-items: center; }
-.sw { display: inline-block; width: .7rem; height: .7rem; margin-right: .45rem; }
+.sw { display: inline-block; width: .7rem; height: .7rem; margin-right: var(--sp-2); }
 .sw-use { background: var(--crt-accent); }
 .sw-today { background: var(--st); }
 .sw-over { background: var(--pause); }
@@ -57,11 +57,11 @@
 .sw-none { height: 2px; background: var(--sline); }
 
 /* Empty states */
-.hempty { justify-content: flex-start; align-items: flex-start; gap: .35rem; padding: .8rem .9rem; }
-.hempty .mu { font-size: .8rem; }
+.hempty { justify-content: flex-start; align-items: flex-start; gap: var(--sp-2); padding: .8rem .9rem; }
+.hempty .mu { font-size: var(--fs-sm); }
 
 /* Previous weeks */
-.wrow { display: flex; flex-direction: column; gap: .3rem; padding: .45rem 0; border-top: 1px dotted var(--sline); }
+.wrow { display: flex; flex-direction: column; gap: .3rem; padding: var(--sp-2) 0; border-top: 1px dotted var(--sline); }
 .wrow:first-child { padding-top: .1rem; border-top: 0; }
 .wtop { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
 .wrow .sbar { --c: var(--crt-accent); }
@@ -74,5 +74,5 @@
 .mbar i { display: block; width: 100%; min-height: 2px; background: var(--crt-accent); }
 .mc.is-zero .mbar i { height: 2px; background: var(--sline); }
 .mc.is-top .mbar i { background: var(--st); }
-.mlab { position: relative; display: flex; justify-content: center; width: 100%; height: 1rem; font: 500 .75rem/1 var(--mono); color: var(--sm); white-space: nowrap; }
-.mtop { position: absolute; top: 0; left: clamp(1.6rem, var(--at), calc(100% - 1.6rem)); transform: translateX(-50%); font: 600 .75rem/1.2 var(--mono); color: var(--st); white-space: nowrap; }
+.mlab { position: relative; display: flex; justify-content: center; width: 100%; height: 1rem; font: 500 var(--fs-xs)/1 var(--mono); color: var(--sm); white-space: nowrap; }
+.mtop { position: absolute; top: 0; left: clamp(1.6rem, var(--at), calc(100% - 1.6rem)); transform: translateX(-50%); font: 600 var(--fs-xs)/1.2 var(--mono); color: var(--st); white-space: nowrap; }

@@ -4,7 +4,10 @@
 // is no session reading) and the same number in the middle. The dark disc keeps contrast on
 // light and dark taskbars. Each size is drawn separately so the number stays sharp.
 const TRAY_SIZES = [16, 20, 24, 32, 40, 48];
-const TRAY_LEVEL_HEX = ["#46C07F", "#E8C547", "#F28C38", "#F2575A"]; // the CRT level colors, as in the Overview
+// The icon is always a CRT, whatever the Screens choice, so these are the CRT values of --free, --moderate, --tight,
+// --pause, --scr, --sline, --st and --sm (not read from the page, which may be on paper screens)
+const TRAY_LEVEL_HEX = ["#46C07F", "#E8C547", "#F28C38", "#F2575A"];
+const TRAY_CRT = { scr: "#0A0F0C", sline: "#2F4036", st: "#E4EFE6", sm: "#9DB0A2" };
 
 function drawTrayIcon(size, color, label, fraction) {
   const c = document.createElement("canvas");
@@ -15,13 +18,13 @@ function drawTrayIcon(size, color, label, fraction) {
   const stroke = Math.max(2, size * 0.14);
   const r = mid - stroke / 2;
 
-  ctx.fillStyle = "#0A0F0C";
+  ctx.fillStyle = TRAY_CRT.scr;
   ctx.beginPath();
   ctx.arc(mid, mid, mid, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.lineWidth = stroke;
-  ctx.strokeStyle = "#2F4036";
+  ctx.strokeStyle = TRAY_CRT.sline;
   ctx.beginPath();
   ctx.arc(mid, mid, r, 0, Math.PI * 2);
   ctx.stroke();
@@ -35,7 +38,7 @@ function drawTrayIcon(size, color, label, fraction) {
   }
 
   const two = label.length > 1;
-  ctx.fillStyle = "#E4EFE6";
+  ctx.fillStyle = TRAY_CRT.st;
   ctx.font = `700 ${Math.round(size * (two ? (size <= 20 ? 0.58 : 0.5) : 0.66))}px "Segoe UI", Arial, sans-serif`;
   if ("letterSpacing" in ctx) ctx.letterSpacing = two ? `${-(size / 32).toFixed(1)}px` : "0px";
   ctx.textAlign = "center";
@@ -47,7 +50,7 @@ function drawTrayIcon(size, color, label, fraction) {
 function updateTray(m) {
   if (!api) return;
   let tooltip = t("tray.setup", { name: t("app.name") });
-  let color = "#9DB0A2";
+  let color = TRAY_CRT.sm;
   let label = "?";
   let fraction = 0;
   if (m) {
@@ -57,7 +60,7 @@ function updateTray(m) {
     fraction = Math.max(0, shown) / 100;
     tooltip = t("tray.head", { name: t("app.name"), level: m.head.name })
       + (m.five ? `\n${t("tray.session", { pct: pct(m.five.used) })}` : "")
-      + `\n${t("tray.week", { pct: pct(m.w.used) })}\n${t("tray.today", { pct: pct(m.todayRatio * 100) })}\n${t("tray.updated", { ago: ago(lastUpdate()) })}`;
+      + `\n${t("tray.week", { pct: pct(m.w.used) })}\n${m.dayOff ? t("tray.todayOff", { pct: pct(m.spent) }) : t("tray.today", { pct: pct(m.todayRatio * 100) })}\n${t("tray.updated", { ago: ago(lastUpdate()) })}`;
   }
   const images = TRAY_SIZES.map((size) => ({ scale: size / 16, dataUrl: drawTrayIcon(size, color, label, fraction) }));
   api.setTray({ images, tooltip });
@@ -78,6 +81,7 @@ function publishSummary(m, src) {
     msg: state.syncMsg && Date.now() - state.syncMsg.at < 10000 ? state.syncMsg : null,
     lang: I18N.getLang(),
     dark: document.documentElement.dataset.theme === "dark",
+    paper: document.documentElement.dataset.screens === "paper", // only ever set with the light theme (its default there)
     lamp: { key: lvKey(STATE_LEVEL[st]), text: st === "none" ? t("src.none") : t(`state.${st}`) },
     notice:
       st === "stale" || st === "offline"
@@ -90,15 +94,18 @@ function publishSummary(m, src) {
     const figures = verdictFigures(m);
     const answer = verdictAnswer(m);
     const shown = verdictLevel(m);
-    s.head = { key: lvKey(shown), name: lvName(shown), answer: answer.text, face: answer.face, pct: figures.pct, when: figures.when };
+    // The card shows the face's first frame, still
+    s.head = { key: lvKey(shown), name: lvName(shown), answer: answer.text, face: answer.face[0].trim(), pct: figures.pct, when: figures.when };
     s.rows = [];
 
     // Today: a share of today's budget; "left" until it is spent, then "over"
-    const off = m.budget <= 0 && m.spent <= 0;
+    // An Off day is not rated: it says Off and what was used (a share of the week), with no level or bar
+    const off = m.dayOff;
     const ratio = off ? 0 : m.todayRatio;
     const left = pct(Math.max(1 - ratio, 0) * 100);
+    const usedToday = pct(m.spent);
     const todayLevel = off ? null : m.lv.today;
-    s.rows.push({ kind: "today", label: t("pop.today"), text: off ? t("day.off") : t("pop.left", { pct: left }), short: off ? "–" : left, isOver: !off && isOverBudget(ratio), off, level: todayLevel, ...budgetBarValues(ratio) });
+    s.rows.push({ kind: "today", label: t("pop.today"), text: off ? t("pop.offUsed", { pct: usedToday }) : t("pop.left", { pct: left }), short: off ? usedToday : left, isOver: !off && isOverBudget(ratio), off, level: todayLevel, ...budgetBarValues(ratio) });
 
     if (m.five) {
       const f = m.five;

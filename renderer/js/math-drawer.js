@@ -5,7 +5,7 @@ const MATH_SECTIONS = [
   { id: "session", code: "01", title: "mod.sessionShort", rows: "session" },
   { id: "today", code: "02", title: "card.today", rows: "today" },
   { id: "week", code: "03", title: "card.week", rows: "week" },
-  { id: "verdict", code: "03", title: "blk.verdict", rows: "projection" }, // the verdict is part of block 03
+  { id: "verdict", code: "04", title: "blk.verdict", rows: "projection" },
 ];
 let mathSection = null; // the section the drawer was opened at, while it is open
 

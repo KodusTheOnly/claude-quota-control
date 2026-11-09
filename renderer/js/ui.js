@@ -2,7 +2,7 @@
 
 const r0 = (n) => String(Math.round(n) || 0);
 const clamp100 = (n) => Math.max(0, Math.min(100, n));
-const LEVEL_CLASSES = ["lv-free", "lv-moderate", "lv-tight", "lv-pause", "lv-none"];
+const LEVEL_CLASSES = ["lv-free", "lv-moderate", "lv-tight", "lv-pause", "lv-none", "lv-room", "lv-reserve"];
 
 // "free", "moderate", "tight", "pause", or "none" for a block that cannot be rated yet
 const lvKey = (level) => (level === null || level === undefined ? "none" : LEVEL_KEYS[level]);

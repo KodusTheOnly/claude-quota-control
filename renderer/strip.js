@@ -51,7 +51,8 @@ function render(s) {
     value = "–";
     flag = t("level.none.name");
   } else if (today.off) {
-    value = "–";
+    value = today.short; // what was used today, a share of the week
+
     flag = t("day.off");
   } else {
     value = today.short;

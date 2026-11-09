@@ -5,3 +5,5 @@ dist/
 .DS_Store
 Thumbs.db
 test/layout/out/
+CLAUDE.md
+.claude/

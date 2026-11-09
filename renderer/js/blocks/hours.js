@@ -44,11 +44,11 @@ function drawHours() {
   if (!m || !box.clientWidth) return;
   const weekStart = m.w.resetsAt - WEEK;
   const { cells, left } = hoursUsageFor(m);
-  // Same axis as the chart and the day columns: the seven calendar days, from the midnight that starts the first day.
-  // The week's last hours (after the seventh midnight, up to the reset) are not drawn; they still count in the total.
+  // Same axis as the chart and the day columns: the seven calendar days, from the midnight that starts the first day,
+  // then the week's last hours up to the reset.
   const axisStart = startOfDay(weekStart);
-  const axisLen = 7 * DAY;
-  const axisEnd = axisStart + axisLen;
+  const axisEnd = Math.max(m.w.resetsAt, axisStart + 7 * DAY);
+  const axisLen = axisEnd - axisStart;
   const step = box.clientWidth / (axisLen / HOUR) >= 4 ? 1 : 3;
 
   const blocks = [];
@@ -69,6 +69,8 @@ function drawHours() {
     t0 = d.getTime();
   }
   const max = Math.max(...blocks.map((b) => b.v), 0.0001);
+  // Each hour takes the color of its day's level, as the day's card under it (Free when the day is not rated)
+  const dayLevel = new Map((m.week || []).map((d) => [dayKey(d.ms), d.level]));
   const nowBlock = hourBlockStart(m.now, step);
 
   box.replaceChildren(
@@ -86,7 +88,7 @@ function drawHours() {
       const when = fmtTime(b.t0);
       const shown = b.v >= 0.05 ? Math.round(b.v * 10) / 10 : 0;
       if (shown > 0) {
-        c.classList.add(b.exact ? "m" : "e");
+        c.classList.add(b.exact ? "m" : "e", `lv-${lvKey(dayLevel.get(dayKey(b.t0)) ?? 0)}`);
         c.style.setProperty("--a", (0.18 + 0.82 * (b.v / max)).toFixed(2));
         c.title = t(b.exact ? "hrs.tipMeasured" : "hrs.tipEst", { when, pct: fmtNum(shown, 0, 1) });
       } else {

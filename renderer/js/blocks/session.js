@@ -3,19 +3,19 @@
 function renderSession(m) {
   const f = m.five;
   const level = f ? m.lv.session : null;
-  // How much of the 5-hour window has gone by, when Claude told us when it ends
-  const elapsed = f && f.resetsAt ? clamp100(100 - ((f.resetsAt - m.now) / (5 * HOUR)) * 100) : null;
 
   $("sPct").textContent = f ? `${r0(f.used)}%` : "–";
   $("sOf").textContent = f ? t("session.of5h") : "";
+  // Like Today, the level only shows when it matters (Tight or Pause): the number and the bar already say the rest
   paintLevel($("sLevel"), level);
+  $("sLevel").classList.toggle("hidden", !(level >= 2));
   $("sResets").textContent = !f ? t("session.noReading") : f.resetsAt ? t("mod.sessionResets", { dur: fmtDur(f.resetsAt - m.now) }) : t("session.logged", { ago: ago(f.at) });
 
   const bar = $("sBar");
   setLevelClass(bar, level);
-  setBar(bar, { fill: f ? f.used : 0, tick: elapsed });
+  // No mark on this bar: the session is already a hard limit, so the app does not pace it (the week and today do that)
+  setBar(bar, { fill: f ? f.used : 0, tick: null });
   bar.setAttribute("aria-label", f ? t("mod.aria.session", { used: r0(f.used) }) : t("session.noReading"));
-  setBarLabel($("sBl"), elapsed === null ? "" : t("session.passed", { pct: r0(elapsed) }));
 
   // Detail: how fast it is climbing, once two readings of the same window exist
   const p = m.pace;

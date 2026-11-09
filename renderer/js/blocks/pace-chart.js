@@ -1,5 +1,7 @@
-// The week's pace chart, drawn as SVG on a CRT: the plan's pace (white), what was used (level color),
-// the parts that went over a day's budget (red), and where the pace so far leads (dashed).
+// The week's pace chart, drawn as SVG on a CRT: the plan's pace (white), what was used (each day in its level's color),
+// the parts that went over a day's budget (red), where the pace so far leads (dashed), the goal line the level
+// counts to (dotted, at 100%), the reserve, the time it would leave without Claude before the reset (red dots on that line),
+// and the room still free before the reset (a faint accent box from now to the reset, with how much it holds).
 // It draws in pixels, so the text stays at its real size, and draws again whenever its box changes size.
 
 const CHART_WHITE = "#E4EFE6";
@@ -20,6 +22,13 @@ function drawPaceChart() {
   if (!chartInput || !box.clientWidth || !box.clientHeight) return;
   const { m, series: s } = chartInput;
   const rem = remPx();
+  // The chart palette comes from the tokens; the constants above are the fallbacks.
+  const PAL = {
+    white: cssVar("--st") || CHART_WHITE, muted: cssVar("--sm") || CHART_MUTED, red: cssVar("--pause") || CHART_RED,
+    grid: cssVar("--crt-grid") || "#1E2A23", gridDay: cssVar("--crt-grid-day") || "#26332B",
+    reserve: cssVar("--crt-reserve") || "#1B2236",
+    shade: cssVar("--crt-shade") || "rgba(0, 0, 0, .35)", band: cssVar("--crt-band") || "rgba(255, 255, 255, .03)",
+  };
   const W = box.clientWidth;
   const H = box.clientHeight;
   // The % scale lives in a gutter on the left (as wide as the HRS label's column); the hours and the day columns
@@ -28,11 +37,14 @@ function drawPaceChart() {
   const R = 0;
   const T = 0.75 * rem;
   const B = 0.25 * rem;
-  // x is in days from the midnight that starts the first day: seven equal columns, Tuesday to Monday. The chart stops at the
-  // seventh midnight (the week's last hours are not drawn, but still count); the part before the reset is shaded as "not this week".
-  const X = (x) => L + (Math.min(x, DAYS_SHOWN + 1) / DAYS_SHOWN) * (W - L - R);
+  // x is in days from the midnight that starts the first day: seven equal columns, Tuesday to Monday, then the week's last
+  // hours up to the reset (a narrower column). The part before the reset is shaded as "not this week".
+  const AX = Math.max(s.span, DAYS_SHOWN);
+  const X = (x) => L + (Math.min(x, AX) / AX) * (W - L - R);
   const Y = (v) => T + (1 - Math.min(Math.max(v, 0), 100) / 100) * (H - T - B);
-  const color = cssVar(`--${["free", "moderate", "tight", "pause"][m.lv.week ?? 0]}`);
+  const accent = cssVar("--crt-accent") || CHART_NOW;
+  // The week's color: its level, or the accent on the last day with room to spend (the risk then is leaving it unused)
+  const color = m.endRoom ? accent : cssVar(`--${["free", "moderate", "tight", "pause"][m.lv.week ?? 0]}`);
   const fmt = (pts) => pts.map((p) => `${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(" ");
 
   svg.textContent = "";
@@ -40,7 +52,7 @@ function drawPaceChart() {
   svg.setAttribute("aria-label", t("chart.aria", { used: r0(s.usedNow), expected: r0(m.lv.expected) }));
   const add = (tag, attrs) => el(tag, attrs, svg);
   const text = (x, y, str, attrs = {}) => {
-    const n = add("text", { x, y, fill: CHART_MUTED, ...attrs });
+    const n = add("text", { x, y, fill: PAL.muted, ...attrs });
     n.textContent = str;
     return n;
   };
@@ -48,48 +60,99 @@ function drawPaceChart() {
   // Grid and scale: 0, 50 and 100%, plus quarters when there is room
   const inner = H - T - B;
   for (const v of inner > 6 * rem ? [0, 25, 50, 75, 100] : inner > 3.4 * rem ? [0, 50, 100] : [0, 100]) {
-    add("line", { x1: L, x2: W - R, y1: Y(v), y2: Y(v), stroke: "#1E2A23" });
+    add("line", { x1: L, x2: W - R, y1: Y(v), y2: Y(v), stroke: PAL.grid });
     // The scale sits in the gutter, level with its line (0% just above the line so it clears the HRS label)
     text(L - 6, v === 0 ? Y(v) - 3 : Y(v) + 4, `${v}%`, { "text-anchor": "end" });
   }
 
-  if (s.s0 > 0.01) add("rect", { x: X(0), y: T, width: X(s.s0) - X(0), height: H - T - B, fill: "#000", opacity: ".35" });
-  // Where the week starts (the reset): a dashed line and its time. The label is placed with the others, below.
+  // The reserve still held (hatched accent, from the plan's ceiling to the goal; its lower edge rises while the
+  // reserve is released). Drawn under every line.
+  if (s.reserve) {
+    const defs = add("defs", {});
+    const pat = el("pattern", { id: "rzHatch", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, defs);
+    el("rect", { width: 6, height: 6, fill: PAL.reserve }, pat);
+    el("rect", { width: 2, height: 6, fill: accent }, pat);
+    const top = [{ x: s.span, y: s.goal }, { x: s.s0, y: s.goal }];
+    add("polygon", { points: fmt([...s.reserve, ...top]), fill: "url(#rzHatch)", opacity: ".7" });
+  }
+
+  // What is still free before the reset: an accent box from now to the reset, from what is used to the plan's ceiling.
+  // Its shape says it: tall and narrow, use it; flat and wide, keep it. Up to where the projection ends it is faint (the
+  // pace so far will use that); above it, stronger: the extra there is to spend.
+  const roomBox = s.room ? { x0: X(s.room.x0), x1: X(s.room.x1), y0: Y(s.room.y1), y1: Y(s.room.y0) } : null;
+  // With no projection inside the box (none yet, or a pace that reaches the goal) all of it is faint: nothing extra to spend.
+  const spendBox = roomBox && s.room.mid !== null ? { ...roomBox, y1: Y(s.room.mid) } : null;
+  if (roomBox) {
+    const rect = (b, op) => add("rect", { x: b.x0, y: b.y0, width: b.x1 - b.x0, height: Math.max(b.y1 - b.y0, 0), fill: accent, "fill-opacity": op });
+    rect(spendBox ? { ...roomBox, y0: spendBox.y1 } : roomBox, ".06");
+    if (spendBox) rect(spendBox, ".2");
+    add("rect", { x: roomBox.x0, y: roomBox.y0, width: roomBox.x1 - roomBox.x0, height: roomBox.y1 - roomBox.y0, fill: "none", stroke: accent, "stroke-opacity": ".45" });
+  }
+
+  // The line the level counts to (the goal, 100%), in the week's color. Its width is not the NOW line's 1.5.
+  const lockY = Y(s.goal);
+  add("line", { x1: L, x2: W - R, y1: lockY, y2: lockY, stroke: color, opacity: ".55", "stroke-width": 1.25, "stroke-dasharray": "1 4", "stroke-linecap": "round" });
+
+  if (s.s0 > 0.01) add("rect", { x: X(0), y: T, width: X(s.s0) - X(0), height: H - T - B, fill: PAL.shade });
+  // Where the week starts (the last reset): a dashed line, no label. The footer already says when the next reset is.
   const startX = s.s0 > 0.01 ? X(s.s0) : null;
-  if (startX !== null) add("line", { x1: startX, x2: startX, y1: T, y2: H - B, stroke: CHART_MUTED, "stroke-dasharray": "3 3", opacity: ".7" });
+  if (startX !== null) add("line", { x1: startX, x2: startX, y1: T, y2: H - B, stroke: PAL.muted, "stroke-dasharray": "3 3", opacity: ".7" });
   // Day columns: shaded every other day, with a line at each midnight (the names are in the footer)
   for (let i = 0; i < DAYS_SHOWN; i++) {
     const x0 = Math.max(i, s.s0);
     const x1 = i + 1;
     if (x1 - x0 < 0.02) continue;
-    if (i % 2 === 0) add("rect", { x: X(x0), y: T, width: X(x1) - X(x0), height: H - T - B, fill: "#fff", opacity: ".03" });
-    if (i > 0 && i >= s.s0) add("line", { x1: X(i), x2: X(i), y1: T, y2: H - B, stroke: "#26332B" });
+    if (i % 2 === 0) add("rect", { x: X(x0), y: T, width: X(x1) - X(x0), height: H - T - B, fill: PAL.band });
+    if (i > 0 && i >= s.s0) add("line", { x1: X(i), x2: X(i), y1: T, y2: H - B, stroke: PAL.gridDay });
   }
+  if (AX > DAYS_SHOWN + 0.02) add("line", { x1: X(DAYS_SHOWN), x2: X(DAYS_SHOWN), y1: T, y2: H - B, stroke: PAL.gridDay });
 
   // The plan's pace, then what was used (with a faint area under it)
   const px = (pts) => pts.map((p) => ({ x: X(p.x), y: Y(p.y) }));
   const projPx = s.proj && s.proj.length > 1 ? px(s.proj) : null;
   // A projection only a few pixels long is just a stub next to the marker: it adds nothing, so it is not drawn
   const showProj = projPx !== null && pathLength(projPx) > 1.5 * rem;
-  add("polyline", { points: fmt(s.expected), fill: "none", stroke: CHART_WHITE, "stroke-width": 2 });
-  const area = `${fmt(s.used)} ${X(s.used[s.used.length - 1].x).toFixed(1)},${Y(0)} ${X(s.used[0].x).toFixed(1)},${Y(0)}`;
-  add("polygon", { points: area, fill: color, opacity: ".22" });
+  add("polyline", { points: fmt(s.expected), fill: "none", stroke: PAL.white, "stroke-width": 2 });
+  // Each day's piece of the used line, and the area under it, takes the color of that day's level, as its card and its
+  // hours (Free when the day is not rated)
+  const dayColor = (k) => cssVar(`--${["free", "moderate", "tight", "pause"][(m.week[k] && m.week[k].level) ?? 0]}`);
+  const segColor = (i) => dayColor(Math.floor((s.used[i - 1].x + s.used[i].x) / 2));
+  const areas = [];
+  for (let i = 1; i < s.used.length; i++) {
+    const c = segColor(i);
+    if (!areas.length || areas[areas.length - 1].c !== c) areas.push({ c, pts: [s.used[i - 1]] });
+    areas[areas.length - 1].pts.push(s.used[i]);
+  }
+  for (const a of areas) {
+    const poly = `${fmt(a.pts)} ${X(a.pts[a.pts.length - 1].x).toFixed(1)},${Y(0)} ${X(a.pts[0].x).toFixed(1)},${Y(0)}`;
+    add("polygon", { points: poly, fill: a.c, opacity: ".22" });
+  }
   // Runs of the line: solid where the hours placed the use from close readings (or the piece is straight), short dashes where it is an estimate
   const runs = [];
   for (let i = 1; i < s.used.length; i++) {
     const est = Boolean(s.used[i].est);
-    if (!runs.length || runs[runs.length - 1].est !== est) runs.push({ est, pts: [s.used[i - 1]] });
+    const c = segColor(i);
+    const last = runs[runs.length - 1];
+    if (!last || last.est !== est || last.c !== c) runs.push({ est, c, pts: [s.used[i - 1]] });
     runs[runs.length - 1].pts.push(s.used[i]);
   }
-  for (const run of runs) add("polyline", { points: fmt(run.pts), fill: "none", stroke: color, "stroke-width": 3, "stroke-linejoin": "round", ...(run.est ? { "stroke-dasharray": "3 3" } : {}) });
-  for (const seg of s.over) add("polyline", { points: fmt(seg), fill: "none", stroke: CHART_RED, "stroke-width": 4 });
+  for (const run of runs) add("polyline", { points: fmt(run.pts), fill: "none", stroke: run.c, "stroke-width": 3, "stroke-linejoin": "round", ...(run.est ? { "stroke-dasharray": "3 3" } : {}) });
+  for (const seg of s.over) add("polyline", { points: fmt(seg), fill: "none", stroke: PAL.red, "stroke-width": 4 });
   // Where 5-hour sessions started: a short tick on the base, with the time on hover
   const TICK = 16;
   for (const st of s.starts) {
-    const tick = add("line", { x1: X(st.x), x2: X(st.x), y1: H - B - TICK, y2: H - B, stroke: CHART_MUTED, "stroke-width": 2 });
+    const tick = add("line", { x1: X(st.x), x2: X(st.x), y1: H - B - TICK, y2: H - B, stroke: PAL.muted, "stroke-width": 2 });
     el("title", {}, tick).textContent = t("chart.sessionStart", { time: fmtTime(st.ms) });
   }
   if (showProj) add("polyline", { points: fmt(s.proj), fill: "none", stroke: color, "stroke-width": 2, "stroke-dasharray": "6 5" });
+  // Where the projection ends at the reset: a dot (the number is up in the band, "at reset"), kept whole at the right edge
+  if (showProj && s.end && s.end.kind === "reset") {
+    const e = projPx[projPx.length - 1];
+    add("circle", { cx: Math.min(e.x, W - R - 4), cy: e.y, r: 3, fill: color });
+  }
+  // From T to the reset: the time without Claude, thicker red dots over the 100% line
+  const lockPx = s.lock ? px(s.lock) : null;
+  if (lockPx) add("polyline", { points: fmt(s.lock), fill: "none", stroke: PAL.red, "stroke-width": 4, "stroke-dasharray": "1 6", "stroke-linecap": "round" });
 
   // Now
   const nowColor = cssVar("--crt-accent") || CHART_NOW;
@@ -98,8 +161,8 @@ function drawPaceChart() {
   add("line", { x1: nx, x2: nx, y1: T, y2: H - B, stroke: nowColor, "stroke-width": 1.5 });
   add("circle", { cx: nx, cy: ny, r: 5, fill: color });
 
-  // The two labels ("now 62%" and where the pace leads). Each one tries a handful of spots and the
-  // pair that touches the fewest lines, and each other, wins.
+  // The labels: "NOW", the room left, "out" when the limit is already reached, and the names of the lines.
+  // Each one tries a handful of spots, and the set that touches the fewest lines, and each other, wins.
   const upper = (str) => str.toLocaleUpperCase(I18N.locale());
   const items = [];
   const nowText = text(0, 0, t("chart.now"), { fill: nowColor, "font-weight": "600", class: "lbl" });
@@ -110,14 +173,52 @@ function drawPaceChart() {
   });
   items.push({ node: nowText, cands: nowCands });
 
-  if (startX !== null) {
-    const startText = text(0, 0, fmtTime(m.w.resetsAt - WEEK), { class: "lbl" });
-    items.push({ node: startText, cands: [{ x: startX + 4, y: T + 0.85 * rem, anchor: "start", pen: 0 }] });
+  // What there is to spend, one number (the band's "to spend"): in the strong part of the box, centered first; just
+  // above the box when that part is too short; not at all when the box is too narrow for it.
+  if (spendBox && s.room.spend >= 1) {
+    const roomText = text(0, 0, `${s.room.spend}%`, { fill: accent, "font-weight": "600", class: "lbl" });
+    const bw = spendBox.x1 - spendBox.x0;
+    const bh = spendBox.y1 - spendBox.y0;
+    const bb = roomText.getBBox();
+    const tw = bb.width || 3 * 0.6 * rem;
+    if (bw >= tw + 10) {
+      const cx = spendBox.x0 + bw / 2;
+      const cands = [];
+      const rows = bh >= 1.3 * rem ? [spendBox.y0 + bh / 2 + 0.35 * rem, spendBox.y0 + 1.05 * rem, spendBox.y1 - 0.4 * rem] : [];
+      rows.push(spendBox.y0 - 4);
+      rows.forEach((y, i) => {
+        cands.push({ x: cx, y, anchor: "middle", pen: i * 2 }, { x: spendBox.x0 + 5, y, anchor: "start", pen: i * 2 + 0.5 }, { x: spendBox.x1 - 5, y, anchor: "end", pen: i * 2 + 1 });
+      });
+      items.push({ node: roomText, cands });
+    } else roomText.remove();
   }
 
   if (s.end && s.end.kind === "out") {
-    const outText = text(0, 0, upper(t("forecast.out")), { fill: CHART_RED, "font-weight": "600", class: "lbl" });
+    const outText = text(0, 0, upper(t("forecast.out")), { fill: PAL.red, "font-weight": "600", class: "lbl" });
     items.push({ node: outText, cands: [{ x: W - R - 6, y: Y(100) + 1.25 * rem, anchor: "end", pen: 0 }] });
+  }
+
+  // The lines say their own names (no legend needed for them): "used" a little before now, "expected" and "projection"
+  // ahead of it. Each name tries a few spots along its line, just above it on the left or just under it on the right.
+  const lineCands = (pts, xs, pen0) => {
+    const cands = [];
+    xs.forEach((x, i) => {
+      const y = yAt(pts, x);
+      if (y === null) return;
+      cands.push({ x: X(x) - 4, y: Y(y) - 7, anchor: "end", pen: pen0 + i * 2 }, { x: X(x) + 4, y: Y(y) + 1.1 * rem, anchor: "start", pen: pen0 + i * 2 + 0.5 });
+    });
+    return cands;
+  };
+  const inWeek = (xs) => xs.filter((x) => x > s.s0 + 0.15 && x < AX - 0.05);
+  const lineLabel = (key, fill, pts, xs, pen0) => {
+    const cands = lineCands(pts, inWeek(xs), pen0);
+    if (cands.length) items.push({ node: text(0, 0, t(key), { fill, class: "lbl" }), cands });
+  };
+  lineLabel("chart.legUsed", dayColor(s.todayIdx), s.used, [s.nowX - 0.4, s.nowX - 1.2, s.nowX - 2.2], 1);
+  lineLabel("chart.legExpected", PAL.white, s.expected, [s.nowX + 1.2, s.nowX + 2.4, s.nowX - 1.6], 1);
+  if (showProj) {
+    const end = s.proj[s.proj.length - 1].x;
+    lineLabel("chart.legProj", color, s.proj, [s.nowX + (end - s.nowX) * 0.55, s.nowX + (end - s.nowX) * 0.8, s.nowX + (end - s.nowX) * 0.3], 2);
   }
 
   const obstacles = [
@@ -125,6 +226,8 @@ function drawPaceChart() {
     { pts: px(s.used), w: 14 },
     ...s.over.map((seg) => ({ pts: px(seg), w: 14 })),
     ...(showProj ? [{ pts: projPx, w: 14 }] : []),
+    ...(lockPx ? [{ pts: lockPx, w: 14 }] : []),
+    { pts: [{ x: L, y: lockY }, { x: W - R, y: lockY }], w: 4 },
     { pts: [{ x: nx, y: T }, { x: nx, y: H - B }], w: 4 },
     ...s.starts.map((st) => ({ pts: [{ x: X(st.x), y: H - B - TICK }, { x: X(st.x), y: H - B }], w: 4 })),
     ...(startX !== null ? [{ pts: [{ x: startX, y: T }, { x: startX, y: H - B }], w: 4 }] : []),
@@ -134,6 +237,16 @@ function drawPaceChart() {
 }
 
 // ---- Label placement ----
+
+// The y of a line (points sorted by x) at x, or null outside it
+function yAt(pts, x) {
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1];
+    const b = pts[i];
+    if (x >= a.x && x <= b.x) return b.x === a.x ? b.y : a.y + ((x - a.x) / (b.x - a.x)) * (b.y - a.y);
+  }
+  return null;
+}
 
 function pathLength(pts) {
   let len = 0;
@@ -176,7 +289,7 @@ function placeLabels(items, obstacles, bounds) {
     const asc = box.height ? -box.y : fs * 0.8;
     const desc = box.height ? box.height + box.y : fs * 0.25;
     for (const c of it.cands) {
-      const x0 = c.anchor === "end" ? c.x - w : c.x;
+      const x0 = c.anchor === "end" ? c.x - w : c.anchor === "middle" ? c.x - w / 2 : c.x;
       c.rect = { x0: x0 - PAD, x1: x0 + w + PAD, y0: c.y - asc - PAD, y1: c.y + desc + PAD };
       let cost = c.pen;
       const out = Math.max(bounds.x0 - c.rect.x0, c.rect.x1 - bounds.x1, bounds.y0 - c.rect.y0, c.rect.y1 - bounds.y1, 0);
