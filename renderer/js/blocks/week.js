@@ -118,6 +118,7 @@ function renderWeek(m) {
     ...(s.used.some((p) => p.est) ? [["chart.legEst", weekColor, "dotted"]] : []),
     ...(s.reserve ? [["chart.legReserve", cssVar("--crt-accent"), ""]] : []),
     ...(s.starts.length ? [["chart.legStart", legMuted, "tick"]] : []),
+    ...(activeHours() ? [["chart.legActive", cssVar("--crt-accent"), "active"]] : []),
   ];
   $("paceLeg").replaceChildren(
     ...legend.map(([key, color, style]) => {
@@ -125,6 +126,7 @@ function renderWeek(m) {
       const line = node("i");
       line.style.borderTopColor = color;
       if (style === "tick") Object.assign(line.style, { width: "0", height: "1em", borderTop: "0", borderLeft: `2px solid ${legMuted}`, marginRight: ".7em" }); // a short vertical tick, as on the chart
+      else if (style === "active") Object.assign(line.style, { borderTopWidth: "3px", opacity: ".75" }); // the bar under the HRS strip
       else if (style) line.style.borderTopStyle = style;
       item.append(line, t(key));
       return item;

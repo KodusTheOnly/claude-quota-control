@@ -138,10 +138,16 @@ const SCENARIOS = {
     delete s.extra;
     return s;
   },
-  // Not signed in to Claude: the header offers to connect
+  // Active hours from 09:00 to 01:00: the chart shades the nights and the plan stands still in them
+  active: (s) => {
+    s.activeHours = { start: 9, end: 1 };
+    return s;
+  },
+  // Not signed in to Claude: the header offers to connect. Active hours are on, so Settings shows its longest form.
   noaccount: (s) => {
     s.claudeConnected = false;
     s.manual.via = "manual";
+    s.activeHours = { start: 9, end: 1 };
     return s;
   },
   // Nothing read yet (first run): the Overview asks for a first reading

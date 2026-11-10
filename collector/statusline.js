@@ -68,15 +68,32 @@ function sameWeek(a, b) {
   return a && b && a.resetsAt && b.resetsAt && Math.abs(a.resetsAt - b.resetsAt) < 3600000;
 }
 
-// Weekday weights (0 = Sunday), set in the app
-function weightedDays(from, to, w) {
+// Weekday weights (0 = Sunday) and active hours, set in the app. Same as weightPieces / weightedDays in
+// renderer/js/core.js: a day weighs its weight, spread over its active hours (the whole day when there are none);
+// a window that crosses midnight counts its two parts for the calendar day that holds them.
+function activeSpans(ms, a) {
+  const d = new Date(ms);
+  const h = (x) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), x).getTime();
+  if (a.start < a.end) return [[h(a.start), h(a.end)]];
+  return [[h(0), h(a.end)], [h(a.start), h(24)]].filter(([x, y]) => y > x);
+}
+function weightedDays(from, to, w, a = null) {
   let total = 0;
   let cur = from;
   while (cur < to) {
     const d = new Date(cur);
     const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
     const end = Math.min(next, to);
-    total += ((end - cur) / DAY_MS) * w[d.getDay()];
+    if (!a) total += ((end - cur) / DAY_MS) * w[d.getDay()];
+    else {
+      const spans = activeSpans(cur, a);
+      const len = spans.reduce((s, [x, y]) => s + y - x, 0);
+      for (const [x, y] of spans) {
+        const p0 = Math.max(x, cur);
+        const p1 = Math.min(y, end);
+        if (p1 > p0) total += ((p1 - p0) / len) * w[d.getDay()];
+      }
+    }
     cur = end;
   }
   return total;
@@ -84,15 +101,15 @@ function weightedDays(from, to, w) {
 
 // Same as dayShare / dayBudget in renderer/js/core.js: today's weight counts only the part of
 // today inside the week (from the reset time on the reset day, up to the next reset on the last day)
-function dayBudget(remaining, resetsAt, now, w) {
+function dayBudget(remaining, resetsAt, now, w, a = null) {
   if (!resetsAt) return remaining / 7;
   const d = new Date(now);
   const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
   const from = Math.max(start, resetsAt - 7 * DAY_MS);
-  const share = weightedDays(from, Math.min(next, resetsAt), w);
+  const share = weightedDays(from, Math.min(next, resetsAt), w, a);
   if (share <= 0) return 0;
-  return (Math.max(remaining, 0) * share) / Math.max(weightedDays(from, resetsAt, w), share);
+  return (Math.max(remaining, 0) * share) / Math.max(weightedDays(from, resetsAt, w, a), share);
 }
 
 // Short log of the readings (time, weekly %, session %, session reset), so the app can rebuild
@@ -144,7 +161,7 @@ function record(input) {
   const w = weightsOf(config);
   days[today] = {
     spent: Math.round(((entry.spent || 0) + delta) * 100) / 100,
-    budget: Math.round(dayBudget(100 - dayStart.used, weekly.resetsAt, now, w) * 100) / 100,
+    budget: Math.round(dayBudget(100 - dayStart.used, weekly.resetsAt, now, w, activeOf(config)) * 100) / 100,
     endUsed: weekly.used,
   };
 
@@ -190,6 +207,14 @@ function todayText(text, today, now, w) {
   if (w[new Date(now).getDay()] !== 0) return `${text.today} ${Math.round(today.spent)}/${Math.round(today.budget)}%`;
   const used = Math.round(today.spent);
   return used > 0 ? `${text.today} ${used}% (${text.off})` : `${text.today} ${text.off}`;
+}
+
+// Same check as activeHours() in renderer/js/core.js
+function activeOf(config) {
+  const a = config && config.activeHours;
+  const isHour = (h) => Number.isInteger(h) && h >= 0 && h <= 23;
+  if (!a || !isHour(a.start) || !isHour(a.end) || a.start === a.end) return null;
+  return { start: a.start, end: a.end };
 }
 
 function weightsOf(config) {

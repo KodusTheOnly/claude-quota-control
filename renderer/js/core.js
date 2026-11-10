@@ -122,17 +122,55 @@ function weights() {
 function evenWeights() {
   return weights().every((x) => x === 1);
 }
-// Sum of the weights between two instants, counting the fraction of each day
-function weightedDays(from, to, w = weights()) {
-  let total = 0;
+// Active hours (Settings): the part of each day the plan counts, as whole hours { start, end } (0-23).
+// A window can cross midnight (9 to 1): then a calendar day holds two parts, 00:00-01:00 and 09:00-24:00,
+// and both count for that calendar day. A whole day still weighs its weight, spread only over the window,
+// so the time outside it counts as nothing. null (or start = end) is the whole day.
+const ACTIVE_DEFAULT = { start: 9, end: 1 }; // what Settings offers when the window is turned on
+const isHour = (h) => Number.isInteger(h) && h >= 0 && h <= 23;
+function activeHours(s = state.settings) {
+  const a = s && s.activeHours;
+  if (!a || !isHour(a.start) || !isHour(a.end) || a.start === a.end) return null;
+  return { start: a.start, end: a.end };
+}
+// The window's parts inside the calendar day that holds `ms`, as [from, to] times
+function activeSpans(ms, a) {
+  const d = new Date(ms);
+  const h = (x) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), x).getTime();
+  if (a.start < a.end) return [[h(a.start), h(a.end)]];
+  return [[h(0), h(a.end)], [h(a.start), h(24)]].filter(([x, y]) => y > x);
+}
+// The pieces of time between from and to over which the plan's weight runs at a steady rate:
+// [{ from, to, wt, len }], where a piece is worth ((to - from) / len) * wt weighted days. Without active hours
+// each calendar day is one piece (len = DAY); with them, each part of the window is one (len = the window's
+// length that day) and the time outside the window is left out.
+function weightPieces(from, to, w = weights(), a = activeHours()) {
+  const out = [];
   let cur = from;
   while (cur < to) {
     const d = new Date(cur);
     const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
     const end = Math.min(next, to);
-    total += ((end - cur) / DAY) * w[d.getDay()];
+    const wt = w[d.getDay()];
+    if (!a) out.push({ from: cur, to: end, wt, len: DAY });
+    else {
+      const spans = activeSpans(cur, a);
+      const len = spans.reduce((s, [x, y]) => s + y - x, 0);
+      for (const [x, y] of spans) {
+        const p0 = Math.max(x, cur);
+        const p1 = Math.min(y, end);
+        if (p1 > p0) out.push({ from: p0, to: p1, wt, len });
+      }
+    }
     cur = end;
   }
+  return out;
+}
+const pieceDays = (p) => ((p.to - p.from) / p.len) * p.wt;
+// Sum of the weights between two instants, counting the fraction of each day (of its active hours, when set)
+function weightedDays(from, to, w = weights(), a = activeHours()) {
+  let total = 0;
+  for (const p of weightPieces(from, to, w, a)) total += pieceDays(p);
   return total;
 }
 // The weighted share of the day that holds `ms` that falls inside the week ending at resetsAt.
@@ -222,22 +260,17 @@ function projectWeek(used, resetsAt, now, w = weights()) {
   return { rate, projected, eta };
 }
 
-// When the pace so far reaches `target`% of the week: walk forward day by day, since the weights change the
-// slope at every midnight. The same walk draws the dashed projection on the chart. null when it does not get
+// When the pace so far reaches `target`% of the week: walk forward piece by piece (weightPieces), since the slope
+// changes at every midnight and at the edges of the active hours. The same walk draws the dashed projection on the chart. null when it does not get
 // there before the reset; now when it is already there.
 function paceReaches(target, used, rate, now, resetsAt, w = weights()) {
   if (used >= target) return now;
   if (!(rate > 0)) return null;
   let need = (target - used) / rate; // weighted days
-  let cur = now;
-  while (cur < resetsAt) {
-    const d = new Date(cur);
-    const next = Math.min(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime(), resetsAt);
-    const weight = w[d.getDay()];
-    const avail = ((next - cur) / DAY) * weight;
-    if (weight > 0 && avail >= need) return cur + (need / weight) * DAY;
+  for (const p of weightPieces(now, resetsAt, w)) {
+    const avail = pieceDays(p);
+    if (p.wt > 0 && avail >= need) return p.from + (need / p.wt) * p.len;
     need -= avail;
-    cur = next;
   }
   return null;
 }

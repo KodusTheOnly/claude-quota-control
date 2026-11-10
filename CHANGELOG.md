@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Active hours (Settings > Plan, off by default): the hours you usually use Claude, as a window such as 09:00 to 01:00. The plan only moves inside them, so the expected line, the pace, the projection and the hours locked out stop treating a night of sleep as falling behind. A whole day keeps its share of the week; only the partial days at the reset change. Hours after midnight count for that calendar day. Use outside the window still counts. The chart shades the hours outside the window, a thin bar under the HRS strip marks the window on every day (with "active hours" in the legend), and the Claude Code collector follows the same rule.
+- The Reserve section in Settings is now Plan, with Active hours and Reserve.
+- The chart's "to spend" number goes under its box when the box touches the top of the chart (it was cut off).
+
 ## 2.1.0
 
 - The weekly goal is gone: the plan always aims at 100% at the reset. A goal under 100% only left quota unused at the reset. The emergency reserve stays, and is the way to keep a cushion: it is released before the reset, so it does not go to waste. The section in Settings is now called Reserve, and a goal saved by an older version is ignored.

@@ -186,6 +186,7 @@
 .hcells { position: absolute; inset: 0; }
 .hc { position: absolute; top: 4px; bottom: 4px; box-sizing: border-box; border-right: 1px solid var(--scr); background: var(--crt-cell); }
 .hc.fut { background: transparent; }
+.hact { position: absolute; bottom: 0; height: 3px; z-index: 3; background: var(--crt-accent); opacity: .75; }
 .hc.m { background: color-mix(in srgb, var(--c, var(--free)) calc(var(--a, 1) * 100%), transparent); }
 .hc.e { background: color-mix(in srgb, var(--c, var(--free)) calc(var(--a, 1) * 45%), transparent); }
 .hc.t0::before, .hc.t6::before { content: ""; position: absolute; left: 0; width: 1px; z-index: 2; pointer-events: none; }

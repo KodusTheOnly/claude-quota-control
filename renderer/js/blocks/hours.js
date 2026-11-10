@@ -97,6 +97,23 @@ function drawHours() {
       return c;
     })
   );
+  // Active hours (Settings > Plan): a thin bar along the bottom of the strip, over the whole week, future included
+  const a = activeHours();
+  if (a) {
+    const tip = t("hrs.active", { from: `${pad(a.start)}:00`, to: `${pad(a.end)}:00` });
+    for (let day = axisStart; day < axisEnd; day = startOfDay(day + DAY + 2 * HOUR)) {
+      for (const [s0, s1] of activeSpans(day, a)) {
+        const from = Math.max(s0, weekStart);
+        const to = Math.min(s1, axisEnd);
+        if (to <= from) continue;
+        const bar = node("i", "hact");
+        bar.style.left = `${(((from - axisStart) / axisLen) * 100).toFixed(3)}%`;
+        bar.style.width = `${(((to - from) / axisLen) * 100).toFixed(3)}%`;
+        bar.title = tip;
+        box.appendChild(bar);
+      }
+    }
+  }
   // The whole strip says what it is; the note about what could not be placed follows when there is one
   $("hrs").title = [t("hrs.tip"), left > 0.05 ? t("hrs.left", { pct: Math.round(left * 10) / 10 }) : ""].filter(Boolean).join("\n");
 }

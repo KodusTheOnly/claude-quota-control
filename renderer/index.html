@@ -293,10 +293,28 @@
                 </div>
               </article>
 
-              <!-- 02 Reserve -->
+              <!-- 02 Plan: active hours and reserve -->
               <article class="blk" id="setGoal" aria-labelledby="tGoal">
-                <header class="pl"><h2 class="pn" id="tGoal"><b>02</b><span data-i18n="goal.title">Reserve</span></h2></header>
+                <header class="pl"><h2 class="pn" id="tGoal"><b>02</b><span data-i18n="goal.title">Plan</span></h2></header>
                 <div class="grp">
+                  <h3 class="grp-h"><span data-i18n="active.title">Active hours</span></h3>
+                  <p class="gt" data-i18n="active.text"></p>
+                  <label class="set tgl">
+                    <span class="lb" data-i18n="active.on">Count only my active hours</span>
+                    <input type="checkbox" id="activeOn">
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                  </label>
+                  <div class="set sub" id="activeFromSet">
+                    <label class="lb" for="activeFrom"><span data-i18n="active.from">From</span></label>
+                    <select id="activeFrom"></select>
+                  </div>
+                  <div class="set sub" id="activeToSet">
+                    <label class="lb" for="activeTo"><span data-i18n="active.to">To</span><small data-i18n="active.toNote"></small></label>
+                    <select id="activeTo"></select>
+                  </div>
+                </div>
+                <div class="grp">
+                  <h3 class="grp-h"><span data-i18n="goal.reserveTitle">Reserve</span></h3>
                   <p class="gt" data-i18n="goal.text"></p>
                   <div class="set stk" role="group" aria-labelledby="reserveLabel">
                     <div class="lb"><span id="reserveLabel" data-i18n="goal.reserve">Emergency reserve</span><small data-i18n="goal.reserveNote"></small></div>

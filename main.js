@@ -703,6 +703,7 @@ async function installCollector() {
   if (previous && !previous.includes(SLUG)) config.chainCommand = previous;
   config.lang = i18n.getLang();
   config.weights = loadSettings().weights || null;
+  config.activeHours = cleanActiveHours(loadSettings().activeHours);
   writeJson(COLLECTOR_CONFIG, config);
 
   settings.statusLine = { type: "command", command: `node "${COLLECTOR_TARGET}"` };
@@ -729,14 +730,17 @@ async function uninstallCollector() {
   return { ok: true, status: await collectorStatus() };
 }
 
-// The collector runs outside the app: it needs the language (status line text) and the day weights
+// The collector runs outside the app: it needs the language (status line text), the day weights and the active hours
 function writeCollectorLanguage() {
   try {
     const config = readJson(COLLECTOR_CONFIG);
     if (!config) return;
-    const weights = loadSettings().weights || null;
-    if (config.lang !== i18n.getLang() || JSON.stringify(config.weights || null) !== JSON.stringify(weights)) {
-      writeJson(COLLECTOR_CONFIG, { ...config, lang: i18n.getLang(), weights });
+    const s = loadSettings();
+    const weights = s.weights || null;
+    const activeHours = cleanActiveHours(s.activeHours);
+    const same = (a, b) => JSON.stringify(a || null) === JSON.stringify(b || null);
+    if (config.lang !== i18n.getLang() || !same(config.weights, weights) || !same(config.activeHours, activeHours)) {
+      writeJson(COLLECTOR_CONFIG, { ...config, lang: i18n.getLang(), weights, activeHours });
     }
   } catch {
     // not essential
@@ -766,10 +770,16 @@ ipcMain.handle("app-info", () => ({ version: app.getVersion(), electron: process
 // Export and import
 
 const BACKUP_KEYS = [
-  "manual", "readings", "sessions", "weights", "extra",
+  "manual", "readings", "sessions", "weights", "activeHours", "extra",
   "language", "theme", "screens", "notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "fiveHourThreshold", "remindEvery",
   "showExtra", "miniWindow", "codeLogs", "shortcutOn", "shortcutKeys", "reserve", "reserveRelease",
 ];
+// Active hours (Settings > Plan): whole hours 0-23, start and end different, or null for the whole day.
+// Same rule as activeHours() in renderer/js/core.js.
+function cleanActiveHours(a) {
+  const isHour = (h) => Number.isInteger(h) && h >= 0 && h <= 23;
+  return a && isHour(a.start) && isHour(a.end) && a.start !== a.end ? { start: a.start, end: a.end } : null;
+}
 const BOOLEAN_KEYS = ["notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "showExtra", "miniWindow", "codeLogs", "shortcutOn"];
 const THRESHOLDS = [60, 70, 75, 80, 85]; // the choices in Settings
 const REMIND_HOURS = [0, 2, 4, 8];
@@ -845,6 +855,7 @@ function cleanBackupSettings(st) {
     if (extra) next.extra = extra;
   }
   if (Array.isArray(st.weights) && st.weights.length === 7 && st.weights.every((w) => [0, 0.5, 1, 2].includes(w))) next.weights = st.weights;
+  if (st.activeHours === null || cleanActiveHours(st.activeHours)) next.activeHours = cleanActiveHours(st.activeHours);
   if (typeof st.language === "string") next.language = i18n.normalize(st.language);
   if (THEMES.includes(st.theme)) next.theme = st.theme;
   if (SCREENS.includes(st.screens)) next.screens = st.screens;
@@ -1009,6 +1020,7 @@ function applySettings(patch) {
     nativeTheme.themeSource = next.theme;
   }
   if ("screens" in patch) next.screens = SCREENS.includes(patch.screens) ? patch.screens : "paper";
+  if ("activeHours" in patch) next.activeHours = cleanActiveHours(patch.activeHours);
   if ("shortcutOn" in patch || "shortcutKeys" in patch) {
     // Only a combination that passes the check is kept, so the settings file never holds a bad one
     const keys = normalizeAccelerator(next.shortcutKeys);
@@ -1019,7 +1031,7 @@ function applySettings(patch) {
   }
   saveSettings(next);
   if ("autoRead" in patch) applyAutoRead();
-  if ("weights" in patch) writeCollectorLanguage();
+  if ("weights" in patch || "activeHours" in patch) writeCollectorLanguage();
   return next;
 }
 

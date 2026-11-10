@@ -106,6 +106,8 @@ function drawPaceChart() {
     if (i > 0 && i >= s.s0) add("line", { x1: X(i), x2: X(i), y1: T, y2: H - B, stroke: PAL.gridDay });
   }
   if (AX > DAYS_SHOWN + 0.02) add("line", { x1: X(DAYS_SHOWN), x2: X(DAYS_SHOWN), y1: T, y2: H - B, stroke: PAL.gridDay });
+  // Outside the active hours (Settings > Plan) the plan stands still: those hours are shaded lightly
+  for (const r of s.rest) add("rect", { x: X(r.x0), y: T, width: Math.max(X(r.x1) - X(r.x0), 0), height: H - T - B, fill: PAL.shade, opacity: ".5" });
 
   // The plan's pace, then what was used (with a faint area under it)
   const px = (pts) => pts.map((p) => ({ x: X(p.x), y: Y(p.y) }));
@@ -174,7 +176,8 @@ function drawPaceChart() {
   items.push({ node: nowText, cands: nowCands });
 
   // What there is to spend, one number (the band's "to spend"): in the strong part of the box, centered first; just
-  // above the box when that part is too short; not at all when the box is too narrow for it.
+  // above the box when that part is too short (just below it when the box touches the top of the chart); not at all
+  // when the box is too narrow for it.
   if (spendBox && s.room.spend >= 1) {
     const roomText = text(0, 0, `${s.room.spend}%`, { fill: accent, "font-weight": "600", class: "lbl" });
     const bw = spendBox.x1 - spendBox.x0;
@@ -185,7 +188,7 @@ function drawPaceChart() {
       const cx = spendBox.x0 + bw / 2;
       const cands = [];
       const rows = bh >= 1.3 * rem ? [spendBox.y0 + bh / 2 + 0.35 * rem, spendBox.y0 + 1.05 * rem, spendBox.y1 - 0.4 * rem] : [];
-      rows.push(spendBox.y0 - 4);
+      rows.push(spendBox.y0 - 4 - (bb.height || 0.8 * rem) >= T ? spendBox.y0 - 4 : spendBox.y1 + 0.95 * rem);
       rows.forEach((y, i) => {
         cands.push({ x: cx, y, anchor: "middle", pen: i * 2 }, { x: spendBox.x0 + 5, y, anchor: "start", pen: i * 2 + 0.5 }, { x: spendBox.x1 - 5, y, anchor: "end", pen: i * 2 + 1 });
       });

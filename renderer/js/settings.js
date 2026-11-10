@@ -225,6 +225,32 @@ function syncNotifyGroup() {
   }
 }
 
+// Active hours: a switch and two hour lists. Turned on, the window starts at ACTIVE_DEFAULT (see core.js).
+// The two lists never show the same hour on both sides: a window needs some length.
+function renderActiveSettings() {
+  const a = activeHours();
+  $("activeOn").checked = Boolean(a);
+  $("activeFromSet").classList.toggle("hidden", !a);
+  $("activeToSet").classList.toggle("hidden", !a);
+  if (!a) return;
+  for (const [id, value] of [["activeFrom", a.start], ["activeTo", a.end]]) {
+    const sel = $(id);
+    if (!sel.options.length) {
+      for (let h = 0; h < 24; h++) sel.appendChild(new Option(`${pad(h)}:00`, String(h)));
+    }
+    sel.value = String(value);
+  }
+  for (const o of $("activeFrom").options) o.disabled = Number(o.value) === a.end;
+  for (const o of $("activeTo").options) o.disabled = Number(o.value) === a.start;
+}
+async function saveActive(activeHoursValue) {
+  await saveSetting({ activeHours: activeHoursValue });
+  renderActiveSettings();
+}
+$("activeOn").addEventListener("change", (e) => saveActive(e.target.checked ? { ...ACTIVE_DEFAULT } : null));
+$("activeFrom").addEventListener("change", (e) => saveActive({ ...activeHours(), start: Number(e.target.value) }));
+$("activeTo").addEventListener("change", (e) => saveActive({ ...activeHours(), end: Number(e.target.value) }));
+
 // Reserve: the reserve and its release are key groups. The plan always ends at 100%.
 // The preview bar shows the plan and the reserve with the values as they will be used (see goalSettings).
 function renderGoalSettings() {
@@ -258,6 +284,7 @@ function bindSettings() {
   syncNotifyGroup();
   $("notifyLevel").checked = s.notifyLevel !== false;
   renderGoalSettings();
+  renderActiveSettings();
   $("fiveHourThreshold").value = String(warnAt());
   $("remindEvery").value = String(s.remindEvery ?? "smart");
   $("notifyResets").checked = s.notifyResets !== false;

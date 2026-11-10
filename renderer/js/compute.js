@@ -360,11 +360,25 @@ function paceSeries(m, cells = null, starts = []) {
   const span = toX(m.w.resetsAt);
   const nowX = Math.min(toX(m.now), span);
 
+  // A point wherever the slope changes: every midnight and, with active hours, every edge of the window
   const expected = [{ x: s0, y: 0 }];
-  for (let k = 1; k <= 8; k++) {
-    const ms = midnight(k);
-    if (ms >= m.w.resetsAt) break;
-    if (ms > weekStart) expected.push({ x: toX(ms), y: expectedUsed(m.w.resetsAt, ms, w, m.g) });
+  const bends = new Set();
+  for (const p of weightPieces(weekStart, m.w.resetsAt, w)) bends.add(p.from).add(p.to);
+  for (let k = 1; k <= 8; k++) bends.add(midnight(k));
+  for (const ms of [...bends].sort((a, b) => a - b)) {
+    if (ms > weekStart && ms < m.w.resetsAt) expected.push({ x: toX(ms), y: expectedUsed(m.w.resetsAt, ms, w, m.g) });
+  }
+  // The hours outside the active window (none without one), inside the week: [{ x0, x1 }]
+  const rest = [];
+  const a = activeHours();
+  for (let k = 0; a && k <= 7; k++) {
+    let cur = Math.max(midnight(k), weekStart);
+    const dayEnd = Math.min(midnight(k + 1), m.w.resetsAt);
+    for (const [x, y] of [...activeSpans(midnight(k), a), [dayEnd, dayEnd]]) {
+      const to = Math.min(x, dayEnd);
+      if (to > cur) rest.push({ x0: toX(cur), x1: to >= m.w.resetsAt ? span : toX(to) });
+      cur = Math.max(cur, y);
+    }
   }
   // The released reserve bends the line in its last hours: a point where the release starts
   const relStart = m.g.reserve && m.g.release ? m.w.resetsAt - m.g.release * HOUR : null;
@@ -424,7 +438,8 @@ function paceSeries(m, cells = null, starts = []) {
     if (!m.dayOff && !m.reserveMode) addOver(Math.max(todayIdx, s0), nowX, y0, m.spent, m.budget, steps);
   }
 
-  // Where the pace so far leads: walk forward day by day, since weights change the slope at every midnight
+  // Where the pace so far leads: walk forward piece by piece (weightPieces), since the slope changes at every
+  // midnight and at the edges of the active hours. Between two pieces (outside the window) the line stays flat.
   let proj = null;
   let lock = null;
   let endLabel = null;
@@ -435,28 +450,38 @@ function paceSeries(m, cells = null, starts = []) {
   } else if (m.lv.proj) {
     const rate = m.lv.proj.rate;
     proj = [{ x: nowX, y: m.w.used }];
-    let cur = m.now;
     let y = m.w.used;
-    while (cur < m.w.resetsAt) {
-      const next = Math.min(midnight(dayIdx(cur) + 1), m.w.resetsAt);
-      if (lockAt !== null && next >= lockAt) {
+    const xOf = (ms) => (ms >= m.w.resetsAt ? span : toX(ms));
+    const pieces = m.now < m.w.resetsAt ? weightPieces(m.now, m.w.resetsAt, w) : [];
+    // Lockout at or before the first piece starts (it sits at its start, or now)
+    if (lockAt !== null && (!pieces.length || lockAt <= pieces[0].from)) {
+      if (lockAt > m.now) proj.push({ x: toX(lockAt), y: m.g.goal });
+      lock = [{ x: lockAt > m.now ? toX(lockAt) : nowX, y: m.g.goal }, { x: span, y: m.g.goal }];
+      endLabel = { kind: "lock", ms: lockAt };
+    }
+    for (const p of endLabel ? [] : pieces) {
+      if (p.from > m.now && xOf(p.from) > proj[proj.length - 1].x) proj.push({ x: xOf(p.from), y });
+      if (lockAt !== null && p.to >= lockAt) {
         if (lockAt > m.now) proj.push({ x: toX(lockAt), y: m.g.goal });
         lock = [{ x: lockAt > m.now ? toX(lockAt) : nowX, y: m.g.goal }, { x: span, y: m.g.goal }];
         endLabel = { kind: "lock", ms: lockAt };
         break;
       }
-      const dy = rate * weightedDays(cur, next, w);
+      const dy = rate * pieceDays(p);
       if (dy > 0 && y + dy >= 100) {
-        const ms = cur + ((100 - y) / dy) * (next - cur);
+        const ms = p.from + ((100 - y) / dy) * (p.to - p.from);
         proj.push({ x: toX(ms), y: 100 });
         endLabel = { kind: "limit", ms };
         break;
       }
       y += dy;
-      proj.push({ x: next === m.w.resetsAt ? span : toX(next), y });
-      cur = next;
+      proj.push({ x: xOf(p.to), y });
     }
-    if (!endLabel) endLabel = { kind: "reset", pct: y };
+    if (!endLabel) {
+      // Flat to the reset when the window closes before it
+      if (proj[proj.length - 1].x < span) proj.push({ x: span, y });
+      endLabel = { kind: "reset", pct: y };
+    }
   }
   const startsOut = starts.filter((ms) => ms >= weekStart && ms <= m.now && toX(ms) <= span).map((ms) => ({ ms, x: toX(ms) }));
   if (proj && proj.length < 2) proj = null; // already past 100%: nothing left to project
@@ -468,7 +493,7 @@ function paceSeries(m, cells = null, starts = []) {
     const spend = mid !== null ? asShownPct(m.ceiling) - asShownPct(m.lv.proj.projected) : 0;
     room = { x0: nowX, x1: span, y0: m.w.used, y1: top, mid, spend: Math.max(spend, 0) };
   }
-  return { s0, span, nowX, todayIdx, expected, used, over, proj, lock, reserve, room, goal: m.g.goal, end: endLabel, usedNow: m.w.used, starts: startsOut };
+  return { s0, span, nowX, todayIdx, rest, expected, used, over, proj, lock, reserve, room, goal: m.g.goal, end: endLabel, usedNow: m.w.used, starts: startsOut };
 }
 
 // Saving a reading (typed in or read from Claude)
