@@ -16,8 +16,10 @@ function renderOverview(m, fresh = false) {
   renderToday(m);
   renderSession(m);
   renderExtra();
+  renderPast(m); // before the week: the chart draws the past weeks
   renderWeek(m);
   renderHours(m);
+  fitTall(); // after: it measures what the week left
   renderSummary(m);
   renderTypeIn(m);
   if ($("mathDrawer").open) renderMathDrawer(m);

@@ -559,3 +559,46 @@ async function saveManual({ weekly, session, sessionReset, sessionResetAt, ancho
   });
   render({ fresh: true });
 }
+
+// Past weeks (the "4 wk" key on the chart)
+// The last n weeks before this one, as the history keeps them: where each week stood at the end of each of its days.
+// x is in days from the midnight that starts that week's first day, as in paceSeries, so the weeks line up with this one.
+// The reset day belongs to the new week, so a week's points are its first seven days. A first day that only has a
+// reading from before its reset still holds the week before's number: when it is higher than the next day's, it is dropped.
+// A week with no day recorded is left out. end is where the week finished, fullDay the day it reached 100% (or null).
+function pastWeeks(days, resetsAt, n = 4) {
+  const out = [];
+  for (let k = 1; k <= n; k++) {
+    const start = resetsAt - (k + 1) * WEEK;
+    const first = startOfDay(start);
+    const d0 = new Date(first);
+    const raw = [];
+    for (let i = 0; i < 7; i++) {
+      const ms = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + i).getTime();
+      const rec = days && days[dayKey(ms)];
+      if (rec && typeof rec.endUsed === "number") raw.push({ i, ms, y: Math.min(Math.max(rec.endUsed, 0), 100) });
+    }
+    if (raw.length > 1 && raw[0].i === 0 && raw[0].y > raw[1].y) raw.shift();
+    if (!raw.length) continue;
+    const pts = [{ x: (start - first) / DAY, y: 0 }];
+    let end = 0;
+    let fullDay = null;
+    for (const r of raw) {
+      end = Math.max(end, r.y);
+      pts.push({ x: r.i + 1, y: end });
+      if (fullDay === null && end >= 100) fullDay = r.ms;
+    }
+    out.push({ start, end, fullDay, pts });
+  }
+  return out;
+}
+
+// Where a past week stood at x (same axis as pastWeeks): along its line, or its last point after it
+function pastWeekAt(week, x) {
+  const p = week.pts;
+  if (x <= p[0].x) return 0;
+  for (let i = 1; i < p.length; i++) {
+    if (x <= p[i].x) return p[i - 1].y + ((p[i].y - p[i - 1].y) * (x - p[i - 1].x)) / (p[i].x - p[i - 1].x);
+  }
+  return p[p.length - 1].y;
+}

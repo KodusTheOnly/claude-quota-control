@@ -150,6 +150,25 @@ const SCENARIOS = {
     s.activeHours = { start: 9, end: 1 };
     return s;
   },
+  // The "4 wk" key on, with four past weeks recorded (one reached 100% on its sixth day), and a session earlier today:
+  // the past weeks are in the chart, or in their own block in a tall vertical window, with Today by hour above them
+  pastweeks: (s) => {
+    s.pastWeeks = true;
+    const ends = [[12, 25, 38, 48, 52, 66, 71], [18, 33, 52, 61, 64, 80, 88], [25, 47, 63, 74, 78, 94, 97], [28, 52, 70, 86, 91, 100, 100]];
+    ends.forEach((week, k) => {
+      const first = new Date(2026, 9, 26 - 7 * (k + 1)).getTime();
+      week.forEach((endUsed, i) => {
+        s.manual.days[key(first + i * DAY + 12 * HOUR)] = { spent: 5, budget: 14, endUsed };
+      });
+    });
+    s.sessions = [{ sr: NOW - 3 * HOUR, peak: 71 }];
+    // Close readings today (15 min apart), so Today by hour has measured bars: 10:00, 11:00, 13:00 and 16:00
+    const s1 = NOW - 3 * HOUR;
+    const s2 = s.manual.fiveHour.resetsAt;
+    s.readings = [[-8, 19, s1], [-7.75, 21, s1], [-7, 21, s1], [-6.75, 23.5, s1], [-5, 23.5, s1], [-4.75, 26, s1], [-2, 26, s2], [-1.75, 29, s2], [-0.25, 29, s2], [0, 31, s2]]
+      .map(([h, w, sr]) => ({ at: NOW + h * HOUR, w, s: 40, sr }));
+    return s;
+  },
   // Nothing read yet (first run): the Overview asks for a first reading
   nodata: (s) => {
     s.claudeConnected = false;

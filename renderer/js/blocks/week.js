@@ -169,7 +169,8 @@ function renderWeek(m) {
     const stateKey = onReserve ? "day.reserve" : d.kind === "off" ? "day.off" : d.kind === "future" ? `plan.${d.name}` : "day.noData";
     r.lv.classList.toggle("hidden", !known);
     if (known) paintLevel(r.lv, d.level);
-    r.sx.textContent = known || plain ? "" : t(stateKey);
+    // A plain Normal day ahead keeps its word: the columns hide it (the footer says "Normal ×N"), the vertical rows show it
+    r.sx.textContent = known ? "" : t(stateKey);
     r.sx.classList.toggle("hidden", known || plain);
     // The day's budget bar (the white mark is the budget). A past day's figures, "9% of 17%", are only in its title and
     // label: the % and the bar already show them. Today and a planned day say the budget they have, "▲14%" (the wide

@@ -24,7 +24,8 @@ function renderChrome(src) {
   lamp.classList.toggle("is-updating", st === "updating");
   // A live region: written only when the text changes. The age comes from the render that already runs every 30 s.
   setText($("lampText"), st === "none" ? t("src.none") : t(`state.${st}`));
-  lamp.title = $("lampText").textContent; // the narrow header can cut the word short
+  // The narrow header can cut the word short. While updating, the tooltip also says the numbers are from the last reading.
+  lamp.title = st === "updating" ? t("msg.updating") : $("lampText").textContent;
   setText($("lampAgeTxt"), st === "fresh" ? `· ${lampAge(Date.now() - lastUpdate())}` : ""); // hidden by CSS where the header has no room for it
   $("lampAge").textContent = src ? t("hd.read", { time: fmtTime(lastUpdate()) }) : "";
   $("lampAge").title = src ? `${sourceLabel(src)} ${ago(lastUpdate())}` : "";
@@ -40,11 +41,12 @@ function renderChrome(src) {
   return st;
 }
 
-// The strip under the header for the updating, stale and offline states. It only explains: Refresh is in the header.
+// The strip under the header for the stale and offline states. It only explains: Refresh is in the header.
+// A reading only gets the thin progress bar and the pulsing lamp, so the page does not jump while it runs.
 function renderDataMsg(st) {
   $("prog").classList.toggle("hidden", st !== "updating");
   const box = $("dataMsg");
-  const show = st === "updating" || st === "stale" || st === "offline";
+  const show = st === "stale" || st === "offline";
   box.classList.toggle("hidden", !show);
   if (!show) return;
   box.className = "msg";

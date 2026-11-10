@@ -60,7 +60,12 @@ dialog::backdrop { background: rgba(10, 15, 12, .55); }
   background: var(--card); color: var(--ink); border: 1px solid var(--edge); border-top: 2px solid var(--ink); box-shadow: 0 8px 24px rgba(0, 0, 0, .35); font-size: var(--fs-md);
 }
 .planmenu .eng { display: block; margin-bottom: .5rem; color: var(--ink); }
-.planmenu .keyset { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
-.planmenu .key { justify-content: flex-start; min-height: 2.25rem; }
+/* minmax(0, 1fr): a column never grows past half the menu, whatever the text */
+.planmenu .keyset { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; }
+.planmenu .keyset .key { flex-direction: column; align-items: flex-start; justify-content: center; gap: .1rem; min-width: 0; min-height: 2.9rem; padding-inline: .7rem; white-space: normal; text-align: left; }
+.planmenu .kn, .planmenu .kp { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.planmenu .kp { font-size: var(--fs-xs); font-weight: 500; color: var(--ink2); }
+.planmenu .key.on .kp { color: inherit; opacity: .8; }
+.planmenu .reset { white-space: normal; }
 .planmenu .hint { display: block; margin-top: .6rem; font-size: var(--fs-sm); line-height: 1.4; color: var(--ink2); }
 .planmenu .reset { margin-top: .6rem; width: 100%; }

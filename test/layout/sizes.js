@@ -7,7 +7,7 @@ const SIZES = [
   ...[[760, 900], [900, 700], [960, 800], [1100, 1000]].map(([w, h]) => ({ w, h, format: "medium" })),
   // Too short for everything to fit (about 36rem is needed): these keep the layout and let it scroll
   ...[[720, 540], [800, 600]].map(([w, h]) => ({ w, h, format: "medium-short" })),
-  ...[[420, 540], [420, 900], [540, 960], [600, 1000]].map(([w, h]) => ({ w, h, format: "vertical" })),
+  ...[[420, 540], [420, 900], [540, 960], [600, 1000], [420, 1240], [420, 1440]].map(([w, h]) => ({ w, h, format: "vertical" })),
 ];
 
 function formatOf(w, h) {

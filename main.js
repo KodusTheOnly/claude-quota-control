@@ -45,6 +45,7 @@ const DEFAULT_SETTINGS = {
   autoRead: false, // opt-in timer that reads usage every few minutes (see the warning in Settings)
   reserve: 0, // emergency reserve, % of the week kept out of the daily plan (off by default)
   reserveRelease: 48, // hours before the reset over which what is left of the reserve joins the plan (0 = never)
+  pastWeeks: false, // the "4 wk" key on the week chart: the last 4 weeks drawn with this one
 };
 
 // Window frame colors (same as --win and --ink in renderer/css/tokens.css), one set per theme
@@ -772,7 +773,7 @@ ipcMain.handle("app-info", () => ({ version: app.getVersion(), electron: process
 const BACKUP_KEYS = [
   "manual", "readings", "sessions", "weights", "activeHours", "extra",
   "language", "theme", "screens", "notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "fiveHourThreshold", "remindEvery",
-  "showExtra", "miniWindow", "codeLogs", "shortcutOn", "shortcutKeys", "reserve", "reserveRelease",
+  "showExtra", "miniWindow", "codeLogs", "shortcutOn", "shortcutKeys", "reserve", "reserveRelease", "pastWeeks",
 ];
 // Active hours (Settings > Plan): whole hours 0-23, start and end different, or null for the whole day.
 // Same rule as activeHours() in renderer/js/core.js.
@@ -780,7 +781,7 @@ function cleanActiveHours(a) {
   const isHour = (h) => Number.isInteger(h) && h >= 0 && h <= 23;
   return a && isHour(a.start) && isHour(a.end) && a.start !== a.end ? { start: a.start, end: a.end } : null;
 }
-const BOOLEAN_KEYS = ["notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "showExtra", "miniWindow", "codeLogs", "shortcutOn"];
+const BOOLEAN_KEYS = ["notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "showExtra", "miniWindow", "codeLogs", "shortcutOn", "pastWeeks"];
 const THRESHOLDS = [60, 70, 75, 80, 85]; // the choices in Settings
 const REMIND_HOURS = [0, 2, 4, 8];
 const RESERVE_CHOICES = [0, 5, 10, 15, 20]; // the choices in Settings, Reserve

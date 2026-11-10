@@ -13,7 +13,9 @@ function renderPlanMenu(m) {
   const keys = node("div", "keyset");
   for (const wt of PLAN_ORDER) {
     const preview = r0(previewBudget(m, planDay, wt));
-    const b = node("button", `key${d.weight === wt ? " on" : ""}`, `${t(`plan.${WEIGHT_NAME[wt]}`)} ${wt}× ${t("plan.preview", { pct: preview })}`);
+    // Two lines (plan on top, the day's budget below) so the key fits half the menu in both languages
+    const b = node("button", `key${d.weight === wt ? " on" : ""}`);
+    b.append(node("span", "kn", `${t(`plan.${WEIGHT_NAME[wt]}`)} ${wt}×`), node("span", "kp", t("plan.preview", { pct: preview })));
     b.type = "button";
     b.setAttribute("aria-label", `${t(`plan.${WEIGHT_NAME[wt]}`)} ${wt}×, ${t("day.budgetAria", { pct: preview })}`);
     b.setAttribute("aria-pressed", String(d.weight === wt));

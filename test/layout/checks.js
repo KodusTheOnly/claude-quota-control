@@ -77,6 +77,16 @@ function checkPage({ format, scrolls: formatScrolls, view = "panel" }) {
     const fs = parseFloat(getComputedStyle(owner).fontSize);
     if (fs < 11.95) problems.push(`text under 12px (${fs.toFixed(1)}px): "${tn.textContent.trim().slice(0, 30)}"`);
   }
+  // Nothing in an open menu or dialog sticks out of it, even when the box does not clip (the plan menu)
+  for (const d of dialogs) {
+    const dr = d.getBoundingClientRect();
+    const inScroller = (e) => { for (let a = e.parentElement; a && a !== d; a = a.parentElement) if (/(auto|scroll)/.test(getComputedStyle(a).overflowY)) return true; return false; };
+    for (const e of d.querySelectorAll("*")) {
+      if (!visible(e) || inScroller(e)) continue; // content in a scrolling area may run past the edge
+      const r = e.getBoundingClientRect();
+      if (r.left < dr.left - 1 || r.right > dr.right + 1 || r.top < dr.top - 1 || r.bottom > dr.bottom + 1) { problems.push(`${describe(e)} sticks out of ${describe(d)}`); break; }
+    }
+  }
   // SVG text of the chart
   for (const tx of document.querySelectorAll("#paceSvg text")) {
     const fs = parseFloat(getComputedStyle(tx).fontSize);
