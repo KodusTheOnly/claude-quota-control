@@ -23,7 +23,7 @@
 .toc-h { padding: 0 .3rem .2rem; font: 600 var(--fs-xs)/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink2); }
 .toc-k { justify-content: flex-start; gap: .6rem; min-height: 2.4rem; font-weight: 500; text-align: left; }
 .toc-k b { padding: 0 var(--sp-2); background: var(--ink); color: var(--card); font-weight: 600; }
-.toc-k.on { padding-left: 1.4rem; }
+.toc-k.on b { background: var(--win); color: var(--ink); }
 .toc-about { margin-top: .6rem; }
 .doc .blk { scroll-margin-top: .6rem; }
 
@@ -149,7 +149,6 @@
   .toc { flex-direction: row; flex-wrap: wrap; gap: var(--sp-2); margin: 0 -1rem; padding: .6rem 1rem; background: var(--win); border-bottom: 1px solid var(--edge); }
   .toc-h { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .toc-k { min-height: 2.2rem; padding-inline: .6rem; }
-  .toc-k.on { padding-left: 1.2rem; }
   .toc-about { margin-top: 0; }
   .doc .blk { scroll-margin-top: .6rem; }
   .rules { grid-template-columns: minmax(0, 1fr); }

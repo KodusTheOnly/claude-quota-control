@@ -9,7 +9,7 @@ function renderToday(m) {
   const ratio = off ? 0 : m.todayRatio;
 
   // An Off day (and a day on the reserve) shows what was used today as a share of the week (a dash when nothing was)
-  $("tUsed").textContent = off ? offDayNumber(m.spent) : `${r0(ratio * 100)}%`;
+  setNum($("tUsed"), off ? offDayNumber(m.spent) : `${r0(ratio * 100)}%`);
   $("tUsedWord").textContent = t(res ? "today.fromReserveWord" : off ? "today.ofWeekWord" : "today.usedWord");
   // The note under the title, longest first; fitTodayHead() takes the first one that fits
   // On the reserve it says when the budget comes back, or how much of the reserve is left

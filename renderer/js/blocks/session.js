@@ -4,7 +4,7 @@ function renderSession(m) {
   const f = m.five;
   const level = f ? m.lv.session : null;
 
-  $("sPct").textContent = f ? `${r0(f.used)}%` : "–";
+  setNum($("sPct"), f ? `${r0(f.used)}%` : "–");
   $("sOf").textContent = f ? t("session.of5h") : "";
   // Like Today, the level only shows when it matters (Tight or Pause): the number and the bar already say the rest
   paintLevel($("sLevel"), level);

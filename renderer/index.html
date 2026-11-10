@@ -109,8 +109,11 @@
             <h2 class="sr-only" id="tWeek" data-i18n="card.week">Week</h2>
             <div class="band crt" id="vScr">
               <div class="vl">
+                <!-- The face's own small screen: verdict.js plays it (decoration only, the level is in the words and the ruler) -->
+                <div class="vface" id="vSlot" aria-hidden="true"><span class="fc" id="vFace"></span></div>
+                <div class="vtxt">
                 <div class="vtop" id="vTop">
-                <p class="ans"><span class="face" id="vFace" aria-hidden="true"></span><span id="vAns"></span><span class="cur" aria-hidden="true"></span></p>
+                <p class="ans"><span id="vAns"></span><span class="cur" aria-hidden="true"></span></p>
                 <div class="ruler" id="vRuler" role="img">
                   <span class="lv-room"><span class="shp"></span><span data-i18n="level.room.name">Room</span></span>
                   <span class="lv-free"><span class="shp"></span><span data-i18n="level.free.name">Free</span></span>
@@ -122,6 +125,7 @@
                 <!-- The second line: a few chips, each an icon, a word or two and the value (the full sentence is its title) -->
                 <div class="chips" id="vChips"></div>
                 <span class="lv lv-none" id="vLevel"><span class="shp"></span><span class="lvn"></span></span>
+                </div>
               </div>
               <div class="wk" id="wScr">
                 <span class="wbig" id="wUsed"></span><span class="mu" id="wUsedWord"></span>

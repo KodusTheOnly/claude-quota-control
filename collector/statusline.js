@@ -108,8 +108,10 @@ function dayBudget(remaining, resetsAt, now, w, a = null) {
   const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
   const from = Math.max(start, resetsAt - 7 * DAY_MS);
   const share = weightedDays(from, Math.min(next, resetsAt), w, a);
-  if (share <= 0) return 0;
-  return (Math.max(remaining, 0) * share) / Math.max(weightedDays(from, resetsAt, w, a), share);
+  const left = weightedDays(from, resetsAt, w, a);
+  // The week's last hours fall outside the active hours: today (not an Off day) gets everything left
+  if (share <= 0) return left <= 0 && w[d.getDay()] !== 0 ? Math.max(remaining, 0) : 0;
+  return (Math.max(remaining, 0) * share) / Math.max(left, share);
 }
 
 // Short log of the readings (time, weekly %, session %, session reset), so the app can rebuild

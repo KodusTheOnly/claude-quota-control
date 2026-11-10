@@ -49,6 +49,7 @@ async function init() {
   showSettingsRecovery();
   api.onData(async (data) => {
     await ingestAuto(data);
+    state.syncFail = null; // fresh numbers: a failed reading is no longer the story the face tells
     render({ fresh: true });
   });
   api.onAutoReadStopped(async () => {

@@ -92,29 +92,60 @@ new ResizeObserver(() => fitChips()).observe($("vChips"));
 
 // The answer in one or two words, with a face. The face is decoration (aria-hidden): the level keeps its color, shape and word.
 // In the first days of the week there is no projection yet, so the answer is "warming up" instead of a level.
-// Each face is a few frames of a short loop (the CSS in overview.css times them). ASCII only, so the font never
-// changes, and every frame of a face is as wide as the others. The first frame is the still one.
-const VERDICT_FACES = [
-  ["^.^", "-.-"], // Free: blinks
-  [">.>", "<.<"], // Moderate: looks aside and back
-  ["(o.o)/", "(o.o)_"], // Tight: waves a hand, calm down
-  [" (O.O) ", "\\(O.O)/"], // Pause: a traffic guard raising both arms (the spaces keep both frames as wide)
-];
-const EARLY_FACE = ["o.o", "-.-", "-o-"]; // Warming up: dozes, yawns, wakes up
-const ROOM_FACE = ["$.$", "-.-"]; // Room to spend: money eyes, blinks
-const RESERVE_FACE = ["O.o", "o.O"]; // On the reserve: one eye, then the other
-// The verdict's mode: "reserve" (using the emergency reserve), "room" (well under the plan), "early" or the level's key
+//
+// The face has a small screen of its own, left of the answer. Each part of it means one thing, so a new face stays readable:
+//   eyes   how much you can relax: ^ happy, o watching, O alarmed, - closed, x failed, ? lost
+//   mouth  the tension: . relaxed, _ tense, o surprised
+//   marks  ; sweat (worry), ! alarm; a z rises while it sleeps
+//   arms   only in the good moments: a new week, the first hello of the day
+// So the levels read from the eyes alone: ^.^ o.o o_o; O_O!. ASCII only, so the font never changes. The screen has a fixed
+// width, so the frames of a face need not be as wide as each other; a long face is drawn smaller to fit (faceFit).
+//
+// frames[0] is the still face (the tray card shows it). acts are what it does now and then: a weight, the frames to show and
+// for how long (it goes back to frames[0] after), and an effect: "hop", "shake", "squash", "glance" (it looks down at the
+// chart and today's point there pings) or "zz" (a z rises). poke is the face for a click on it.
+const FACES = {
+  room: { frames: ["^.~", "~.^", "^o^"], poke: "^o^", acts: [{ w: 3, seq: [[1, 500]] }, { w: 2, seq: [[2, 800]], fx: "hop" }] }, // Room to spend: a wink, swaps eyes, smiles
+  free: { frames: ["^.^", "-.-", "^o^"], poke: "^o^", acts: [{ w: 5, seq: [[1, 140]] }, { w: 2, seq: [[1, 110], [0, 120], [1, 110]] }, { w: 2, seq: [[2, 900]], fx: "hop" }] }, // Free: blinks, smiles
+  moderate: { frames: ["o.o", "._.", "-.-"], poke: "O.O", acts: [{ w: 4, seq: [[1, 1000]], fx: "glance" }, { w: 4, seq: [[2, 140]] }] }, // Moderate: watches, glances at the chart
+  tight: { frames: ["o_o;", "-_-;", "._.;"], poke: "O_O;", acts: [{ w: 3, seq: [[1, 600]] }, { w: 3, seq: [[2, 1000]], fx: "glance" }, { w: 2, seq: [[0, 400]], fx: "squash" }] }, // Tight: sweats, wipes it, glances at the chart, gulps
+  pause: { frames: ["O_O!", "-_-!"], poke: ">_<!", acts: [{ w: 4, seq: [[0, 500]], fx: "shake" }, { w: 3, seq: [[1, 90]] }] }, // Pause: alarmed, shakes, quick blinks
+  locked: { frames: ["T_T", "T.T", "TOT"], poke: "TOT", acts: [{ w: 3, seq: [[1, 220], [0, 220], [1, 220]], fx: "squash" }, { w: 1, seq: [[2, 700]], fx: "shake" }] }, // Limit reached: cries and sobs
+  early: { frames: ["'.'", "-.-", "'o'"], poke: "O.O", acts: [{ w: 4, seq: [[1, 500]] }, { w: 2, seq: [[2, 900]] }] }, // Warming up: small sleepy eyes, slow blinks, yawns
+  reserve: { frames: ["O_o", "o_O", "O_o;"], poke: "o_O!", acts: [{ w: 4, seq: [[1, 500], [0, 500], [1, 500]] }, { w: 2, seq: [[2, 1100]] }] }, // On the reserve: one eye, then the other
+  // What the app is doing comes before the level, in the muted color, so the color keeps saying only the level
+  reading: { frames: ["o.o", "<.<", ">.>"], tone: "muted", loop: [[1, 260], [0, 200], [2, 260], [0, 200]] }, // A reading: the eyes run along the page
+  error: { frames: ["x.x"], tone: "muted", enter: "shake" }, // The last reading failed, until one works
+  login: { frames: ["?.?"], tone: "muted", hold: "tilt" }, // Claude asks to sign in again
+  asleep: { frames: ["-.-"], tone: "dim", poke: "o.O", gap: [1800, 3200], acts: [{ w: 1, seq: [[0, 0]], fx: "zz" }] }, // Outside the active hours: sleeps
+};
+// One-off moments; then the face goes back to what it was doing. Steps are [frame, ms, effect].
+const FACE_MOMENTS = {
+  reset: { frames: ["\\(^o^)/", "(^o^)"], seq: [[0, 320, "hop"], [1, 320], [0, 320, "hop"], [1, 320], [0, 320, "hop"], [1, 320], [0, 320, "hop"], [1, 320]] }, // a new week
+  hello: { frames: ["^o^/", "^o^-"], seq: [[0, 280, "hop"], [1, 280], [0, 280], [1, 280], [0, 280], [1, 280], [0, 600]] }, // the first time the Overview shows today
+  jump: { frames: ["O.O", "._."], seq: [[0, 600, "shake"], [1, 1200, "glance"]] }, // a new reading went up a lot
+  worse: { frames: ["O.O"], seq: [[0, 750, "shake"]] }, // the level got worse
+  better: { frames: ["^o^"], seq: [[0, 700, "hop"]] }, // the level got better
+  relief: { frames: ["^_^;", "-_-;"], seq: [[0, 1400, "hop"], [1, 500], [0, 1400], [1, 500], [0, 1600]] }, // back to Free from Tight or worse: relieved, still sweating
+};
+// How bad each verdict is, to tell worse from better (Warming up sits with Free)
+const FACE_RANK = { room: 0, free: 1, early: 1, moderate: 2, tight: 3, pause: 4, reserve: 4, locked: 5 };
+const FACE_JUMP = 5; // points of the week between two readings that make it jump; under half a point it only nods
+// The pace sets its energy, the time between two acts: slow, on pace, fast (with no pace, on pace)
+const FACE_GAPS = [[8000, 15000], [3000, 12000], [2000, 5000]];
+
+// The verdict's mode: "locked" (the limit is reached), "reserve" (using the emergency reserve), "early", "room" (well
+// under the plan) or the level's key
 function verdictMode(m) {
+  if (m.forecast.kind === "out") return "locked";
   if (m.reserveMode) return "reserve";
   if (m.forecast.kind === "early") return "early";
   return m.head.room ? "room" : LEVEL_KEYS[m.head.level];
 }
 function verdictAnswer(m) {
   const mode = verdictMode(m);
-  if (mode === "reserve") return { text: t("hero.ans.reserve"), face: RESERVE_FACE };
-  if (mode === "early") return { text: t("hero.ans.early"), face: EARLY_FACE };
-  if (mode === "room") return { text: t("hero.ans.room"), face: ROOM_FACE };
-  return { text: t(`hero.ans.${LEVEL_KEYS[m.head.level]}`), face: VERDICT_FACES[m.head.level] };
+  const text = ["reserve", "early", "room"].includes(mode) ? t(`hero.ans.${mode}`) : t(`hero.ans.${LEVEL_KEYS[m.head.level]}`);
+  return { text, face: FACES[mode].frames };
 }
 
 // The level the verdict shows. While the projection is still missing the level would rest on one
@@ -123,54 +154,201 @@ function verdictLevel(m) {
   return m.forecast.kind === "early" && !weekAtPause(m.w.used) ? null : m.head.level;
 }
 
-// The face plays for a burst of about 10 s when the level changes or a new reading arrives, then one loop every
-// 30 s. Never while the window is hidden or another screen is open; prefers-reduced-motion stops it in the CSS.
-const FACE_BURST_MS = 10000;
-const FACE_REST_MS = 30000;
-let faceBurst = null;
-let faceRest = null;
+// Inside the active hours (Settings > Plan), or all day when there are none
+function inActiveHours(ms) {
+  const a = activeHours();
+  return !a || activeSpans(ms, a).some(([from, to]) => ms >= from && ms < to);
+}
 
-// Puts the frames in place; true when the face changed
-function paintFace(box, frames, key) {
-  const sig = `${key}:${frames.join("|")}`;
-  if (box.dataset.sig === sig) return false;
-  box.dataset.sig = sig;
-  box.dataset.face = key;
-  box.replaceChildren(...frames.map((f) => node("span", "", f)));
-  return true;
+// What the face shows: what the app is doing first (a reading, a failed one, asleep), then the verdict's mode
+function faceKey(m, mode) {
+  if (typeof syncBusy !== "undefined" && syncBusy) return "reading";
+  if (state.syncFail === "need-login") return "login";
+  if (state.syncFail) return "error";
+  if (!inActiveHours(m.now)) return "asleep";
+  return mode;
 }
+
+// ---- The face's player ----
+// One timer at a time. It plays only while the Overview is on screen and motion is allowed; otherwise the face holds its
+// still frame. The new week and the hello wait until it can play.
+const face = { key: null, token: 0, timer: null, live: false, fit: null, pending: null, used: null, today: null, zone: null, glance: null };
+const faceReduced = () => Boolean(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+const faceCanPlay = () => !document.hidden && state.view === "panel" && !faceReduced();
+// The new week and the day of the last hello live in this window's storage
+function faceStore(k, v) {
+  try {
+    if (v === undefined) return localStorage.getItem(`face.${k}`);
+    localStorage.setItem(`face.${k}`, String(v));
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function faceShow(text) {
+  $("vFace").textContent = text;
+}
+// The face's size comes from the CSS; a face too long for the screen gets a smaller one (Plex Mono is 0.6em a character)
+function faceFit(frames) {
+  face.fit = frames;
+  const fc = $("vFace");
+  const slot = $("vSlot");
+  fc.style.fontSize = "";
+  const room = slot.clientWidth - 2 * (parseFloat(getComputedStyle(slot).paddingLeft) || 0);
+  const size = parseFloat(getComputedStyle(fc).fontSize) || 0;
+  const chars = Math.max(...frames.map((f) => f.length));
+  if (room > 0 && chars * 0.6 * size > room) fc.style.fontSize = `${Math.floor(room / (chars * 0.6))}px`;
+}
+new ResizeObserver(() => face.fit && faceFit(face.fit)).observe($("vSlot"));
+
+function faceFx(name) {
+  if (!name || faceReduced()) return;
+  if (name === "glance") {
+    const plot = $("plot");
+    plot.classList.remove("glance");
+    void plot.offsetWidth; // restart the ping
+    plot.classList.add("glance");
+    clearTimeout(face.glance);
+    face.glance = setTimeout(() => plot.classList.remove("glance"), 1900);
+    return;
+  }
+  if (name === "zz") {
+    const z = node("span", "zz", Math.random() < 0.5 ? "z" : "Z");
+    z.addEventListener("animationend", () => z.remove());
+    $("vSlot").append(z);
+    return;
+  }
+  const fc = $("vFace");
+  fc.classList.remove("hop", "shake", "squash");
+  void fc.offsetWidth;
+  fc.classList.add(name);
+}
+$("vFace").addEventListener("animationend", (e) => e.animationName !== "face-tilt" && $("vFace").classList.remove("hop", "shake", "squash"));
+
+// Plays steps [frame, ms, effect], then calls done
+function facePlay(frames, seq, done) {
+  const my = ++face.token;
+  clearTimeout(face.timer);
+  face.live = true;
+  let i = 0;
+  const step = () => {
+    if (my !== face.token) return;
+    if (i >= seq.length) return done();
+    const [f, ms, fx] = seq[i++];
+    faceShow(frames[f]);
+    faceFx(fx);
+    face.timer = setTimeout(step, ms);
+  };
+  step();
+}
+
+// The still face, then the next act after a pause (or the loop, for a reading)
+function faceSettle() {
+  const f = FACES[face.key];
+  ++face.token;
+  clearTimeout(face.timer);
+  face.live = false;
+  faceFit(f.frames);
+  faceShow(f.frames[0]);
+  if (!faceCanPlay()) return;
+  if (f.loop) return facePlay(f.frames, f.loop, faceSettle);
+  if (!f.acts) return;
+  const [lo, hi] = f.gap || FACE_GAPS[face.zone ?? 1];
+  face.live = true;
+  face.timer = setTimeout(() => {
+    let r = Math.random() * f.acts.reduce((s, a) => s + a.w, 0);
+    const act = f.acts.find((a) => (r -= a.w) < 0) || f.acts[0];
+    facePlay(f.frames, act.seq.map((s, i) => (i === 0 ? [s[0], s[1], act.fx] : s)), faceSettle);
+  }, lo + Math.random() * (hi - lo));
+}
+
+function faceMoment(name) {
+  if (!faceCanPlay()) {
+    if (name === "reset" || name === "hello") face.pending = name;
+    return faceSettle();
+  }
+  face.pending = null;
+  if (name === "reset" || name === "hello") faceStore("hello", face.today); // a new week says hello too
+  const mo = FACE_MOMENTS[name];
+  faceFit(mo.frames);
+  facePlay(mo.frames, mo.seq, faceSettle);
+}
+
 function faceStop() {
-  clearTimeout(faceBurst);
-  clearInterval(faceRest);
-  faceBurst = null;
-  faceRest = null;
-  $("vFace").classList.remove("play", "once");
+  ++face.token;
+  clearTimeout(face.timer);
+  face.live = false;
+  $("vFace").style.translate = "";
+  if (face.key) faceShow(FACES[face.key].frames[0]);
 }
-const faceCanPlay = () => !document.hidden && state.view === "panel";
-function faceOnce() {
-  if (!faceCanPlay()) return;
-  const face = $("vFace");
-  face.classList.remove("once");
-  void face.offsetWidth; // restart the loop
-  face.classList.add("once");
-}
-// The quiet part: one loop every 30 s, if nothing is running yet
 function faceResume() {
-  if (faceBurst || faceRest || !faceCanPlay()) return;
-  faceRest = setInterval(faceOnce, FACE_REST_MS);
+  if (!face.key || face.live || !faceCanPlay()) return;
+  if (face.pending) return faceMoment(face.pending);
+  faceSettle();
 }
-function faceKick() {
-  faceStop();
-  if (!faceCanPlay()) return;
-  $("vFace").classList.add("play");
-  faceBurst = setTimeout(() => {
-    faceBurst = null;
-    $("vFace").classList.remove("play");
-    faceResume();
-  }, FACE_BURST_MS);
-}
-$("vFace").addEventListener("animationend", () => $("vFace").classList.remove("once"));
 document.addEventListener("visibilitychange", () => (document.hidden ? faceStop() : faceResume()));
+
+// The head turns a few pixels toward the pointer
+let facePoint = null;
+function faceLook() {
+  const p = facePoint;
+  facePoint = null;
+  const r = $("vSlot").getBoundingClientRect();
+  if (!p || !r.width) return;
+  const dx = p.x - (r.left + r.width / 2);
+  const dy = p.y - (r.top + r.height / 2);
+  const d = Math.hypot(dx, dy) || 1;
+  const k = Math.min(1, d / 260);
+  $("vFace").style.translate = `${((dx / d) * k * 6).toFixed(1)}px ${((dy / d) * k * 3.5).toFixed(1)}px`;
+}
+document.addEventListener("pointermove", (e) => {
+  if (!faceCanPlay()) return;
+  if (!facePoint) requestAnimationFrame(faceLook);
+  facePoint = { x: e.clientX, y: e.clientY };
+});
+document.addEventListener("mouseout", (e) => !e.relatedTarget && ($("vFace").style.translate = ""));
+// A click on the face: it reacts
+$("vSlot").addEventListener("click", () => {
+  const f = FACES[face.key];
+  if (f && f.poke && faceCanPlay()) facePlay([f.poke], [[0, 700, "squash"]], faceSettle);
+});
+
+// Picks what the face does after a render: a new week, a change of level, a new reading, the day's hello, or just carry on
+function renderFace(m, mode, fresh) {
+  const key = faceKey(m, mode);
+  const prev = face.key;
+  const ranked = (k) => FACE_RANK[k] !== undefined;
+  face.key = key;
+  face.zone = paceZone(m);
+  face.today = dayKey(m.now);
+  const f = FACES[key];
+  $("vSlot").classList.toggle("muted", f.tone === "muted");
+  $("vSlot").classList.toggle("dim", f.tone === "dim");
+  $("vFace").classList.toggle("tilt", f.hold === "tilt" && !faceReduced());
+  const delta = face.used === null ? null : m.w.used - face.used;
+  face.used = m.w.used;
+
+  // A new week: the reset moved on by days since the face last saw it (a few minutes either way is the same week)
+  const seen = Number(faceStore("week")) || 0;
+  const week = m.w.resetsAt || 0;
+  if (week && week !== seen) faceStore("week", week);
+  if (seen && week - seen > 2 * DAY) return faceMoment("reset");
+
+  if (prev && key !== prev && ranked(key) && ranked(prev) && FACE_RANK[key] !== FACE_RANK[prev]) {
+    const from = FACE_RANK[prev];
+    const to = FACE_RANK[key];
+    return faceMoment(to > from ? "worse" : from >= 3 && to <= 1 ? "relief" : "better");
+  }
+  if (fresh && ranked(key) && delta !== null && delta >= FACE_JUMP) return faceMoment("jump");
+  if (key !== prev) {
+    faceSettle();
+    if (prev && f.enter && faceCanPlay()) faceFx(f.enter);
+  }
+  if (fresh && ranked(key) && delta !== null && Math.abs(delta) < 0.5 && faceCanPlay()) faceFx("squash"); // a nod: nothing new
+  if (ranked(key) && faceStore("hello") !== face.today) return faceMoment("hello"); // waits for the Overview when it is not on screen
+  faceResume();
+}
 
 function renderVerdict(m, fresh = false) {
   const level = verdictLevel(m);
@@ -179,14 +357,15 @@ function renderVerdict(m, fresh = false) {
   const answer = verdictAnswer(m);
   $("vAns").textContent = answer.text;
   const mode = verdictMode(m);
-  if (paintFace($("vFace"), answer.face, mode) || fresh) faceKick();
-  else faceResume();
-  // The answer and the cursor take the level's color; room and the reserve take the accent
+  // The answer, the cursor and the face take the level's color; room and the reserve take the accent
   const ans = $("vAns").parentElement;
-  if (mode === "room" || mode === "reserve") {
-    ans.classList.remove(...LEVEL_CLASSES);
-    ans.classList.add(`lv-${mode}`);
-  } else setLevelClass(ans, level);
+  for (const el of [ans, $("vSlot")]) {
+    if (mode === "room" || mode === "reserve") {
+      el.classList.remove(...LEVEL_CLASSES);
+      el.classList.add(`lv-${mode}`);
+    } else setLevelClass(el, level);
+  }
+  renderFace(m, mode, fresh);
   if (mode === "room") {
     $("vLevel").classList.remove(...LEVEL_CLASSES);
     $("vLevel").classList.add("lv-room");
@@ -212,7 +391,7 @@ function renderVerdict(m, fresh = false) {
 const TOP_STEPS = [{}, { bare: true }, { bare: true, snug: true }, { bare: true, snug: true, wrap: true }];
 function fitBand() {
   const top = $("vTop");
-  const vl = top.parentElement;
+  const vl = top.closest(".vl");
   const hasLit = Boolean($("vRuler").querySelector(".on")); // with no level lit, the shapes all stay
   for (const step of TOP_STEPS) {
     if (step.bare && !hasLit && !step.wrap) continue;

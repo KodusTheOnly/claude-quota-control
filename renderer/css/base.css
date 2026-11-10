@@ -55,8 +55,8 @@ button { font-family: var(--sans); }
 .key:disabled { opacity: .5; cursor: progress; }
 .key.primary { background: var(--card); border-bottom-color: var(--cobalt); }
 .key.primary:hover { background: var(--keyhi); }
-.key.on { background: var(--keyon); border-bottom-width: 1px; margin-top: 2px; box-shadow: inset 0 2px 0 rgba(0, 0, 0, .25); padding-left: 1.4rem; }
-.key.on::before { content: ""; position: absolute; left: .55rem; top: 50%; margin-top: -3px; width: 6px; height: 6px; background: var(--cobalt); }
+/* The selected key is pressed in and lit: an ink face with panel text, in both themes */
+.key.on, .key.on:hover { background: var(--ink); color: var(--win); border-color: var(--ink); border-bottom-width: 1px; margin-top: 2px; box-shadow: inset 0 2px 0 rgba(0, 0, 0, .18); }
 .key .ico { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .key.is-busy .ico { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

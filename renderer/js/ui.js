@@ -14,6 +14,18 @@ function setText(elem, text) {
   if (elem.textContent !== text) elem.textContent = text;
 }
 
+// Writes a number. When a new reading changes it, it glows for a moment (.glow in crt.css; still with reduced motion).
+// The first number written, over the "–" placeholder, does not glow.
+function setNum(elem, text) {
+  const prev = elem.textContent;
+  if (prev === text) return;
+  elem.textContent = text;
+  if (!prev || prev === "–") return;
+  elem.classList.remove("glow");
+  void elem.offsetWidth; // restart the animation
+  elem.classList.add("glow");
+}
+
 function node(tag, cls, text) {
   const n = document.createElement(tag);
   if (cls) n.className = cls;

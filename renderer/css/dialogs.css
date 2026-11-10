@@ -60,6 +60,5 @@ dialog::backdrop { background: rgba(10, 15, 12, .55); }
 .planmenu .eng { display: block; margin-bottom: .5rem; color: var(--ink); }
 .planmenu .keyset { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
 .planmenu .key { justify-content: flex-start; min-height: 2.25rem; }
-.planmenu .key.on { padding-left: 1.4rem; }
 .planmenu .hint { display: block; margin-top: .6rem; font-size: var(--fs-sm); line-height: 1.4; color: var(--ink2); }
 .planmenu .reset { margin-top: .6rem; width: 100%; }

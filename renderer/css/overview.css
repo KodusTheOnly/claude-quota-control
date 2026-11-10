@@ -33,7 +33,7 @@
 .dash .band::after { display: none; }
 .dash .band > :is(.vl, .wk) { position: relative; overflow: hidden; background: var(--scr) repeating-linear-gradient(0deg, var(--crt-scan) 0 1px, transparent 1px 3px); border: 1px solid var(--crt-border); border-radius: var(--r-sm); box-shadow: inset 0 1px 3px var(--well-lo), 0 1px 0 var(--well-hi); }
 /* Old data: the numbers and levels fade (see --stale-fade in tokens.css). Labels keep their color, so the small text stays readable. */
-:is(.is-stale, .is-offline) :is(.big, .mid-num, .chip, .gauge, .wbig, .day .nu, .lv, .lc, .ruler, .ans, .sbar, .plot, .hrs, #sumLeft, #sumProj) {
+:is(.is-stale, .is-offline) :is(.big, .mid-num, .chip, .gauge, .wbig, .day .nu, .lv, .lc, .ruler, .ans, .vface, .sbar, .plot, .hrs, #sumLeft, #sumProj) {
   filter: saturate(var(--stale-sat)); opacity: var(--stale-fade);
 }
 
@@ -68,60 +68,59 @@
 .band { flex: none; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: stretch; padding: 0; }
 .band .vl, .band .wk { display: flex; align-items: center; gap: .2rem .9rem; min-width: 0; padding: .4rem .8rem; }
 .band .wk { gap: .5rem; }
-/* Two lines: the answer and the level, then the chips. fitBand() and fitChips() in verdict.js make each line give way on its own. */
-.band .vl { flex-direction: column; align-items: stretch; justify-content: center; gap: .3rem; container-type: inline-size; container-name: verdict; }
+/* The face's screen on the left, then two lines: the answer and the level, then the chips. fitBand() and fitChips() in
+   verdict.js make each line give way on its own. */
+.band .vl { align-items: stretch; gap: .8rem; container-type: inline-size; container-name: vband; }
+.band .vtxt { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: .3rem; min-width: 0; container-type: inline-size; container-name: verdict; }
 .band .vtop { display: flex; align-items: center; justify-content: space-between; gap: .2rem .9rem; min-width: 0; }
 .band .vtop.wrap { flex-wrap: wrap; }
 /* Snug (fitBand, before wrapping): less room between the pieces and no blinking cursor */
 .band .vtop.snug { column-gap: .4rem; }
-.band .vtop.snug .face { margin-right: .3em; }
 .band .vtop.snug .cur { display: none; }
-.band .ans { flex: none; font-size: var(--fs-lg); }
-/* The verdict's face, before the answer in the level's color. Its frames sit on top of each other and the loop swaps
-   them with no fade (step-end). verdict.js adds .play for a burst and .once for a single loop; without either, or with
-   reduced motion, only the first frame shows. */
-.band .face { display: inline-grid; margin: 0 .6em 0 0; color: var(--c, var(--sm)); white-space: pre; }
-.band .face > span { grid-area: 1 / 1; opacity: 0; }
-.band .face > span:first-child { opacity: 1; }
-.band .face.once { --runs: 1; }
-.band .face:is(.play, .once) > span { animation-timing-function: step-end; animation-iteration-count: var(--runs, infinite); }
-.band .face[data-face="free"]:is(.play, .once) > span { animation-duration: 4s; }
-.band .face[data-face="free"]:is(.play, .once) > :nth-child(1) { animation-name: face-free-1; }
-.band .face[data-face="free"]:is(.play, .once) > :nth-child(2) { animation-name: face-free-2; }
-.band .face[data-face="moderate"]:is(.play, .once) > span { animation-duration: 3.2s; }
-.band .face[data-face="moderate"]:is(.play, .once) > :nth-child(1) { animation-name: face-moderate-1; }
-.band .face[data-face="moderate"]:is(.play, .once) > :nth-child(2) { animation-name: face-moderate-2; }
-.band .face[data-face="tight"]:is(.play, .once) > span { animation-duration: 4s; }
-.band .face[data-face="pause"]:is(.play, .once) > span { animation-duration: 3s; }
-.band .face:is([data-face="tight"], [data-face="pause"]):is(.play, .once) > :nth-child(1) { animation-name: face-wave-1; }
-.band .face:is([data-face="tight"], [data-face="pause"]):is(.play, .once) > :nth-child(2) { animation-name: face-wave-2; }
-.band .face[data-face="early"]:is(.play, .once) > span { animation-duration: 6s; }
-.band .face[data-face="early"]:is(.play, .once) > :nth-child(1) { animation-name: face-early-1; }
-.band .face[data-face="early"]:is(.play, .once) > :nth-child(2) { animation-name: face-early-2; }
-.band .face[data-face="early"]:is(.play, .once) > :nth-child(3) { animation-name: face-early-3; }
-/* Free blinks in the last 6% of the loop */
-@keyframes face-free-1 { 0% { opacity: 1; } 94% { opacity: 0; } 100% { opacity: 0; } }
-@keyframes face-free-2 { 0% { opacity: 0; } 94% { opacity: 1; } 100% { opacity: 1; } }
-/* Moderate looks aside from 56% to 72% */
-@keyframes face-moderate-1 { 0% { opacity: 1; } 56% { opacity: 0; } 72% { opacity: 1; } 100% { opacity: 1; } }
-@keyframes face-moderate-2 { 0% { opacity: 0; } 56% { opacity: 1; } 72% { opacity: 0; } 100% { opacity: 0; } }
-/* Tight and Pause wave twice: 8 to 15% and 24 to 31% */
-@keyframes face-wave-1 { 0% { opacity: 1; } 8% { opacity: 0; } 15% { opacity: 1; } 24% { opacity: 0; } 31% { opacity: 1; } 100% { opacity: 1; } }
-@keyframes face-wave-2 { 0% { opacity: 0; } 8% { opacity: 1; } 15% { opacity: 0; } 24% { opacity: 1; } 31% { opacity: 0; } 100% { opacity: 0; } }
-/* Warming up: eyes shut to 20%, a yawn to 35%, shut again to 50%, then awake */
-@keyframes face-early-1 { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 1; } }
-@keyframes face-early-2 { 0% { opacity: 1; } 20% { opacity: 0; } 35% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 0; } }
-@keyframes face-early-3 { 0% { opacity: 0; } 20% { opacity: 1; } 35% { opacity: 0; } 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .band .face > span { animation: none !important; } }
+/* The answer is the headline of the Overview: as big as the Session and Today numbers, a step smaller in a narrow verdict */
+.band .ans { flex: none; font-size: var(--fs-3xl); font-weight: 600; letter-spacing: .03em; }
+@container verdict (max-width: 32rem) { .band .ans { font-size: var(--fs-2xl); } }
+@container verdict (max-width: 22rem) { .band .ans { font-size: var(--fs-xl); } }
+@container verdict (max-width: 11rem) { .band .ans { font-size: var(--fs-lg); } } /* the narrowest window, next to the face */
+/* The face: second only to the chart, so it has a small screen of its own, in the level's color (muted while the app reads,
+   fails or sleeps) with a phosphor glow (paper does not glow). verdict.js swaps the frames, plays the effects below and turns
+   the head toward the pointer (translate). A long face gets a smaller size there. It shrinks with a narrow verdict. */
+.band .vface { position: relative; flex: none; display: grid; place-items: center; width: 8.5rem; min-height: 3.6rem; padding: 0 .4rem; overflow: hidden; border-radius: var(--r-sm); --fcol: var(--c, var(--sm)); border: 1px solid color-mix(in srgb, var(--fcol) 40%, transparent); background: color-mix(in srgb, var(--fcol) 7%, transparent); transition: border-color .3s, background-color .3s; }
+.band .vface.muted { --fcol: var(--sm); }
+.band .fc { display: block; font: 500 var(--fs-5xl)/1 var(--mono); color: var(--fcol); white-space: pre; transition: translate .25s ease-out, color .3s, opacity .3s; text-shadow: 0 0 .16em color-mix(in srgb, var(--fcol) 75%, transparent), 0 0 .6em color-mix(in srgb, var(--fcol) 40%, transparent); }
+html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: none; }
+.band .vface.dim .fc { opacity: .6; }
+@container vband (max-width: 36rem) { .band .vface { width: 6.5rem; } .band .fc { font-size: var(--fs-4xl); } }
+@container vband (max-width: 26rem) { .band .vl { gap: .5rem; } .band .vface { width: 5rem; min-height: 3rem; } .band .fc { font-size: var(--fs-2xl); } }
+@container vband (max-width: 20rem) { .band .vl { gap: .4rem; } .band .vface { width: 3.2rem; padding: 0 .2rem; } .band .fc { font-size: var(--fs-lg); } }
+.band .fc.hop { animation: face-hop .45s ease-out; }
+.band .fc.shake { animation: face-shake .45s linear; }
+.band .fc.squash { animation: face-squash .35s ease-out; }
+.band .fc.tilt { animation: face-tilt 1.4s ease-in-out infinite; }
+.band .vface .zz { position: absolute; left: 62%; top: 35%; font: 600 var(--fs-sm)/1 var(--mono); color: var(--sm); pointer-events: none; animation: face-zz 2.2s ease-out forwards; }
+@keyframes face-hop { 40% { transform: translateY(-.35rem); } 70% { transform: translateY(.05rem); } }
+@keyframes face-shake { 20% { transform: translateX(-3px); } 40% { transform: translateX(3px); } 60% { transform: translateX(-2px); } 80% { transform: translateX(2px); } }
+@keyframes face-squash { 40% { transform: scale(1.12, .86); } 75% { transform: scale(.96, 1.05); } }
+@keyframes face-tilt { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+@keyframes face-zz { from { opacity: 0; transform: translate(0, 0) scale(.8); } 20% { opacity: 1; } to { opacity: 0; transform: translate(1.4rem, -2rem) scale(1.25); } }
+/* The ring around today's point on the chart pings when the face glances at it */
+.plot .nowping { opacity: 0; transform-box: fill-box; transform-origin: center; pointer-events: none; }
+.plot.glance .nowping { animation: now-ping .9s ease-out 2; }
+@keyframes now-ping { from { opacity: .9; transform: scale(.35); } to { opacity: 0; transform: scale(1.4); } }
+@media (prefers-reduced-motion: reduce) {
+  .band .fc, .band .vface .zz, .plot .nowping { animation: none !important; }
+  .band .fc { transition: none; }
+}
 /* The chips: an icon, a word or two (muted) and the value. A warning chip (locked) takes the Pause color. */
 .chips { display: flex; align-items: center; gap: .4rem; min-width: 0; overflow: hidden; }
-.chip { flex: none; display: inline-flex; align-items: baseline; gap: .35rem; padding: .15rem .45rem; border: 1px solid var(--sline); background: color-mix(in srgb, var(--st) 5%, transparent); font: 400 var(--fs-xs)/1.3 var(--mono); color: var(--sm); white-space: nowrap; }
+.chip { flex: none; display: inline-flex; align-items: baseline; gap: .35rem; padding: .15rem .45rem; border: 1px solid transparent; background: color-mix(in srgb, var(--st) 8%, transparent); font: 400 var(--fs-xs)/1.3 var(--mono); color: var(--sm); white-space: nowrap; }
 .chip .ci { font-style: normal; color: var(--st); }
 .chip .cv { font: 600 var(--fs-sm)/1.2 var(--mono); color: var(--st); }
 .chip.warn { border-color: color-mix(in srgb, var(--pause) 60%, transparent); }
 .chip.warn .ci, .chip.warn .cv { color: var(--pause); }
 .chip.plain { padding-left: 0; border: 0; background: none; }
 .chip.plain .cv { font-weight: 400; color: var(--sm); }
+.chip.plain { flex: 0 1 auto; min-width: 0; white-space: normal; } /* words only ("Too early to tell"): they wrap rather than run out of a narrow verdict */
 .chip.bare .cw { display: none; }
 .band .vl.lit-bare .ruler > span.on > span:not(.shp) { display: none; }
 .band #vLevel { display: none; } /* the ruler already lights the level */
@@ -201,10 +200,10 @@
 /* --ax is the chart's axis in days (week.js): 7, plus the week's last hours up to the reset. The days cover only the seven
    columns and leave that last stretch empty, under the chart's. The line above them is the hours' bottom edge, so it runs on. */
 .days { grid-column: 2; grid-row: 3; position: relative; z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: calc(100% * 7 / var(--ax, 7)); }
-.day:last-child { border-right: 1px solid var(--sline); }
+.day:last-child { border-right: 1px solid var(--crt-grid-day); }
 .day {
   position: relative; display: flex; flex-direction: column; align-items: stretch; gap: .1rem; min-width: 0; padding: .3rem .5rem .35rem; overflow: hidden;
-  text-align: left; font: inherit; color: var(--st); background: transparent; border: 0; border-left: 1px solid var(--sline); border-radius: 0; cursor: pointer;
+  text-align: left; font: inherit; color: var(--st); background: transparent; border: 0; border-left: 1px solid var(--crt-grid-day); border-radius: 0; cursor: pointer;
 }
 .day:first-child { border-left: 0; }
 .day .nm { display: flex; justify-content: space-between; align-items: baseline; gap: .4rem; min-width: 0; font: 600 var(--fs-xs)/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
@@ -225,11 +224,16 @@
 .day .bg .sbar { flex: 1 1 auto; min-width: 1.5rem; height: .5rem; }
 .day .bd { font: 400 var(--fs-xs)/1.3 var(--mono); color: var(--sm); white-space: nowrap; }
 .day .bd .bdw { font-style: normal; }
+/* A day ahead: no % and no empty bar, only its budget and where the week should stand at its end */
+.day.ahead .pr, .day.ahead .bg .sbar { display: none; }
+.day.ahead .bg { margin-top: .1rem; }
+.day .wt { font: 400 var(--fs-xs)/1.3 var(--mono); color: var(--sm); white-space: nowrap; }
+.day .wt .wtw { font-style: normal; }
 .day:hover:not(.locked) { background: var(--crt-hover); box-shadow: inset 0 0 0 1px var(--crt-accent); }
 .day.locked { cursor: default; }
 .day:focus-visible { outline: 2px solid var(--crt-accent); outline-offset: -2px; }
-/* The frame around today runs from the top of the chart down through the hours and the day column */
-.todaybox { position: absolute; top: 0; bottom: 0; z-index: 0; box-sizing: border-box; pointer-events: none; border: 1px solid color-mix(in srgb, var(--crt-accent) 50%, transparent); background: color-mix(in srgb, var(--crt-accent) 6%, transparent);
+/* Today's column runs from the top of the chart down through the hours and the day column: a tint, no frame */
+.todaybox { position: absolute; top: 0; bottom: 0; z-index: 0; box-sizing: border-box; pointer-events: none; background: color-mix(in srgb, var(--crt-accent) 9%, transparent);
   left: calc(var(--gut) + (100% - var(--gut)) * var(--ti, 0) / var(--ax, 7)); width: calc((100% - var(--gut)) / var(--ax, 7)); }
 
 /* ---- Extra usage: a slim strip, only when it is set up ---- */
@@ -303,7 +307,7 @@
 /* Cut order, widest first: the word "budget", then the tag (and the budget moves under the bar), then the date and the
    legend, then the budget and the state word. */
 .days { container: days / inline-size; }
-@container days (max-width: 73.25rem) { .day .bdw { display: none; } }
+@container days (max-width: 73.25rem) { .day .bdw, .day .wtw { display: none; } }
 @container days (max-width: 49.25rem) {
   .day .tg { display: none; }
   .day .bg { flex-wrap: wrap; row-gap: .15rem; }

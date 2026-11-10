@@ -11,8 +11,6 @@
 #view-history .pn { min-width: 0; white-space: normal; align-items: flex-start; } /* a long heading wraps under its number instead of running out of the block */
 #view-history .pn b { flex: none; }
 .rk { min-height: 2rem; padding-inline: .7rem; font-size: var(--fs-xs); }
-.rk.on { padding-left: 1.3rem; }
-.rk.on::before { left: .5rem; }
 .hnote { max-width: 62rem; padding: 0 .4rem; font-size: var(--fs-sm); line-height: 1.45; color: var(--ink2); }
 
 /* Stats row */

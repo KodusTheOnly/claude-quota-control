@@ -185,10 +185,15 @@ function dayShare(ms, resetsAt, w = weights()) {
 const isDayOff = (ms, w = weights()) => w[new Date(ms).getDay()] === 0;
 // What an Off today shows as its number: the use as a share of the week, or a dash when nothing was used
 const offDayNumber = (spent) => (Math.round(spent) > 0 ? `${Math.round(spent)}%` : "–");
+// The week's last hours fall outside the active hours: from the start of today (not an Off day) to the reset
+// there is no plan time left. Today then gets everything left, since it is lost at the reset.
+function weekEndsUnplanned(now, resetsAt, w = weights()) {
+  return !isDayOff(now, w) && weightedDays(Math.max(startOfDay(now), resetsAt - WEEK), resetsAt, w) <= 0;
+}
 // Today's budget: today's share of what is left, counting the week from the start of the day
 function dayBudget(remaining, resetsAt, now, w = weights()) {
   const share = dayShare(now, resetsAt, w);
-  if (share <= 0) return 0;
+  if (share <= 0) return weekEndsUnplanned(now, resetsAt, w) ? Math.max(remaining, 0) : 0;
   const from = Math.max(startOfDay(now), resetsAt - WEEK);
   return (Math.max(remaining, 0) * share) / Math.max(weightedDays(from, resetsAt, w), share);
 }
@@ -236,7 +241,8 @@ function reserveReleased(left, a, b, from, resetsAt, g) {
 // With FULL_WEEK it is dayBudget(100 - usedStart).
 function planBudget(usedStart, resetsAt, now, g, w = weights()) {
   const plan = dayBudget(g.goal - g.reserve - usedStart, resetsAt, now, w);
-  if (dayShare(now, resetsAt, w) <= 0) return plan;
+  // No plan time left before the reset: the whole reserve left joins today too
+  if (dayShare(now, resetsAt, w) <= 0) return weekEndsUnplanned(now, resetsAt, w) ? Math.max(g.goal - usedStart, 0) : plan;
   const from = Math.max(startOfDay(now), resetsAt - WEEK);
   const d = new Date(now);
   const to = Math.min(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime(), resetsAt);

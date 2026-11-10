@@ -88,11 +88,14 @@ async function runSync({ visible = false, auto = false } = {}) {
     $("syncLabel").textContent = t("hd.refresh");
   }
 
+  // The verdict's face shows a failed reading (state.syncFail, the error code) until one works
+  if (res.ok) state.syncFail = null;
+  else if (res.error !== "too-soon") state.syncFail = res.error || "fail";
   if (res.ok && !res.weekly.resetsAt && !(state.settings.manual && state.settings.manual.anchor)) {
     if (!auto) {
       syncFeedback(t("sync.noReset", { pct: pct(res.weekly.used) }), "error",
         { label: t("sync.openSettings"), run: () => go("settings") });
-    }
+    } else render(); // the face stops reading
     return;
   }
   if (res.ok) {
@@ -158,6 +161,7 @@ async function connectClaude() {
 async function disconnectClaude() {
   if (!confirm(t("acct.confirmDisconnect"))) return;
   await api.claudeLogout();
+  state.syncFail = null;
   state.settings = await api.getSettings();
   bindAccount();
   render();

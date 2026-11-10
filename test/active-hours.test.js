@@ -164,3 +164,43 @@ test("the collector and the app compute the same day budget with active hours", 
     fs.rmSync(home, { recursive: true, force: true });
   }
 });
+
+// The week's last hours fall outside the window (9 to 23, reset Tue 08:00): Tuesday 00:00-08:00 has no plan time,
+// so today gets everything left. Before, the budget was 0 and any use there read as 200% and Pause.
+const DAYTIME = { activeHours: { start: 9, end: 23 } };
+test("the last hours before the reset, outside the window, get everything left", () => {
+  const reset = at(2026, 11, 10, 8);
+  const now = at(2026, 11, 10, 0, 23);
+  const sb = load(now, DAYTIME);
+  near(ev(sb, `dayShare(${now}, ${reset}, ${JSON.stringify(EVEN)})`), 0, "no plan time today");
+  near(ev(sb, `dayBudget(12, ${reset}, ${now}, ${JSON.stringify(EVEN)})`), 12);
+  // With a reserve, what is left of it joins too: it would be lost at the reset
+  near(ev(sb, `planBudget(88, ${reset}, ${now}, { goal: 100, reserve: 20, release: 72 }, ${JSON.stringify(EVEN)})`), 12);
+  near(ev(sb, `planBudget(99, ${reset}, ${now}, { goal: 100, reserve: 5, release: 0 }, ${JSON.stringify(EVEN)})`), 1);
+  // An Off Tuesday stays at 0 (it is not rated), and so do the hours after the reset outside the window
+  const offTue = [1, 1, 0, 1, 1, 1, 1];
+  near(ev(sb, `dayBudget(12, ${reset}, ${now}, ${JSON.stringify(offTue)})`), 0);
+  const lateReset = at(2026, 11, 10, 23, 30);
+  near(ev(load(at(2026, 11, 3, 23, 45), DAYTIME), `dayBudget(100, ${lateReset}, ${at(2026, 11, 3, 23, 45)}, ${JSON.stringify(EVEN)})`), 0);
+
+  // The overview: 88% of the week used, 1% of it since midnight
+  sb.__src = { kind: "manual", data: { updatedAt: now, weekly: { used: 88, resetsAt: reset }, fiveHour: null, dayStart: { day: "2026-11-10", at: at(2026, 11, 10), used: 87 }, days: {} } };
+  vm.runInContext(`state.settings.manual = __src.data; state.settings.weights = ${JSON.stringify(EVEN)}; var __m = compute(__src);`, sb);
+  const m = ev(sb, "({ budget: __m.budget, ratio: __m.todayRatio, lv: __m.lv.today })");
+  near(m.budget, 13);
+  near(m.ratio, 1 / 13);
+  assert.equal(m.lv, 0, "Free, not Pause");
+});
+
+test("the collector gives the same budget in the last hours outside the window", () => {
+  const src = fs.readFileSync(path.join(__dirname, "..", "collector", "statusline.js"), "utf8");
+  const fn = (name) => src.match(new RegExp("function " + name + "\\([\\s\\S]*?\\r?\\n}\\r?\\n"))[0];
+  const sb = { Date };
+  vm.createContext(sb);
+  vm.runInContext(`const DAY_MS = 86400000;\n${fn("activeSpans")}${fn("weightedDays")}${fn("dayBudget")}`, sb);
+  const reset = at(2026, 11, 10, 8);
+  const a = JSON.stringify(DAYTIME.activeHours);
+  near(ev(sb, `dayBudget(12, ${reset}, ${at(2026, 11, 10, 0, 23)}, ${JSON.stringify(EVEN)}, ${a})`), 12);
+  near(ev(sb, `dayBudget(12, ${reset}, ${at(2026, 11, 10, 0, 23)}, ${JSON.stringify([1, 1, 0, 1, 1, 1, 1])}, ${a})`), 0);
+  near(ev(sb, `dayBudget(60, ${reset}, ${at(2026, 11, 5)}, ${JSON.stringify(EVEN)}, ${a})`), 60 / 5, "midweek is unchanged: the Tuesday night hours weigh nothing");
+});

@@ -33,6 +33,13 @@
 .sbar .fill { left: 0; width: var(--fill, 0%); background: var(--c); }
 .sbar .ov { left: calc(var(--fill, 0%) - var(--ov, 0%)); width: var(--ov, 0%); background: var(--pause); }
 .sbar .tick { position: absolute; top: -.25rem; bottom: -.25rem; left: var(--tx, 100%); width: 2px; margin-left: -1px; background: var(--tick); z-index: 2; }
+/* A new reading: the bars slide to their new value and a number that changed glows for a moment (setNum in ui.js) */
+@media (prefers-reduced-motion: no-preference) {
+  .sbar .fill, .sbar .ov { transition: width .22s ease-out, left .22s ease-out; }
+  .sbar .tick { transition: left .22s ease-out; }
+  .glow { animation: num-glow .6s ease-out; }
+}
+@keyframes num-glow { from { color: var(--num-flash); text-shadow: 0 0 .45em var(--num-halo); } }
 .cap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 .6rem; font: 500 var(--fs-xs)/1.3 var(--mono); color: var(--sm); }
 .cap span { white-space: nowrap; }
 /* ---- Plate heading: the number and the title of a block (Overview setup, History, Settings, Help, About) ---- */
@@ -42,6 +49,6 @@
 .pn span { min-width: 0; }
 
 .plates { display: flex; gap: .4rem; flex-wrap: wrap; }
-.plate { padding: .1rem .45rem; border: 1px solid var(--crt-thumb); color: var(--sm); font: 600 var(--fs-xs)/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.plate { padding: .1rem .45rem; border: 1px solid transparent; background: color-mix(in srgb, var(--st) 8%, transparent); color: var(--sm); font: 600 var(--fs-xs)/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
 .crt .lv.lv-none { color: var(--sm); }
 .crt.fit { flex: none; }

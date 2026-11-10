@@ -50,7 +50,6 @@
 @media (min-width: 720px) and (max-width: 999px) {
   .brand-name, #syncLabel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .keys .key { padding-inline: .6rem; }
-  .keys .key.on { padding-left: 1.2rem; }
   #syncBtn { min-width: 0; padding-inline: .6rem; }
   #connectBtn .long { display: none; }
   #connectBtn .short { display: inline; }
@@ -63,7 +62,6 @@
   .brand, .sync { min-height: 2.15rem; }
   .keys { margin-right: calc(max(.8rem, var(--ctl)) * -1 + .8rem); }
   .keys .key { flex: 1 1 auto; padding-inline: .5rem; }
-  .keys .key.on { padding-left: 1.2rem; }
   #syncBtn { min-width: 0; padding-inline: .6rem; }
   #syncLabel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   #connectBtn .long { display: none; }

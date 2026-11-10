@@ -1,5 +1,6 @@
-// The verdict's faces: every level and Warming up has frames, all plain ASCII (so the font never changes),
-// and the frames of a face are all as wide as each other (so the line does not jump while it plays).
+// The verdict's faces (renderer/js/blocks/verdict.js): every mode and app state has one, all plain ASCII (so the font
+// never changes) and short enough for the face's screen, every act points at frames that exist, the parts keep their
+// meaning (arms only in the good moments) and the CSS has every effect and stops them with reduced motion.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -8,8 +9,8 @@ const vm = require("node:vm");
 
 const ROOT = path.join(__dirname, "..");
 
-function loadFaces() {
-  const stub = () => ({ parentElement: {}, addEventListener() {}, classList: { remove() {}, add() {} }, dataset: {} });
+function load() {
+  const stub = () => ({ parentElement: {}, addEventListener() {}, classList: { remove() {}, add() {}, toggle() {} }, dataset: {}, style: {} });
   const sandbox = {
     document: { getElementById: stub, addEventListener() {}, hidden: false },
     window: { quota: {} },
@@ -20,36 +21,73 @@ function loadFaces() {
   for (const f of ["core.js", "compute.js", "ui.js", "blocks/verdict.js"]) {
     vm.runInContext(fs.readFileSync(path.join(ROOT, "renderer", "js", f), "utf8"), sandbox);
   }
-  return vm.runInContext("({ levels: VERDICT_FACES, early: EARLY_FACE, keys: LEVEL_KEYS })", sandbox);
+  return vm.runInContext("({ FACES, FACE_MOMENTS, FACE_RANK, FACE_GAPS, verdictMode })", sandbox);
 }
 
-const faces = loadFaces();
-const all = [...faces.levels.map((frames, i) => [faces.keys[i], frames]), ["early", faces.early]];
+const { FACES, FACE_MOMENTS, FACE_RANK, FACE_GAPS, verdictMode } = load();
+const MODES = ["room", "free", "moderate", "tight", "pause", "locked", "early", "reserve"];
+const STATES = ["reading", "error", "login", "asleep"];
+const EFFECTS = ["hop", "shake", "squash", "glance", "zz"];
+const everyFrame = () => [
+  ...Object.entries(FACES).flatMap(([k, f]) => [...f.frames, ...(f.poke ? [f.poke] : [])].map((fr) => [k, fr])),
+  ...Object.entries(FACE_MOMENTS).flatMap(([k, mo]) => mo.frames.map((fr) => [k, fr])),
+];
 
-test("every level and Warming up has a face with at least two frames", () => {
-  assert.equal(faces.levels.length, faces.keys.length);
-  for (const [key, frames] of all) {
-    assert.ok(Array.isArray(frames), key);
-    assert.ok(frames.length >= 2, `${key} has ${frames.length} frames`);
-    for (const f of frames) assert.ok(typeof f === "string" && f.trim().length > 0, `${key}: empty frame`);
+test("every verdict mode and app state has a face, and every mode has a rank", () => {
+  for (const k of [...MODES, ...STATES]) assert.ok(FACES[k] && FACES[k].frames.length >= 1, k);
+  for (const k of MODES) {
+    assert.ok(Number.isFinite(FACE_RANK[k]), `${k} has no rank`);
+    assert.ok(FACES[k].frames.length >= 2 && FACES[k].acts.length >= 1, `${k} does nothing`);
   }
 });
 
-test("the frames are plain printable ASCII", () => {
-  for (const [key, frames] of all) {
-    for (const f of frames) assert.ok(/^[\x20-\x7E]+$/.test(f), `${key}: "${f}"`);
+test("the frames are plain printable ASCII and fit the face's screen", () => {
+  for (const [k, fr] of everyFrame()) {
+    assert.ok(/^[\x20-\x7E]+$/.test(fr), `${k}: "${fr}"`);
+    assert.ok(fr.trim().length > 0 && fr.length <= 7, `${k}: "${fr}" is empty or too long`);
   }
 });
 
-test("the frames of each face are all as wide as each other", () => {
-  for (const [key, frames] of all) {
-    const widths = new Set(frames.map((f) => f.length));
-    assert.equal(widths.size, 1, `${key}: ${frames.map((f) => `"${f}"`).join(", ")}`);
+test("acts and moments point at frames that exist, with a known effect", () => {
+  const steps = (k, frames, seq) => {
+    for (const [f, ms, fx] of seq) {
+      assert.ok(Number.isInteger(f) && f >= 0 && f < frames.length, `${k}: frame ${f}`);
+      assert.ok(Number.isFinite(ms) && ms >= 0, `${k}: ${ms} ms`);
+      if (fx !== undefined) assert.ok(EFFECTS.includes(fx), `${k}: effect ${fx}`);
+    }
+  };
+  for (const [k, f] of Object.entries(FACES)) {
+    for (const a of f.acts || []) {
+      assert.ok(a.w > 0, `${k}: weight`);
+      if (a.fx) assert.ok(EFFECTS.includes(a.fx), `${k}: effect ${a.fx}`);
+      steps(k, f.frames, a.seq);
+    }
+    if (f.loop) steps(k, f.frames, f.loop);
   }
+  for (const [k, mo] of Object.entries(FACE_MOMENTS)) steps(k, mo.frames, mo.seq);
+  for (const [lo, hi] of FACE_GAPS) assert.ok(lo > 0 && hi >= lo);
 });
 
-test("the CSS times a loop for every face", () => {
+test("the levels read from the eyes, and arms only show in the good moments", () => {
+  const eyes = (k) => FACES[k].frames[0][0];
+  assert.deepEqual(["free", "moderate", "tight", "pause"].map(eyes), ["^", "o", "o", "O"]);
+  assert.ok(FACES.tight.frames[0].includes(";") && FACES.pause.frames[0].includes("!"), "Tight sweats, Pause is alarmed");
+  for (const [k, f] of Object.entries(FACES)) for (const fr of [...f.frames, f.poke || ""]) assert.ok(!/[\\/]/.test(fr), `${k}: "${fr}" has arms`);
+  for (const k of ["reset", "hello"]) assert.ok(FACE_MOMENTS[k].frames.some((fr) => /[\\/]/.test(fr)), `${k} has arms`);
+});
+
+test("the verdict's mode: limit reached first, then the reserve, warming up, room, the level", () => {
+  const m = (o) => ({ forecast: { kind: "ok" }, reserveMode: false, head: { room: false, level: 1 }, ...o });
+  assert.equal(verdictMode(m({ forecast: { kind: "out" }, reserveMode: true })), "locked");
+  assert.equal(verdictMode(m({ reserveMode: true })), "reserve");
+  assert.equal(verdictMode(m({ forecast: { kind: "early" } })), "early");
+  assert.equal(verdictMode(m({ head: { room: true, level: 0 } })), "room");
+  assert.equal(verdictMode(m({})), "moderate");
+});
+
+test("the CSS has every effect and stops them with reduced motion", () => {
   const css = fs.readFileSync(path.join(ROOT, "renderer", "css", "overview.css"), "utf8");
-  for (const [key] of all) assert.ok(css.includes(`[data-face="${key}"]`), key);
-  assert.ok(/prefers-reduced-motion: reduce\)\s*\{\s*\.band \.face > span \{ animation: none/.test(css), "no motion when reduced");
+  for (const fx of ["hop", "shake", "squash", "tilt"]) assert.ok(css.includes(`.band .fc.${fx} {`), fx);
+  assert.ok(css.includes(".band .vface .zz {") && css.includes(".plot.glance .nowping {"), "zz and the chart's ping");
+  assert.ok(/prefers-reduced-motion: reduce\)\s*\{\s*\.band \.fc, \.band \.vface \.zz, \.plot \.nowping \{ animation: none/.test(css), "no motion when reduced");
 });

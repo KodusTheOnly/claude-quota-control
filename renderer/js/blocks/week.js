@@ -7,12 +7,14 @@ const PLAN_ORDER = [1, 0.5, 2, 0]; // Normal, Light, Heavy, Off
 
 function dayLabel(ms) {
   const date = new Date(ms);
-  return { nm: shortWeekday(date), date: date.toLocaleDateString(I18N.locale(), { month: "short", day: "numeric" }) };
+  const locale = I18N.locale();
+  return { nm: shortWeekday(date), date: date.toLocaleDateString(locale, { month: "short", day: "numeric" }), dayNum: date.toLocaleDateString(locale, { day: "numeric" }) };
 }
 
 // The footer of the graph: seven equal columns, one per calendar day, each exactly under its part of the chart.
 // A column has three rows: name and date, the day's % with its level shape and its tag, the budget bar.
 // A day with no reading says why (no data, off, a plan other than Normal) between the % and the bar.
+// A day ahead has nothing to measure yet: no %, no bar. It shows its budget and where the week should stand at its end.
 // The week starts mid-day (at the reset) and ends a little after the seventh day: the chart and the hours run on to the
 // reset, and the days leave that last stretch empty.
 function buildDays() {
@@ -39,13 +41,14 @@ function buildDays() {
     bar.append(tr, node("b", "tick"));
     const bud = node("span", "bd");
     bg.append(bar, bud);
-    b.append(nm, pr, sx, bg);
+    const wt = node("span", "wt");
+    b.append(nm, pr, sx, bg, wt);
     // Days that already passed are a record, not a plan: only today and the days ahead open the plan menu
     b.addEventListener("click", () => {
       if (lastM && lastM.week[i].when !== "past") openPlanMenu(i, b);
     });
     box.appendChild(b);
-    DAYS.push({ b, nameB, date, num, tag, lv, sx, bg, bar, bud });
+    DAYS.push({ b, nameB, date, num, tag, lv, sx, bg, bar, bud, wt });
   }
 }
 
@@ -72,7 +75,7 @@ function paintWeekZones(bar, m) {
 function renderWeek(m) {
   buildDays();
   const level = verdictLevel(m);
-  $("wUsed").textContent = `${r0(m.w.used)}%`;
+  setNum($("wUsed"), `${r0(m.w.used)}%`);
   $("wUsedWord").textContent = t("week.usedLong");
   paintLevel($("wLevel"), level);
   const wBar = $("wBar");
@@ -136,17 +139,21 @@ function renderWeek(m) {
   $("planSum").title = t("plan.label");
   $("wResets").textContent = t("chart.resets", { when: `${shortWeekday(new Date(m.w.resetsAt))} ${fmtTime(m.w.resetsAt)}` });
 
+  // Where the week should stand at the end of each day ahead: today ending on its budget (or where it already is, when
+  // that is more), then each day ahead spending its own budget
+  let weekTo = Math.max(m.w.used, m.usedStart + (m.budget || 0));
   m.week.forEach((d, i) => {
     const r = DAYS[i];
-    const { nm, date } = dayLabel(d.ms);
+    const { nm, date, dayNum } = dayLabel(d.ms);
+    const ahead = d.when === "future";
     const known = d.ratio !== null && (d.kind === "past" || d.kind === "today");
     // A day with a reading shows its level color; a planned or off day is dimmer
     // A day ahead on the Normal plan shows only its bar: the footer already says "Normal ×N"
     const plain = !known && !d.isToday && d.kind === "future" && d.name === "normal";
-    r.b.className = `day ${known ? "live" : "idle"}${d.isToday ? " today" : ""}${d.when === "past" ? " locked" : ""}${plain ? " plain" : ""}`;
+    r.b.className = `day ${known ? "live" : "idle"}${d.isToday ? " today" : ""}${d.when === "past" ? " locked" : ""}${plain ? " plain" : ""}${ahead ? " ahead" : ""}`;
     setLevelClass(r.b, known ? d.level : null);
     r.nameB.textContent = nm;
-    r.date.textContent = date;
+    r.date.textContent = ahead ? dayNum : date; // the month is already on the days before it
     r.tag.textContent = d.isToday ? t("day.today") : i === 0 ? t("day.reset") : "";
     r.tag.classList.toggle("hidden", !r.tag.textContent);
     // Today off: no ratio, so the number is what was used (a share of the week); other days off keep the dash
@@ -173,8 +180,15 @@ function renderWeek(m) {
       r.bud.replaceChildren();
     } else {
       r.bud.replaceChildren();
-      if (d.budget && !plain) r.bud.append("▲", node("i", "bdw", ` ${t("day.budgetWord")} `), `${r0(d.budget)}%`);
+      if (d.budget) r.bud.append("▲", node("i", "bdw", ` ${t("day.budgetWord")} `), `${r0(d.budget)}%`);
     }
+    let weekPhrase = "";
+    if (ahead && d.budget > 0) {
+      weekTo = Math.min(weekTo + d.budget, 100);
+      r.wt.replaceChildren(node("i", "wtw", `${t("day.weekWord")} `), `→ ${r0(weekTo)}%`);
+      weekPhrase = `, ${t("day.weekToAria", { pct: r0(weekTo) })}`;
+    } else r.wt.replaceChildren();
+    r.wt.classList.toggle("hidden", !weekPhrase);
     if (d.when === "past") {
       r.b.setAttribute("aria-disabled", "true");
       r.b.removeAttribute("aria-haspopup");
@@ -184,7 +198,7 @@ function renderWeek(m) {
     }
     const status = known ? `${lvName(d.level)}, ${t(isOverBudget(d.ratio) ? "day.over" : "day.within")}` : d.kind === "off" ? t("day.off") : d.kind === "future" ? t(`plan.${d.name}`) : t("day.noData");
     r.b.title = i === 0 ? `${t("day.reset")} ${fmtTime(m.w.resetsAt)}` : "";
-    r.b.setAttribute("aria-label", `${nm} ${date}, ${t(`plan.${d.name}`)}, ${shownNum}, ${status}${i === 0 ? `, ${t("day.reset")} ${fmtTime(m.w.resetsAt)}` : ""}${fig ? `, ${figPhrase}` : d.budget ? `, ${t("day.budgetAria", { pct: r0(d.budget) })}` : ""}${d.isToday ? `, ${t("day.today")}` : ""}`);
+    r.b.setAttribute("aria-label", `${nm} ${date}, ${t(`plan.${d.name}`)}, ${shownNum}, ${status}${i === 0 ? `, ${t("day.reset")} ${fmtTime(m.w.resetsAt)}` : ""}${fig ? `, ${figPhrase}` : d.budget ? `, ${t("day.budgetAria", { pct: r0(d.budget) })}` : ""}${weekPhrase}${d.isToday ? `, ${t("day.today")}` : ""}`);
     r.b.title = r.b.getAttribute("aria-label"); // the narrow columns hide the date and the level word; hover shows them
   });
 
@@ -197,17 +211,26 @@ function renderWeek(m) {
 // The pace: what the week is doing per day against what still fits, in three named zones. Slow under 85% of what fits,
 // on pace up to 110%, fast above. The lit zone says where the pace is, the needle where in that zone; the numbers are in the title.
 const PACE_ZONES = ["pace.slow", "pace.ok", "pace.fast"];
-function renderPaceGauge(m) {
-  const g = $("pGauge");
+// The zone the pace is in (0 slow, 1 on pace, 2 fast), or null when there is no pace to show. The verdict's face takes
+// its energy from it.
+function paceZone(m) {
   const need = m.lv.need;
   const doing = m.lv.doing;
-  const show = need !== null && need > 0 && doing !== null && !m.reserveMode;
+  if (!(need !== null && need > 0 && doing !== null && !m.reserveMode)) return null;
+  const r = doing / need;
+  return r < 0.85 ? 0 : r < 1.1 ? 1 : 2;
+}
+function renderPaceGauge(m) {
+  const g = $("pGauge");
+  const zone = paceZone(m);
+  const show = zone !== null;
   g.classList.toggle("hidden", !show);
   g.classList.toggle("end", Boolean(m.endRoom));
   $("pLab").classList.toggle("hidden", !show);
   if (!show) return;
+  const need = m.lv.need;
+  const doing = m.lv.doing;
   const r = doing / need;
-  const zone = r < 0.85 ? 0 : r < 1.1 ? 1 : 2;
   const f = zone === 0 ? r / 0.85 : zone === 1 ? (r - 0.85) / 0.25 : Math.min((r - 1.1) / 0.9, 1);
   const zones = [...g.querySelectorAll(".z")];
   zones.forEach((z, i) => z.classList.toggle("on", i === zone));

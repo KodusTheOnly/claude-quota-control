@@ -29,7 +29,6 @@ html { font-size: 16px; }
   --cobalt: #1F3FA6;
   --keybg: #E6E2D6;
   --keyhi: #F0EDE3;
-  --keyon: #B7B3A7;
   --bezel: #1A1A18;
   /* Where a screen sits in the panel: a dark lip inside its top edge and a light lip under it, so it reads as set in */
   --well-hi: #E2DED3;
@@ -60,6 +59,7 @@ html { font-size: 16px; }
   --crt-cell-mark: rgba(255, 255, 255, .16); /* the 6 a.m. mark on the HRS strip */
   --crt-shade: rgba(0, 0, 0, .35); /* the part of the chart before the week started */
   --crt-band: rgba(255, 255, 255, .03); /* every other day on the chart */
+  --num-flash: #FFFFFF; --num-halo: rgba(228, 239, 230, .75); /* a number that a new reading changed, for a moment */
 
   /* Room the native window buttons take in the top-right corner (Electron's title bar overlay).
      Outside Electron the variable falls back to a typical 140px. */
@@ -113,7 +113,6 @@ html[data-theme="dark"] {
   --cobalt: #86A2FF;
   --keybg: #2D3134;
   --keyhi: #383D41;
-  --keyon: #121415;
   --bezel: #5B626A;
   --fc: #86A2FF;
   --danger: #F2575A;
@@ -149,5 +148,6 @@ html[data-screens="paper"]:not([data-theme="dark"]) {
   --crt-cell-mark: rgba(0, 0, 0, .22);
   --crt-shade: rgba(90, 80, 60, .14);
   --crt-band: rgba(90, 80, 60, .04);
+  --num-flash: #1F3FA6; --num-halo: transparent; /* paper does not glow: the number flashes in the accent */
   --well-lo: rgba(0, 0, 0, .18);
 }

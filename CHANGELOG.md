@@ -3,8 +3,19 @@
 ## Unreleased
 
 - Active hours (Settings > Plan, off by default): the hours you usually use Claude, as a window such as 09:00 to 01:00. The plan only moves inside them, so the expected line, the pace, the projection and the hours locked out stop treating a night of sleep as falling behind. A whole day keeps its share of the week; only the partial days at the reset change. Hours after midnight count for that calendar day. Use outside the window still counts. The chart shades the hours outside the window, a thin bar under the HRS strip marks the window on every day (with "active hours" in the legend), and the Claude Code collector follows the same rule.
+- Fixed: when the last hours before the reset fall outside the active hours (a window of 09:00 to 23:00 and a reset at 08:00), today had a budget of 0, so any use after midnight showed as 200% and Pause. Today now gets everything left of the week, the reserve included, since it is lost at the reset. The collector follows the same rule.
 - The Reserve section in Settings is now Plan, with Active hours and Reserve.
-- The chart's "to spend" number goes under its box when the box touches the top of the chart (it was cut off).
+- The verdict is the headline of the Overview: its answer is as big as the Session and Today numbers (a step smaller when its screen is narrow).
+- The chart dims the time after now. The room box is gone: what there is to spend is a bracket at the reset, from where the projection ends to the plan's ceiling, with "~N% to spend" (only the number in a narrow chart). When the projection stays within 2 points of the plan, the expected line stops at now and the projection carries on alone, named "projection ≈ expected". When the chart is too tight for them, the names of the lines and the "to spend" number are left out instead of sitting on a line; "now" always stays.
+- The days ahead show their budget and where the week should stand at their end ("→ 64%"), with no % and no empty bar, and only the day of the month as the date.
+- The selected key (tabs, History ranges, Settings contents, the plan menu) is lit: pressed in, with an ink face, instead of a dark key with a small square.
+- Fewer outlines: the verdict's chips and the plates on the tray card sit on a tint, today's column has a tint and no frame, and the lines between the days match the chart's day lines. The warning chip keeps its outline.
+- A new reading slides the bars to their new values and makes a changed number glow for a moment (none with reduced motion).
+- On paper screens the tray card writes the level's name in ink; the shape and the bars keep the level's color.
+- The verdict's face has a small screen of its own, left of the answer, bigger and with a phosphor glow (none on paper). Each part of it means one thing: the eyes say how much you can relax, the mouth the tension, a side mark the extra (; sweat, ! alarm), and arms only show in good moments. The faces are new: Room `^.~`, Free `^.^`, Moderate `o.o`, Tight `o_o;`, Pause `O_O!`, Limit reached `T_T` (it had Pause's face), Warming up `'.'` and Reserve `O_o` (Room and Reserve never moved before).
+- The face lives: it blinks and acts at random times, faster when the pace is fast and calmer when it is slow, turns its head toward the pointer and reacts to a click. Moderate and Tight glance at the chart, and today's point there pings.
+- It shows what the app is doing, in the muted color: its eyes run along the page during a reading, `x.x` after a failed one and `?.?` when Claude asks to sign in again (both until a reading works), and it sleeps outside the active hours.
+- It reacts: a start when the level gets worse, a smile when it gets better, relief (still sweating) when it comes back from Tight or Pause, a start and a glance at the chart when a reading jumps 5 points or more, a nod when a reading brings nothing new, a wave the first time the Overview shows each day, and a cheer for a new week. Nothing moves while the window is hidden, on another screen or with reduced motion.
 
 ## 2.1.0
 
