@@ -147,30 +147,79 @@ async function renderAbout() {
   if (info.version) parts.push(t("about.version", { v: info.version }));
   if (info.electron) parts.push(t("about.electron", { e: info.electron }));
   $("aboutVersion").textContent = parts.join(" · ");
+  renderUpdate();
 }
 
-// The update result is a line on the nameplate screen: UPDATE, the result, and a cursor
-$("updateBtn").addEventListener("click", async () => {
-  const btn = $("updateBtn");
+// Updates (updater.js), only on a click. The line on the nameplate screen says UPDATE, the result of the last click and
+// when a check last worked. When a check finds a version the app can install, "Update to X" downloads and installs it
+// (the app quits and opens again); otherwise the link opens the release on GitHub to download by hand.
+// upd.phase: idle, checking, result (upd.res), downloading (upd.pct), installing, installFail
+const upd = { phase: "idle", res: null, pct: 0 };
+
+function updateLink(href, key) {
+  const a = document.createElement("a");
+  a.href = href;
+  a.target = "_blank";
+  a.rel = "noopener";
+  a.textContent = t(key);
+  return a;
+}
+
+function renderUpdate() {
   const out = $("updateResult");
-  btn.disabled = true;
-  $("updateLine").classList.remove("hidden");
-  out.textContent = t("about.checking");
-  const res = await api.checkUpdate();
-  btn.disabled = false;
+  const res = upd.res;
+  const busy = upd.phase === "checking" || upd.phase === "downloading" || upd.phase === "installing";
   out.textContent = "";
-  if (res.status === "newer") {
-    out.append(t("about.newer", { v: res.version }) + " ");
-    const a = document.createElement("a");
-    a.href = res.url;
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.textContent = t("about.download");
-    out.appendChild(a);
-  } else if (res.status === "latest") out.textContent = t("about.latest");
-  else if (res.status === "none") out.textContent = t("about.noReleases");
-  else out.textContent = t("about.updateFail");
+  if (upd.phase === "checking") out.textContent = t("about.checking");
+  else if (upd.phase === "downloading") out.textContent = t("about.downloading", { v: res.version, pct: upd.pct });
+  else if (upd.phase === "installing") out.textContent = t("about.installing", { v: res.version });
+  else if (upd.phase === "installFail") out.append(`${t("about.installFail")} `, updateLink(res.url, "about.download"));
+  else if (upd.phase === "result") {
+    if (res.status === "newer") out.append(`${t("about.newer", { v: res.version })} `, updateLink(res.url, res.canInstall ? "about.notes" : "about.download"));
+    else if (res.status === "latest") out.textContent = t("about.latest");
+    else if (res.status === "none") out.textContent = t("about.noReleases");
+    else out.textContent = t("about.updateFail");
+  }
+  const last = state.settings && state.settings.lastUpdateCheck;
+  $("updateWhen").textContent = busy ? "" : last ? t("about.lastChecked", { ago: ago(last) }) : t("about.neverChecked");
+  const install = $("updateInstallBtn");
+  const canInstall = res && res.status === "newer" && res.canInstall && upd.phase !== "idle" && upd.phase !== "checking";
+  install.classList.toggle("hidden", !canInstall);
+  if (canInstall) install.textContent = t("about.install", { v: res.version });
+  install.disabled = busy;
+  $("updateBtn").disabled = busy;
+}
+
+$("updateBtn").addEventListener("click", async () => {
+  upd.phase = "checking";
+  renderUpdate();
+  const res = await api.checkUpdate();
+  if (res.checkedAt && state.settings) state.settings.lastUpdateCheck = res.checkedAt;
+  upd.res = res;
+  upd.phase = "result";
+  renderUpdate();
 });
+
+$("updateInstallBtn").addEventListener("click", async () => {
+  upd.phase = "downloading";
+  upd.pct = 0;
+  renderUpdate();
+  const r = await api.installUpdate();
+  if (r.status === "installing") upd.phase = "installing";
+  else {
+    upd.phase = "installFail";
+    if (r.url) upd.res = { ...upd.res, url: r.url };
+  }
+  renderUpdate();
+});
+
+if (api && api.onUpdateProgress) {
+  api.onUpdateProgress((pct) => {
+    if (upd.phase !== "downloading") return;
+    upd.pct = pct;
+    renderUpdate();
+  });
+}
 
 // Settings
 

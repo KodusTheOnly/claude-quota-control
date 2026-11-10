@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld("quota", {
   toast: (payload) => ipcRenderer.send("toast", payload),
   appInfo: () => ipcRenderer.invoke("app-info"),
   checkUpdate: () => ipcRenderer.invoke("check-update"),
+  installUpdate: () => ipcRenderer.invoke("install-update"),
+  onUpdateProgress: (callback) => ipcRenderer.on("update-progress", (_e, pct) => callback(pct)),
   exportData: (format) => ipcRenderer.invoke("export-data", format),
   importData: () => ipcRenderer.invoke("import-data"),
   clearData: () => ipcRenderer.invoke("clear-data"),

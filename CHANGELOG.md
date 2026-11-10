@@ -2,6 +2,13 @@
 
 ## 2.2.0
 
+- Updates install from the app: Help > About shows when the last check for updates worked, and when a new version is out, "Update to X" downloads it, checks it against the release and installs it, then the app opens again. Your data stays. Nothing is checked or downloaded without a click. Versions before 2.2.0 still need the installer from GitHub once.
+- The installer is now named Claude-Quota-Control-Setup-X.exe.
+- Past weeks (off by default): the "Past 4 weeks" key under the week chart draws the last 4 weeks as faint dashed lines with this one, in red for a week that reached 100%. In a tall vertical window with room to spare they move to a block of their own under the chart, with where each week ended and where they usually stood at this point of the week.
+- In a tall vertical window with room to spare, "Today, by hour" shows today's use per hour, with the 5-hour sessions behind the bars.
+- In the vertical window the chart names the days on its own axis, and a Normal day ahead says so in its row.
+- The plan menu's keys have two lines, the plan on top and the day's budget below, so they fit in both languages.
+- A reading no longer opens a strip under the header: only the thin progress bar and the pulsing lamp show it, so the page does not jump. The lamp's tooltip says the numbers are from the last reading.
 - Active hours (Settings > Plan, off by default): the hours you usually use Claude, as a window such as 09:00 to 01:00. The plan only moves inside them, so the expected line, the pace, the projection and the hours locked out stop treating a night of sleep as falling behind. A whole day keeps its share of the week; only the partial days at the reset change. Hours after midnight count for that calendar day. Use outside the window still counts. The chart shades the hours outside the window, a thin bar under the HRS strip marks the window on every day (with "active hours" in the legend), and the Claude Code collector follows the same rule.
 - Fixed: when the last hours before the reset fall outside the active hours (a window of 09:00 to 23:00 and a reset at 08:00), today had a budget of 0, so any use after midnight showed as 200% and Pause. Today now gets everything left of the week, the reserve included, since it is lost at the reset. The collector follows the same rule.
 - The Reserve section in Settings is now Plan, with Active hours and Reserve.

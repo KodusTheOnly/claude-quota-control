@@ -224,9 +224,12 @@ function checkPage({ format, scrolls: formatScrolls, view = "panel" }) {
     if (!lit || lit.dataset.view !== "help") problems.push("Help is not lit while About is open");
     const mark = document.querySelector("#view-about .mark svg");
     if (!mark || mark.getBoundingClientRect().width < 20) problems.push("the bar mark is missing from the nameplate");
+    // The update line always says something: the result of a check, or when the last one worked
     const line = document.getElementById("updateLine");
-    const checked = !line.classList.contains("hidden");
-    if (checked && (!visible(line) || !line.querySelector("#updateResult").textContent.trim())) problems.push("the update line is open but says nothing");
+    const said = line.querySelector("#updateResult").textContent.trim() || line.querySelector("#updateWhen").textContent.trim();
+    if (!visible(line) || !said) problems.push("the update line says nothing");
+    const res = typeof upd === "object" && upd.res;
+    if (res && res.canInstall && !visible(document.getElementById("updateInstallBtn"))) problems.push("a version that can be installed has no Update key");
   }
 
   // 6. The window buttons own the top-right corner; the header must stay clear of it

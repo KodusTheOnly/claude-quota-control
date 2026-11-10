@@ -2,7 +2,7 @@
 // Reads ~/.claude/claude-quota-control.json and owns the window, the tray, notifications,
 // "start with Windows" and the collector install.
 
-const { app, BrowserWindow, Tray, Menu, nativeImage, nativeTheme, ipcMain, Notification, shell, screen, net, dialog, globalShortcut } = require("electron");
+const { app, BrowserWindow, Tray, Menu, nativeImage, nativeTheme, ipcMain, Notification, shell, screen, dialog, globalShortcut } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
@@ -12,6 +12,7 @@ const execAsync = promisify(exec);
 const claude = require("./claude-sync");
 const { readActivity } = require("./claude-activity");
 const i18n = require("./renderer/i18n.js");
+const { setupUpdates } = require("./updater");
 const { createRefreshPolicy, normalizeAccelerator, TIMER_EVERY, timerVerdict } = require("./refresh-policy");
 
 const SLUG = "claude-quota-control";
@@ -46,6 +47,8 @@ const DEFAULT_SETTINGS = {
   reserve: 0, // emergency reserve, % of the week kept out of the daily plan (off by default)
   reserveRelease: 48, // hours before the reset over which what is left of the reserve joins the plan (0 = never)
   pastWeeks: false, // the "4 wk" key on the week chart: the last 4 weeks drawn with this one
+  lastUpdateCheck: 0, // when "Check for updates" last worked (updater.js)
+  updateTo: null, // the version "Update now" is installing, read at the next start (updater.js)
 };
 
 // Window frame colors (same as --win and --ink in renderer/css/tokens.css), one set per theme
@@ -974,27 +977,6 @@ ipcMain.handle("clear-data", () => {
   return applySettings({ manual: null, readings: [], sessions: [], lastLevel: null });
 });
 
-// "Check for updates": only on a click, asks GitHub for the latest published release
-const RELEASES_API = "https://api.github.com/repos/KodusTheOnly/claude-quota-control/releases/latest";
-function newerThan(a, b) {
-  const pa = a.split(".").map(Number), pb = b.split(".").map(Number);
-  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
-  return false;
-}
-ipcMain.handle("check-update", async () => {
-  try {
-    const res = await net.fetch(RELEASES_API, { headers: { Accept: "application/vnd.github+json" } });
-    if (res.status === 404) return { status: "none" };
-    if (!res.ok) return { status: "error" };
-    const rel = await res.json();
-    const version = String(rel.tag_name || "").replace(/^v/i, "");
-    if (!version) return { status: "none" };
-    return newerThan(version, app.getVersion()) ? { status: "newer", version, url: rel.html_url } : { status: "latest", version };
-  } catch {
-    return { status: "error" };
-  }
-});
-
 ipcMain.handle("get-settings", () => {
   const s = loadSettings();
   return { ...s, openAtLogin: app.getLoginItemSettings().openAtLogin };
@@ -1177,6 +1159,12 @@ if (!app.requestSingleInstanceLock()) {
     applyShortcut();
     applyAutoRead();
     if (loadSettings().miniWindow) startStrip();
+    setupUpdates({
+      loadSettings,
+      saveSettings,
+      send: (channel, value) => win && !win.isDestroyed() && win.webContents.send(channel, value),
+      notify: (title, body) => Notification.isSupported() && showNotification(title, body, showWindow),
+    });
     for (const ev of ["display-metrics-changed", "display-added", "display-removed"]) screen.on(ev, placeStrip);
   });
 

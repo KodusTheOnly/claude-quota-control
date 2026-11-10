@@ -58,7 +58,7 @@ function buildCases() {
         }
         // About: the screen, then with each result of "Check for updates" on the nameplate
         if (views.includes("about")) {
-          for (const update of quick ? [null, "newer"] : [null, "checking", "latest", "newer", "none", "fail"]) cases.push({ ...size, language, theme, scenario: "moderate", interaction: null, view: "about", update });
+          for (const update of quick ? [null, "newer"] : [null, "checking", "latest", "newer", "manual", "downloading", "none", "fail"]) cases.push({ ...size, language, theme, scenario: "moderate", interaction: null, view: "about", update });
         }
         // History: a full one, one with only three days, one with big days (blocks of 2%) and the empty states
         if (views.includes("history")) {

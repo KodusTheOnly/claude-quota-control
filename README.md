@@ -68,6 +68,10 @@ Your data stays on your computer, in `%APPDATA%\Claude Quota Control`. The app g
 
 Download the installer from the [latest release](https://github.com/KodusTheOnly/claude-quota-control/releases/latest). Windows 10 or 11.
 
+## Update
+
+Help > About > Check for updates. When there is a new version, "Update to X" downloads it, checks it and installs it, and the app opens again. Your data stays. The app never checks or downloads on its own. Versions before 2.2.0 have to download the installer from the release page once.
+
 ## Build and test
 
 You need Node.js 20 or newer.

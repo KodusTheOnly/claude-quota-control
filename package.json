@@ -10,7 +10,7 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test test/*.test.js",
-    "dist": "electron-builder --win",
+    "dist": "electron-builder --win --publish never",
     "test:layout": "node test/layout/run.js"
   },
   "repository": {
@@ -54,6 +54,7 @@
       "usage-json.js",
       "usage-listener.js",
       "refresh-policy.js",
+      "updater.js",
       "renderer/**",
       "collector/**",
       "assets/**"
@@ -65,7 +66,18 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "Claude Quota Control"
-    }
+      "shortcutName": "Claude Quota Control",
+      "artifactName": "Claude-Quota-Control-Setup-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "KodusTheOnly",
+        "repo": "claude-quota-control"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }

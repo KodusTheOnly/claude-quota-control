@@ -40,7 +40,7 @@ test("every key the HTML asks for exists", () => {
 });
 
 test("every fixed key the scripts ask for exists", () => {
-  const files = [...listJs("renderer"), "main.js", "claude-sync.js"];
+  const files = [...listJs("renderer"), "main.js", "claude-sync.js", "updater.js"];
   const missing = [];
   for (const file of files) {
     if (file.endsWith("i18n.js")) continue;
@@ -51,7 +51,7 @@ test("every fixed key the scripts ask for exists", () => {
 });
 
 test("every text is used somewhere (no dead texts left behind)", () => {
-  const files = [...listJs("renderer").filter((f) => !f.endsWith("i18n.js")), "main.js", "claude-sync.js", "preload.js", "renderer/index.html", "renderer/popup.html", "renderer/strip.html"];
+  const files = [...listJs("renderer").filter((f) => !f.endsWith("i18n.js")), "main.js", "claude-sync.js", "updater.js", "preload.js", "renderer/index.html", "renderer/popup.html", "renderer/strip.html"];
   const code = files.map(read).join("\n");
   // Keys built at run time, like t(`state.${name}`), count as using everything under that prefix
   const prefixes = [...code.matchAll(/[`"']([\w.]+\.)\$\{/g)].map((m) => m[1]);

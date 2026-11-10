@@ -607,7 +607,8 @@
               <span class="ver" id="aboutVersion"></span>
               <p class="tag2" data-i18n="about.tagline"></p>
               <span class="by" data-i18n="about.by"></span>
-              <div class="con hidden" id="updateLine"><b data-i18n="about.updateTag">Update</b><span id="updateResult" role="status"></span><span class="cur" aria-hidden="true"></span></div>
+              <!-- UPDATE, the result of the last click, when the last check worked, and a cursor (settings.js) -->
+              <div class="con" id="updateLine"><b data-i18n="about.updateTag">Update</b><span id="updateResult" role="status"></span><span class="when" id="updateWhen"></span><span class="cur" aria-hidden="true"></span></div>
             </div>
           </div>
 
@@ -618,6 +619,8 @@
             </a>
             <a class="key" href="https://github.com/KodusTheOnly" target="_blank" rel="noopener" data-i18n="about.github">GitHub profile</a>
             <button class="key" type="button" id="updateBtn" data-i18n="about.update">Check for updates</button>
+            <!-- Only when a check found a version the app can install itself -->
+            <button class="key hidden" type="button" id="updateInstallBtn"></button>
           </div>
 
           <div class="plates4">

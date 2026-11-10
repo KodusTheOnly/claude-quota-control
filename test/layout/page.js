@@ -44,6 +44,8 @@ function installBridge({ now, settings, offline, hangSync, shortcut }) {
     toast: noop,
     appInfo: async () => ({ version: "1.1.0", electron: "45.0.0" }),
     checkUpdate: async () => ({}),
+    installUpdate: () => new Promise(noop),
+    onUpdateProgress: noop,
     exportData: async () => ({}),
     importData: async () => ({}),
     publishSummary: (s) => { window.__summary = s; }, // the tray card and the strip tests read it back
@@ -95,10 +97,17 @@ async function openOverview(browser, opts) {
   if (view === "about") await page.evaluate(() => go("about")); // About has no key of its own: it opens from Help
   else if (view !== "panel") await page.click(`.nav-btn[data-view="${view}"]`);
   if (view === "about" && update) {
-    // The result of "Check for updates": checking never finishes, the others answer at once
-    const answers = { latest: { status: "latest" }, newer: { status: "newer", version: "1.2.0", url: "https://example.com/release" }, none: { status: "none" }, fail: { status: "error" } };
+    // The result of "Check for updates": checking never finishes, the others answer at once. "downloading" also clicks
+    // "Update to X", whose download never finishes (shown at 100%, the longest text).
+    const at = Date.now();
+    const newer = { status: "newer", version: "1.2.0", url: "https://example.com/release", canInstall: true, checkedAt: at };
+    const answers = { latest: { status: "latest", checkedAt: at }, newer, manual: { ...newer, canInstall: false }, downloading: newer, none: { status: "none", checkedAt: at }, fail: { status: "error" } };
     await page.evaluate((answer) => { window.quota.checkUpdate = () => (answer ? Promise.resolve(answer) : new Promise(() => {})); }, answers[update] || null);
     await page.click("#updateBtn");
+    if (update === "downloading") {
+      await page.click("#updateInstallBtn");
+      await page.evaluate(() => { upd.pct = 100; renderUpdate(); });
+    }
   }
   await page.waitForTimeout(250);
   return { page, errors, close: () => context.close() };
