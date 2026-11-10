@@ -44,10 +44,10 @@ function drawHours() {
   if (!m || !box.clientWidth) return;
   const weekStart = m.w.resetsAt - WEEK;
   const { cells, left } = hoursUsageFor(m);
-  // Same axis as the chart and the day columns: the seven calendar days, from the midnight that starts the first day,
-  // then the week's last hours up to the reset.
-  const axisStart = startOfDay(weekStart);
-  const axisEnd = Math.max(m.w.resetsAt, axisStart + 7 * DAY);
+  // Same axis as the chart and the day columns: from chartAxisStart (the reset, or earlier when it is late in the day)
+  // to the next reset. Hours before the reset get no cell.
+  const axisStart = chartAxisStart(weekStart);
+  const axisEnd = m.w.resetsAt;
   const axisLen = axisEnd - axisStart;
   const step = box.clientWidth / (axisLen / HOUR) >= 4 ? 1 : 3;
 
@@ -101,7 +101,7 @@ function drawHours() {
   const a = activeHours();
   if (a) {
     const tip = t("hrs.active", { from: `${pad(a.start)}:00`, to: `${pad(a.end)}:00` });
-    for (let day = axisStart; day < axisEnd; day = startOfDay(day + DAY + 2 * HOUR)) {
+    for (let day = startOfDay(axisStart); day < axisEnd; day = startOfDay(day + DAY + 2 * HOUR)) {
       for (const [s0, s1] of activeSpans(day, a)) {
         const from = Math.max(s0, weekStart);
         const to = Math.min(s1, axisEnd);

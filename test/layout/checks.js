@@ -228,8 +228,10 @@ function checkPage({ format, scrolls: formatScrolls, view = "panel" }) {
   }
 
   // 6b. Nothing in the header may sit on top of the brand or another header item (a long status text pushed into the brand once)
-  const headItems = [...document.querySelectorAll(".hd .brand, .hd .sync > *")].filter(visible);
+  // The brand's icon and name count on their own: the name can spill out of the brand's box (it did at 420px with Connect)
+  const headItems = [...document.querySelectorAll(".hd .brand, .hd .brand > *, .hd .sync > *")].filter(visible);
   for (let i = 0; i < headItems.length; i++) for (let j = i + 1; j < headItems.length; j++) {
+    if (headItems[i].contains(headItems[j]) || headItems[j].contains(headItems[i])) continue;
     const a = headItems[i].getBoundingClientRect(), b = headItems[j].getBoundingClientRect();
     if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) problems.push(`header items overlap: ${describe(headItems[i])} and ${describe(headItems[j])}`);
   }

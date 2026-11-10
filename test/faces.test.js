@@ -21,10 +21,10 @@ function load() {
   for (const f of ["core.js", "compute.js", "ui.js", "blocks/verdict.js"]) {
     vm.runInContext(fs.readFileSync(path.join(ROOT, "renderer", "js", f), "utf8"), sandbox);
   }
-  return vm.runInContext("({ FACES, FACE_MOMENTS, FACE_RANK, FACE_GAPS, verdictMode })", sandbox);
+  return vm.runInContext("({ FACES, FACE_MOMENTS, FACE_RANK, FACE_GAPS, verdictMode, faceKey, state })", sandbox);
 }
 
-const { FACES, FACE_MOMENTS, FACE_RANK, FACE_GAPS, verdictMode } = load();
+const { FACES, FACE_MOMENTS, FACE_RANK, FACE_GAPS, verdictMode, faceKey, state } = load();
 const MODES = ["room", "free", "moderate", "tight", "pause", "locked", "early", "reserve"];
 const STATES = ["reading", "error", "login", "asleep"];
 const EFFECTS = ["hop", "shake", "squash", "glance", "zz"];
@@ -83,6 +83,17 @@ test("the verdict's mode: limit reached first, then the reserve, warming up, roo
   assert.equal(verdictMode(m({ forecast: { kind: "early" } })), "early");
   assert.equal(verdictMode(m({ head: { room: true, level: 0 } })), "room");
   assert.equal(verdictMode(m({})), "moderate");
+});
+
+test("outside the active hours it sleeps only when nothing is at risk", () => {
+  state.settings = { activeHours: { start: 9, end: 17 } };
+  const night = { now: new Date(2026, 10, 10, 3, 0).getTime() };
+  const day = { now: new Date(2026, 10, 10, 12, 0).getTime() };
+  for (const k of ["room", "free", "early", "moderate"]) assert.equal(faceKey(night, k), "asleep", k);
+  for (const k of ["tight", "pause", "reserve", "locked"]) assert.equal(faceKey(night, k), k, `${k} stays awake`);
+  for (const k of MODES) assert.equal(faceKey(day, k), k, `${k} by day`);
+  state.settings = {};
+  assert.equal(faceKey(night, "free"), "free", "no active hours: never asleep");
 });
 
 test("the CSS has every effect and stops them with reduced motion", () => {

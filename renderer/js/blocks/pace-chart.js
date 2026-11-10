@@ -38,10 +38,12 @@ function drawPaceChart() {
   const R = 0;
   const T = 0.75 * rem;
   const B = 0.25 * rem;
-  // x is in days from the midnight that starts the first day: seven equal columns, Tuesday to Monday, then the week's last
-  // hours up to the reset (a narrower column). The part before the reset is shaded as "not this week".
-  const AX = Math.max(s.span, DAYS_SHOWN);
-  const X = (x) => L + (Math.min(x, AX) / AX) * (W - L - R);
+  // x is in days from the midnight that starts the first day. The axis runs from a0 (the reset, or 08:00 of the first day
+  // when the reset is later: chartAxisStart) to the next reset: a narrower first column, six whole days, then the week's
+  // last hours up to the reset (another narrow column). Hours before the reset that are on the axis are shaded.
+  const A0 = s.a0;
+  const AX = Math.max(s.span, A0 + 1);
+  const X = (x) => L + ((Math.min(Math.max(x, A0), AX) - A0) / (AX - A0)) * (W - L - R);
   const Y = (v) => T + (1 - Math.min(Math.max(v, 0), 100) / 100) * (H - T - B);
   const accent = cssVar("--crt-accent") || CHART_NOW;
   // The week's color: its level, or the accent on the last day with room to spend (the risk then is leaving it unused)
@@ -87,17 +89,20 @@ function drawPaceChart() {
   const lockY = Y(s.goal);
   add("line", { x1: L, x2: W - R, y1: lockY, y2: lockY, stroke: color, opacity: ".55", "stroke-width": 1.25, "stroke-dasharray": "1 4", "stroke-linecap": "round" });
 
-  if (s.s0 > 0.01) add("rect", { x: X(0), y: T, width: X(s.s0) - X(0), height: H - T - B, fill: PAL.shade });
-  // Where the week starts (the last reset): a dashed line, no label. The footer already says when the next reset is.
-  const startX = s.s0 > 0.01 ? X(s.s0) : null;
-  if (startX !== null) add("line", { x1: startX, x2: startX, y1: T, y2: H - B, stroke: PAL.muted, "stroke-dasharray": "3 3", opacity: ".7" });
+  // Where the week starts (the last reset), when the axis starts before it: the hours before are shaded as "not this
+  // week", and a dashed line, no label, marks the reset. The footer already says when the next reset is.
+  const startX = s.s0 > A0 + 0.01 ? X(s.s0) : null;
+  if (startX !== null) {
+    add("rect", { x: X(A0), y: T, width: startX - X(A0), height: H - T - B, fill: PAL.shade });
+    add("line", { x1: startX, x2: startX, y1: T, y2: H - B, stroke: PAL.muted, "stroke-dasharray": "3 3", opacity: ".7" });
+  }
   // Day columns: shaded every other day, with a line at each midnight (the names are in the footer)
   for (let i = 0; i < DAYS_SHOWN; i++) {
     const x0 = Math.max(i, s.s0);
     const x1 = i + 1;
     if (x1 - x0 < 0.02) continue;
     if (i % 2 === 0) add("rect", { x: X(x0), y: T, width: X(x1) - X(x0), height: H - T - B, fill: PAL.band });
-    if (i > 0 && i >= s.s0) add("line", { x1: X(i), x2: X(i), y1: T, y2: H - B, stroke: PAL.gridDay });
+    if (i > A0 + 0.02) add("line", { x1: X(i), x2: X(i), y1: T, y2: H - B, stroke: PAL.gridDay });
   }
   if (AX > DAYS_SHOWN + 0.02) add("line", { x1: X(DAYS_SHOWN), x2: X(DAYS_SHOWN), y1: T, y2: H - B, stroke: PAL.gridDay });
   // Outside the active hours (Settings > Plan) the plan stands still: those hours are shaded lightly

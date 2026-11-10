@@ -151,7 +151,7 @@ function verdictAnswer(m) {
 // The level the verdict shows. While the projection is still missing the level would rest on one
 // noisy day, so it stays "not rated" (null), unless the week is already so far gone that it reads Pause.
 function verdictLevel(m) {
-  return m.forecast.kind === "early" && !weekAtPause(m.w.used) ? null : m.head.level;
+  return m.forecast.kind === "early" && !weekAtPause(m.w.used, hoursToReset(m)) ? null : m.head.level;
 }
 
 // Inside the active hours (Settings > Plan), or all day when there are none
@@ -160,12 +160,16 @@ function inActiveHours(ms) {
   return !a || activeSpans(ms, a).some(([from, to]) => ms >= from && ms < to);
 }
 
+// The worst mode the face may sleep through: from Tight on (Tight, Pause, the reserve, the limit reached) it stays awake
+// outside the active hours, since that is when the week is at risk
+const FACE_SLEEPS_TO = FACE_RANK.moderate;
+
 // What the face shows: what the app is doing first (a reading, a failed one, asleep), then the verdict's mode
 function faceKey(m, mode) {
   if (typeof syncBusy !== "undefined" && syncBusy) return "reading";
   if (state.syncFail === "need-login") return "login";
   if (state.syncFail) return "error";
-  if (!inActiveHours(m.now)) return "asleep";
+  if (FACE_RANK[mode] <= FACE_SLEEPS_TO && !inActiveHours(m.now)) return "asleep";
   return mode;
 }
 

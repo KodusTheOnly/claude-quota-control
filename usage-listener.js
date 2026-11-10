@@ -21,19 +21,23 @@ function maskedPath(url) {
 }
 
 // `webContents` is an Electron WebContents (or anything with the same `debugger`).
-// Resolves with an object that fills in by itself: { status, body }.
+// Resolves with an object that fills in by itself: { requested, status, body }. requested: the page sent its
+// usage request (an answer may still be on its way).
 function listenForUsage(webContents, origin, trace = () => {}) {
   const pattern = usageUrlPattern(origin);
   const dbg = webContents.debugger;
-  const got = { status: null, body: null };
+  const got = { requested: false, status: null, body: null };
   const mine = new Set();
   dbg.attach("1.3");
   dbg.on("message", (_e, method, params) => {
-    if (method === "Network.responseReceived") {
+    if (method === "Network.requestWillBeSent") {
+      if (params.request && pattern.test(params.request.url)) got.requested = true;
+    } else if (method === "Network.responseReceived") {
       const url = params.response.url;
       // Only the path, with ids masked: enough to see what the page asks for, nothing personal
       if (url.startsWith(`${origin}/api/`)) trace(`page request ${params.response.status} ${maskedPath(url)}`);
       if (pattern.test(url)) {
+        got.requested = true;
         mine.add(params.requestId);
         got.status = params.response.status;
       }

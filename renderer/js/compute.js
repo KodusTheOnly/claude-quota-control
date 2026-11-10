@@ -83,6 +83,9 @@ function projection(w, now) {
   return { elapsed, left: weightedDays(now, w.resetsAt), rate, projected: w.used + rate * weightedDays(now, w.resetsAt) };
 }
 
+// Hours from now to the week's reset
+const hoursToReset = (m) => (m.w.resetsAt - m.now) / HOUR;
+
 // One level per module, from the cutoffs in core.js, plus the numbers behind them
 function computeLevels(m) {
   const expected = expectedUsed(m.w.resetsAt, m.now, weights(), m.g);
@@ -95,7 +98,7 @@ function computeLevels(m) {
   const lockLevel = lock ? levelFromLockout(lock.hours) : null;
   const lv = {
     session: m.five ? levelFromSession(m.five.used) : null,
-    week: weekLevel(m.w.used, lock ? lock.hours : null, weekRatio), // the hours locked out, see core.js
+    week: weekLevel(m.w.used, lock ? lock.hours : null, weekRatio, hoursToReset(m)), // the hours locked out, see core.js
     today: m.dayOff || m.reserveMode ? null : m.budget > 0 || m.spent > 0 ? levelFromRatio(m.todayRatio) : null,
     projection: m.w.used >= 100 ? 3 : lockLevel,
   };
@@ -111,13 +114,13 @@ function computeLevels(m) {
 }
 
 // The answer to "can I use Claude until the reset?" follows the projection (the week's level while
-// there is none yet). Only one thing can raise it: a week already at WEEK_PAUSE_AT or more.
+// there is none yet). Only one thing can raise it: a week already at WEEK_PAUSE_AT or more (see weekAtPause).
 function headroom(m) {
   const signals = [];
   const add = (level, reason, until) => signals.push({ level, reason, until });
 
   const base = m.lv.projection ?? m.lv.week ?? 0;
-  if (weekAtPause(m.w.used)) add(3, t("reason.weekAt", { pct: pct(m.w.used) }), m.w.resetsAt);
+  if (weekAtPause(m.w.used, hoursToReset(m))) add(3, t("reason.weekAt", { pct: pct(m.w.used) }), m.w.resetsAt);
   else if (base > 0 && m.lv.lock && m.lv.lock.at !== null) add(base, t("reason.weekLocked", { goal: m.g.goal, when: fmtWhen(m.lv.lock.at, m.now), dur: lockDur(m.lv.lock.hours) }), m.w.resetsAt);
   else if (base > 0) add(base, t("reason.weekRatio", { ratio: m.lv.weekRatio === null ? "–" : fmtNum(m.lv.weekRatio, 2, 2) }), m.w.resetsAt);
 
@@ -217,7 +220,7 @@ function mathRows(m) {
           ["math.weekScale", t("math.weekScaleRatio")],
           ["math.cutoffsRatio", t("math.cutoffsRatioValue")],
         ]),
-    ...(weekAtPause(m.w.used) ? [["math.weekPause", t("math.weekPauseValue", { pct: `${WEEK_PAUSE_AT}%` })]] : []),
+    ...(weekAtPause(m.w.used, hoursToReset(m)) ? [["math.weekPause", t("math.weekPauseValue", { pct: `${WEEK_PAUSE_AT}%` })]] : []),
     ["math.level", lvName(L.week)],
   ];
   rows.today = [
@@ -332,7 +335,8 @@ function limitsFirst(m) {
 
 // The lines of the week's pace chart. x is measured in days from the midnight that starts the plan's
 // first day, so the seven day columns are [0,1], [1,2] ... [6,7]. The week itself runs from s0 (the time of
-// the reset, as a fraction of that first day) to span (the next reset, a week later). y is % of the weekly limit.
+// the reset, as a fraction of that first day) to span (the next reset, a week later). The chart's axis starts at a0
+// (chartAxisStart: the reset, or earlier when it is late in the day). y is % of the weekly limit.
 //   expected  the plan's pace: how much should be used at every midnight, ending at 100% at the reset
 //   used      what was used: the end of each past day (recorded), then now. With the hours' cells (hourly.js) each day is a
 //             set of steps instead of a straight piece; a point with est: true ends a piece placed by estimated cells
@@ -493,7 +497,7 @@ function paceSeries(m, cells = null, starts = []) {
     const spend = mid !== null ? asShownPct(m.ceiling) - asShownPct(m.lv.proj.projected) : 0;
     room = { x0: nowX, x1: span, y0: m.w.used, y1: top, mid, spend: Math.max(spend, 0) };
   }
-  return { s0, span, nowX, todayIdx, rest, expected, used, over, proj, lock, reserve, room, goal: m.g.goal, end: endLabel, usedNow: m.w.used, starts: startsOut };
+  return { a0: toX(chartAxisStart(weekStart)), s0, span, nowX, todayIdx, rest, expected, used, over, proj, lock, reserve, room, goal: m.g.goal, end: endLabel, usedNow: m.w.used, starts: startsOut };
 }
 
 // Saving a reading (typed in or read from Claude)

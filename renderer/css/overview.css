@@ -197,15 +197,21 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 /* The seven days: three rows each (name and date; the %, its level shape and the tag; the budget bar), and the state
    between them on a day with no reading */
 .dg { grid-column: 1; grid-row: 3; border-top: 1px solid var(--sline); background: var(--scr); }
-/* --ax is the chart's axis in days (week.js): 7, plus the week's last hours up to the reset. The days cover only the seven
-   columns and leave that last stretch empty, under the chart's. The line above them is the hours' bottom edge, so it runs on. */
-.days { grid-column: 2; grid-row: 3; position: relative; z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: calc(100% * 7 / var(--ax, 7)); }
+/* --ax is the chart's axis in days (week.js), from the reset to the next one; --dw is the part of it up to the seventh
+   midnight. The days cover only that part (the first column is narrower: its day starts at the reset; week.js sets the
+   columns) and leave the last stretch empty, under the chart's. The line above them is the hours' bottom edge, so it runs on. */
+.days { grid-column: 2; grid-row: 3; position: relative; z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: calc(100% * var(--dw, 7) / var(--ax, 7)); }
 .day:last-child { border-right: 1px solid var(--crt-grid-day); }
 .day {
   position: relative; display: flex; flex-direction: column; align-items: stretch; gap: .1rem; min-width: 0; padding: .3rem .5rem .35rem; overflow: hidden;
   text-align: left; font: inherit; color: var(--st); background: transparent; border: 0; border-left: 1px solid var(--crt-grid-day); border-radius: 0; cursor: pointer;
 }
-.day:first-child { border-left: 0; }
+.day:first-child { border-left: 0; container: day0 / inline-size; }
+/* The first column starts at the reset, so it can be narrow: there the date, then the tag ("Today") give way to the %
+   (both stay in the button's title), and in the narrowest window the % gets smaller */
+@container day0 (max-width: 9rem) { .day .dt { display: none; } }
+@container day0 (max-width: 7.5rem) { .day .tg { display: none; } }
+@container day0 (max-width: 3.5rem) { .days .day .nu { font-size: var(--fs-xs); } }
 .day .nm { display: flex; justify-content: space-between; align-items: baseline; gap: .4rem; min-width: 0; font: 600 var(--fs-xs)/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
 .day .nm b { font-weight: 600; }
 .day .dt { font-style: normal; font-weight: 400; letter-spacing: .02em; color: var(--sm); }
@@ -234,7 +240,7 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 .day:focus-visible { outline: 2px solid var(--crt-accent); outline-offset: -2px; }
 /* Today's column runs from the top of the chart down through the hours and the day column: a tint, no frame */
 .todaybox { position: absolute; top: 0; bottom: 0; z-index: 0; box-sizing: border-box; pointer-events: none; background: color-mix(in srgb, var(--crt-accent) 9%, transparent);
-  left: calc(var(--gut) + (100% - var(--gut)) * var(--ti, 0) / var(--ax, 7)); width: calc((100% - var(--gut)) / var(--ax, 7)); }
+  left: calc(var(--gut) + (100% - var(--gut)) * var(--tl, 0) / var(--ax, 7)); width: calc((100% - var(--gut)) * var(--tw, 1) / var(--ax, 7)); }
 
 /* ---- Extra usage: a slim strip, only when it is set up ---- */
 .foot { flex: none; display: flex; }

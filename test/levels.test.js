@@ -157,6 +157,13 @@ test("a week at 95% or more reads Pause in the week level, the verdict and the m
   assert.ok(m.math.week.some(([k]) => k === "math.weekPause"));
 });
 
+test("10 minutes before the reset, a week at 96% is no longer Pause", () => {
+  const m = run(reading({ used: 96, now: at(2026, 11, 4, 7) + 50 * 60000 }));
+  assert.ok(m.head.level < 3, `level ${m.head.level}`);
+  assert.ok(m.lv.week < 3, `week ${m.lv.week}`);
+  assert.ok(!m.math.week.some(([k]) => k === "math.weekPause"));
+});
+
 test("with a projection, the week's math shows when it hits 100%, the hours locked out and the slow down", () => {
   const m = run(reading({ used: 27 }));
   assert.ok(!m.math.week.some(([k]) => k === "math.weekScale"), "no Scale row");

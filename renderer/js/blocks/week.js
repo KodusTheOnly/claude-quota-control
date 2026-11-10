@@ -11,7 +11,7 @@ function dayLabel(ms) {
   return { nm: shortWeekday(date), date: date.toLocaleDateString(locale, { month: "short", day: "numeric" }), dayNum: date.toLocaleDateString(locale, { day: "numeric" }) };
 }
 
-// The footer of the graph: seven equal columns, one per calendar day, each exactly under its part of the chart.
+// The footer of the graph: seven columns, one per calendar day (the first one narrower: it starts at the reset), each exactly under its part of the chart.
 // A column has three rows: name and date, the day's % with its level shape and its tag, the budget bar.
 // A day with no reading says why (no data, off, a plan other than Normal) between the % and the bar.
 // A day ahead has nothing to measure yet: no %, no bar. It shows its budget and where the week should stand at its end.
@@ -109,8 +109,12 @@ function renderWeek(m) {
   // The room left before the reset, outlined on the bar too: from what is used to the plan's ceiling at the reset
   wBar.style.setProperty("--rm-l", `${clamp100(m.w.used)}%`);
   wBar.style.setProperty("--rm-w", s.room ? `${clamp100(s.room.y1) - clamp100(s.room.y0)}%` : "0%");
-  // The axis runs past the seventh midnight to the reset: the days and the frame around today leave that stretch empty
-  $("days").parentElement.style.setProperty("--ax", Math.max(s.span, 7).toFixed(3));
+  // The axis runs from a0 (the reset, or earlier when it is late in the day) to the next reset, in days. The first day's
+  // column holds only its part on the axis, and the days leave the stretch after the seventh midnight empty, as the chart does.
+  const gridBox = $("days").parentElement;
+  gridBox.style.setProperty("--ax", Math.max(s.span - s.a0, 1).toFixed(3));
+  gridBox.style.setProperty("--dw", (Math.min(s.span, 7) - s.a0).toFixed(3));
+  $("days").style.gridTemplateColumns = `minmax(0, ${(1 - s.a0).toFixed(3)}fr) repeat(6, minmax(0, 1fr))`;
   // The legend only explains what the chart shows this week and does not name on its own: the used, expected and
   // projection lines carry their names, and the goal is the top of the scale (100%)
   const weekColor = m.endRoom ? cssVar("--crt-accent") : cssVar(`--${["free", "moderate", "tight", "pause"][m.lv.week ?? 0]}`);
@@ -154,7 +158,8 @@ function renderWeek(m) {
     setLevelClass(r.b, known ? d.level : null);
     r.nameB.textContent = nm;
     r.date.textContent = ahead ? dayNum : date; // the month is already on the days before it
-    r.tag.textContent = d.isToday ? t("day.today") : i === 0 ? t("day.reset") : "";
+    // The reset is the chart's left edge now, so the first day needs no tag for it (its title and label still say it)
+    r.tag.textContent = d.isToday ? t("day.today") : "";
     r.tag.classList.toggle("hidden", !r.tag.textContent);
     // Today off: no ratio, so the number is what was used (a share of the week); other days off keep the dash
     const onReserve = d.isToday && m.reserveMode; // today on the reserve: what was used, as on an Off day
@@ -205,7 +210,11 @@ function renderWeek(m) {
   // The frame around today runs from the top of the chart down through the hours and the day column
   const todayIdx = m.week.findIndex((d) => d.isToday);
   $("todayBox").classList.toggle("hidden", todayIdx < 0);
-  if (todayIdx >= 0) $("todayBox").style.setProperty("--ti", todayIdx);
+  if (todayIdx >= 0) {
+    // Where today's column starts on the axis and how wide it is, in days (the first day starts where the axis does)
+    $("todayBox").style.setProperty("--tl", (Math.max(todayIdx, s.a0) - s.a0).toFixed(3));
+    $("todayBox").style.setProperty("--tw", (Math.min(todayIdx + 1, s.span) - Math.max(todayIdx, s.a0)).toFixed(3));
+  }
 }
 
 // The pace: what the week is doing per day against what still fits, in three named zones. Slow under 85% of what fits,

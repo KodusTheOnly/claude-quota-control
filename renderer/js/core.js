@@ -40,6 +40,13 @@ function startOfDay(ms) {
   const d = new Date(ms);
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
+// Where the week chart's axis starts (the hours and the day columns too): at the reset, so the hours before it take no
+// room. The first day's column keeps at least 16 hours, so its card stays readable: with a reset later than 08:00 the
+// axis starts at 08:00 that day, and the hours from there to the reset are shaded as "not this week".
+const CHART_FIRST_DAY_MIN = 16 * HOUR;
+function chartAxisStart(weekStart) {
+  return Math.min(weekStart, startOfDay(weekStart) + DAY - CHART_FIRST_DAY_MIN);
+}
 function fmtDur(ms) {
   if (ms <= 0) return t("dur.now");
   const d = Math.floor(ms / DAY);
@@ -291,7 +298,8 @@ function paceReaches(target, used, rate, now, resetsAt, w = weights()) {
 // are shown whole, so a percent is rated rounded to a whole number and a ratio to two decimals.
 const RATIO_CUTS = [0.7, 1.0, 1.4];
 const SESSION_CUTS = [50, 75, 90];
-const WEEK_PAUSE_AT = 95; // a week this far gone reads Pause, whatever the pace
+const WEEK_PAUSE_AT = 95; // a week this far gone reads Pause, whatever the pace...
+const WEEK_PAUSE_HOURS = 5; // ...while the reset is more than one session away (closer, a lockout is under 5 h: Moderate at most)
 const asShownPct = (x) => (Number.isFinite(x) ? Math.round(x) : x);
 const asShownRatio = (r) => (Number.isFinite(r) ? Math.round(r * 100) / 100 : r);
 // "Over budget" follows the same number: a day shown at 100% is never called over
@@ -340,16 +348,17 @@ function slowDownPct(used, projected, target = LOCK_AT) {
   return Math.min(Math.max(Math.ceil(n - 1e-9), 0), 100);
 }
 
-// A week this far gone reads Pause, whatever the pace. The verdict and the week level both ask here.
+// A week this far gone reads Pause, whatever the pace, unless the reset is WEEK_PAUSE_HOURS or less away: then
+// the projection decides. The verdict and the week level both ask here. hoursLeft: hours to the reset (unknown: far).
 // Rated as shown: 94.6% is shown as 95%, so it is Pause.
-const weekAtPause = (used) => asShownPct(used) >= WEEK_PAUSE_AT;
+const weekAtPause = (used, hoursLeft = Infinity) => asShownPct(used) >= WEEK_PAUSE_AT && !(hoursLeft <= WEEK_PAUSE_HOURS);
 
 // The week's level: the hours locked out once there is a projection, and before that (the first
-// MIN_WEIGHTED_DAYS) used / expected on the ratio scale. A week at WEEK_PAUSE_AT or more is Pause either way.
+// MIN_WEIGHTED_DAYS) used / expected on the ratio scale. A week at WEEK_PAUSE_AT or more is Pause either way (see weekAtPause).
 // lockHours: the hours locked out (0 when the pace never reaches LOCK_AT), or null while there is no projection.
-// weekRatio: used / expected, or null.
-function weekLevel(used, lockHours, weekRatio) {
-  if (weekAtPause(used)) return 3;
+// weekRatio: used / expected, or null. hoursLeft: hours to the reset.
+function weekLevel(used, lockHours, weekRatio, hoursLeft) {
+  if (weekAtPause(used, hoursLeft)) return 3;
   if (lockHours !== null && lockHours !== undefined) return levelFromLockout(lockHours);
   return levelFromRatio(weekRatio);
 }

@@ -98,6 +98,18 @@ test("the pace chart is measured in days from the midnight that starts the plan"
   assert.equal(s.todayIdx, 2);
 });
 
+test("the chart's axis starts at the reset, but keeps at least 16 hours for the first day", () => {
+  // Reset at 08:00: the axis starts right at the reset, nothing before it takes room
+  const s = run(reading(), "paceSeries(__m)");
+  assert.ok(Math.abs(s.a0 - s.s0) < 1e-9);
+  // Reset at 15:00: the axis starts at 08:00 that day, and the hours up to the reset stay on it (shaded)
+  const sb = load(at(2026, 10, 30, 20));
+  const late = at(2026, 10, 28, 15);
+  assert.equal(vm.runInContext(`chartAxisStart(${late})`, sb), at(2026, 10, 28, 8));
+  // Reset at midnight: the first day is whole
+  assert.equal(vm.runInContext(`chartAxisStart(${at(2026, 10, 28)})`, sb), at(2026, 10, 28));
+});
+
 test("the expected line rises from 0 to 100% and never goes backwards", () => {
   const s = run(reading(), "paceSeries(__m)");
   assert.deepEqual([s.expected[0].x, s.expected[0].y], [s.s0, 0]);

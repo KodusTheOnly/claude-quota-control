@@ -12,6 +12,7 @@ $("setupForm").addEventListener("submit", async (e) => {
   }
   if (Number.isNaN(anchor)) return;
   await saveManual({ weekly, anchor });
+  hideError(); // the numbers are in: an earlier "enter a number" no longer applies
 });
 
 $("anchorForm").addEventListener("submit", async (e) => {
@@ -45,7 +46,12 @@ async function runTransfer(action, kind) {
   if (!res || res.canceled) return;
   if (res.ok) {
     state.settings = await api.getSettings();
+    // A backup can bring another language and theme: the main process already switched, the window follows
+    applyLanguage();
+    applyTheme();
     bindSettings();
+    bindAccount();
+    refreshCollector();
     render();
     toast(kind === "import" ? t("data.imported", { n: res.readings }) : t("data.exported"));
   } else {

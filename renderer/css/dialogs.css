@@ -50,6 +50,8 @@ dialog::backdrop { background: rgba(10, 15, 12, .55); }
 .modal .fields > label:last-child { grid-column: 1 / -1; }
 .modal .input-suffix input { width: 100%; font: 600 var(--fs-lg) var(--mono); }
 .modal .input-suffix i { color: var(--sm); }
+.modal .ferr { display: flex; align-items: center; gap: .6rem; color: var(--st); font-size: var(--fs-sm); }
+.modal input[aria-invalid="true"] { border-color: var(--pause); }
 .modal .foot-keys { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: flex-end; }
 
 /* ---- Plan menu (click a day) ---- */

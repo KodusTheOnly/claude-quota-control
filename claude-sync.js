@@ -250,13 +250,15 @@ async function readUsageSteps({ visible = false, parent } = {}, trace, ref) {
       }
       await wait(300);
     }
-    trace(`deadline reached (usage answer: ${got.status === null ? "never seen" : `status ${got.status}`}, body ${got.body === null ? "missing" : "present"})`);
+    trace(`deadline reached (usage request ${got.requested ? "sent" : "not seen"}, answer: ${got.status === null ? "never seen" : `status ${got.status}`}, body ${got.body === null ? "missing" : "present"})`);
     const lastText = await pageText(w);
     const challenge = /verif|human|humano|just a moment|um momento|captcha|checking your browser/i.test(lastText);
     if (challenge) return { ok: false, error: "challenge" };
     if (!lastText.trim()) return { ok: false, error: "offline" };
     // The page opened but its usage data never arrived in a usable form
     if (got.status !== null && got.status !== 200) return { ok: false, error: "fail" };
+    // The page asked and the answer was still on its way: a slow connection, not a change in Claude's data
+    if (got.requested && got.status === null) return { ok: false, error: "fail" };
     saveFailedRead(got.status === null ? "the page never asked for the usage data" : "the usage data came back empty");
     return { ok: false, error: "format" };
   } finally {

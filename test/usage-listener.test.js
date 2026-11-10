@@ -67,6 +67,16 @@ test("ignores every other request", async () => {
   assert.ok(!dbg.calls.includes("Network.getResponseBody"));
 });
 
+test("notes that the page sent its usage request, before any answer", async () => {
+  const { wc, emit } = fakeWebContents({});
+  const got = await listenForUsage(wc, ORIGIN);
+  emit("Network.requestWillBeSent", { requestId: "r0", request: { url: `${ORIGIN}/api/organizations/org-1/prepaid/credits` } });
+  assert.equal(got.requested, false);
+  emit("Network.requestWillBeSent", { requestId: "r1", request: { url: API } });
+  assert.equal(got.requested, true);
+  assert.equal(got.status, null);
+});
+
 test("keeps the status when the body cannot be read", async () => {
   const { wc, emit } = fakeWebContents({});
   const got = await listenForUsage(wc, ORIGIN);

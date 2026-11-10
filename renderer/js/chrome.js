@@ -24,6 +24,7 @@ function renderChrome(src) {
   lamp.classList.toggle("is-updating", st === "updating");
   // A live region: written only when the text changes. The age comes from the render that already runs every 30 s.
   setText($("lampText"), st === "none" ? t("src.none") : t(`state.${st}`));
+  lamp.title = $("lampText").textContent; // the narrow header can cut the word short
   setText($("lampAgeTxt"), st === "fresh" ? `· ${lampAge(Date.now() - lastUpdate())}` : ""); // hidden by CSS where the header has no room for it
   $("lampAge").textContent = src ? t("hd.read", { time: fmtTime(lastUpdate()) }) : "";
   $("lampAge").title = src ? `${sourceLabel(src)} ${ago(lastUpdate())}` : "";

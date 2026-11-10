@@ -28,6 +28,11 @@ function toast(text, kind, action) {
 // Error strip under the header, on every screen: pushes the content down and stays until it is closed,
 // its action is used, a newer error replaces it or a reading succeeds
 function showError(text, action) {
+  // A toast still on screen was placed for the header without the strip and would now sit on it; the error is newer news
+  const f = $("toast");
+  clearTimeout(f.__t);
+  clearTimeout(f.__t2);
+  f.classList.add("hidden");
   setText($("errMsgText"), text);
   const act = $("errMsgAct");
   act.classList.toggle("hidden", !action);

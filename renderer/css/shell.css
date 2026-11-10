@@ -57,9 +57,16 @@
 
 /* Vertical format: row 1 holds the brand, the lamp and Refresh (as an icon); row 2 holds the tabs */
 @media (max-width: 719px) {
-  .hd { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "brand sync" "keys keys"; row-gap: .15rem; padding-top: .3rem; padding-bottom: .35rem; }
+  .hd { grid-template-columns: minmax(1.4rem, 1fr) auto; grid-template-areas: "brand sync" "keys keys"; row-gap: .15rem; padding-top: .3rem; padding-bottom: .35rem; }
   .sepv, .rd { display: none; }
-  .brand, .sync { min-height: 2.15rem; }
+  .sync { min-height: 2.15rem; gap: .5rem; }
+  /* Row 1 is short at 420px (measured: up to 51px over with Connect and "Desatualizado"). What gives way, in order:
+     the brand's name (it wraps onto a second line that is cut off, so the icon stays), then the lamp's word
+     (cut with an ellipsis; the full word is its title). The keys keep their size. */
+  .brand { min-width: 0; height: 1.25rem; flex-wrap: wrap; align-content: flex-start; row-gap: 1rem; overflow: hidden; }
+  .sync > .key { flex: none; }
+  .lamp { min-width: 0; flex: 0 1 auto; padding-inline: .45em .4em; }
+  #lampText { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .keys { margin-right: calc(max(.8rem, var(--ctl)) * -1 + .8rem); }
   .keys .key { flex: 1 1 auto; padding-inline: .5rem; }
   #syncBtn { min-width: 0; padding-inline: .6rem; }

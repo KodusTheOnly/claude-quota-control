@@ -793,9 +793,12 @@ const numOrNull = (v) => (isNum(v) ? v : null);
 // dropped; a broken week leaves only the reset time, if there is one (as after setting it in Settings).
 function cleanManual(m) {
   if (!isPlainObject(m)) return null;
-  if (!isPlainObject(m.weekly) || !isPct(m.weekly.used) || !isNum(m.weekly.resetsAt)) return isNum(m.anchor) ? { anchor: m.anchor } : null;
+  // Where the reset time came from (Settings hides its own form when the account gave it)
+  const via = ["sync", "manual"].includes(m.anchorVia) ? { anchorVia: m.anchorVia } : {};
+  if (!isPlainObject(m.weekly) || !isPct(m.weekly.used) || !isNum(m.weekly.resetsAt)) return isNum(m.anchor) ? { anchor: m.anchor, ...via } : null;
   const out = {
     anchor: isNum(m.anchor) ? m.anchor : m.weekly.resetsAt,
+    ...via,
     updatedAt: isNum(m.updatedAt) ? m.updatedAt : 0,
     via: m.via === "sync" ? "sync" : "manual",
     weekly: { used: m.weekly.used, resetsAt: m.weekly.resetsAt },

@@ -52,7 +52,7 @@ function openPlanMenu(i, anchor) {
   menu.style.left = `${Math.max(gap, Math.min(a.left + a.width / 2 - w / 2, window.innerWidth - w - gap))}px`;
   menu.style.top = `${Math.max(gap, above ? a.top - h - gap : Math.min(a.bottom + gap, window.innerHeight - h - gap))}px`;
   anchor.setAttribute("aria-expanded", "true");
-  menu.querySelector(".key.on, .key").focus();
+  (menu.querySelector(".key.on") || menu.querySelector(".key")).focus(); // the day's current plan
 }
 
 $("planMenu").addEventListener("toggle", (e) => {

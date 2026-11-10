@@ -1,8 +1,21 @@
 // "Type it in": key in a reading by hand, for when the usage page is not connected (or just to correct a number)
 
+// Marks the field that cannot be saved and says why, inside the dialog (null clears it)
+function typeInError(input) {
+  $("typeErr").classList.toggle("hidden", !input);
+  for (const id of ["qWeekly", "qSession"]) {
+    if ($(id) === input) $(id).setAttribute("aria-invalid", "true");
+    else $(id).removeAttribute("aria-invalid");
+  }
+  if (input) input.focus();
+}
+
 function openTypeIn() {
   const dlg = $("typeDlg");
-  if (!dlg.open) dlg.showModal();
+  if (!dlg.open) {
+    typeInError(null);
+    dlg.showModal();
+  }
   $("qWeekly").focus();
   $("qWeekly").select();
 }
@@ -28,9 +41,10 @@ $("typeForm").addEventListener("submit", async (e) => {
   const weekly = readNumber($("qWeekly"));
   const session = readNumber($("qSession"));
   if (weekly === null || Number.isNaN(weekly) || Number.isNaN(session)) {
-    toast(t("q.invalid"), "error");
+    typeInError(weekly === null || Number.isNaN(weekly) ? $("qWeekly") : $("qSession"));
     return;
   }
+  typeInError(null);
   // First manual reading with the collector already running: inherit its reset time
   let anchor;
   if (!(state.settings.manual && state.settings.manual.anchor)) {

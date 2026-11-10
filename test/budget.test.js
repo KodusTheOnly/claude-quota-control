@@ -288,6 +288,13 @@ test("a week at 95% or more is Pause, with or without a projection", () => {
   assert.equal(core.weekLevel(94.6, 3, 1.0), 3, "94.6 is shown as 95%, so it is Pause");
 });
 
+test("the 95% rule stops 5 h before the reset: then the hours locked out decide", () => {
+  assert.equal(core.weekLevel(96, 0, 1.0, 5.1), 3, "more than 5 h left: Pause");
+  assert.equal(core.weekLevel(96, 0, 1.0, 5), 0, "5 h left and no lockout: Free");
+  assert.equal(core.weekLevel(96, 0, 1.0, 0.2), 0, "10 minutes left: Free");
+  assert.equal(core.weekLevel(99, 3, 1.0, 4), 1, "a lockout under 5 h is Moderate");
+});
+
 test("slow ~N%: how much the pace of the days left has to drop to end at 100%", () => {
   // 40% used, 123% projected: 1 - 60 / 83 = 0.277, so 28%
   assert.equal(core.slowDownPct(40, 123), 28);

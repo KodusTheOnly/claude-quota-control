@@ -93,7 +93,7 @@ function renderHelpCalc() {
   add("session");
   add("expected", { weights });
   add("budget");
-  add("proj", { weekPause: WEEK_PAUSE_AT, days: fmtNum(MIN_WEIGHTED_DAYS), lock: goalSettings().goal, room: ROOM_GAP, shown: LOCK_HOURS_SHOWN, ...lockCutoffs() });
+  add("proj", { weekPause: WEEK_PAUSE_AT, pauseHours: WEEK_PAUSE_HOURS, days: fmtNum(MIN_WEIGHTED_DAYS), lock: goalSettings().goal, room: ROOM_GAP, shown: LOCK_HOURS_SHOWN, ...lockCutoffs() });
   add("red");
   add("round");
   body.appendChild(dl);
