@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.2.0
 
 - Active hours (Settings > Plan, off by default): the hours you usually use Claude, as a window such as 09:00 to 01:00. The plan only moves inside them, so the expected line, the pace, the projection and the hours locked out stop treating a night of sleep as falling behind. A whole day keeps its share of the week; only the partial days at the reset change. Hours after midnight count for that calendar day. Use outside the window still counts. The chart shades the hours outside the window, a thin bar under the HRS strip marks the window on every day (with "active hours" in the legend), and the Claude Code collector follows the same rule.
 - Fixed: when the last hours before the reset fall outside the active hours (a window of 09:00 to 23:00 and a reset at 08:00), today had a budget of 0, so any use after midnight showed as 200% and Pause. Today now gets everything left of the week, the reserve included, since it is lost at the reset. The collector follows the same rule.
