@@ -345,6 +345,20 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
   .osc { min-height: 4.5rem; }
   .hrs { height: 1.6rem; }
 }
+/* Very short windows (down to 480px, the smallest the window goes): every row above and under the chart gets tighter,
+   so the chart keeps about 7rem with a message strip open. The keys keep their 32px. */
+@media (min-width: 720px) and (max-height: 560px) {
+  .dash { --well-pad: .35rem; --well-gap: .3rem; }
+  .band .vl { padding-top: .25rem; padding-bottom: .25rem; }
+  .band .vface { min-height: 3rem; }
+  .band .wk { row-gap: 1.25rem; padding-top: .3rem; padding-bottom: .3rem; }
+  .now .crt { padding-top: .2rem; padding-bottom: .2rem; }
+  .hrs { height: 1.3rem; }
+  .day { gap: 0; padding-top: .2rem; padding-bottom: .25rem; }
+  .day .pr { min-height: 1.35rem; }
+  .ghead { padding-top: 0; padding-bottom: 0; }
+  .xcell { padding-top: .25rem; padding-bottom: .25rem; }
+}
 
 /* =================== Tiers =================== */
 /* .t2 is secondary info, .t3 is detail. Thresholds are in rem, so they follow the scale (npm run test:layout checks that

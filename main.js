@@ -206,7 +206,7 @@ function createWindow() {
     width: 1100,
     height: 780,
     minWidth: 420,
-    minHeight: 540,
+    minHeight: 480,
     useContentSize: true,
     show: false,
     title: i18n.t("app.name"),
