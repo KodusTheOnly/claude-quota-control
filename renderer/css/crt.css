@@ -20,7 +20,7 @@
 .cur { display: inline-block; width: .55em; height: 1em; margin-left: .3em; vertical-align: -.12em; background: var(--c, var(--free)); animation: blink 1s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .cur { animation: none; } }
-/* Segmented bar: 20 segments, with a white tick at the limit */
+/* Segmented bar: 20 segments (the session time bar overrides it with 5), with a white tick at the limit */
 .sbar { position: relative; flex: none; height: .7rem; background: var(--sl); border: 1px solid var(--sline); }
 .sbar .tr { position: absolute; inset: 0; -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(5% - 2px), transparent calc(5% - 2px) 5%); mask: repeating-linear-gradient(90deg, #000 0 calc(5% - 2px), transparent calc(5% - 2px) 5%); }
 /* The week bar's zones: the reserve still held (hatched, from the plan's ceiling to the goal) and the part of the
