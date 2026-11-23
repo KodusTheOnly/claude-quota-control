@@ -49,7 +49,7 @@ function renderHelpCalc() {
   table.appendChild(node("caption", "sr-only", t("calc.levels")));
   const head = node("tr");
   for (const key of ["calc.col.level", "calc.col.session", "calc.col.ratio"]) {
-    const th = node("th", "", t(key));
+    const th = node("th", "", t(key, { min: SESSION_PACE_AFTER }));
     th.scope = "col";
     head.appendChild(th);
   }
@@ -68,12 +68,15 @@ function renderHelpCalc() {
   }
   table.appendChild(tbody);
   ladder.appendChild(table);
-  levelScale(ladder, t("calc.col.session"), SESSION_CUTS, 100, fmtPct);
   levelScale(ladder, t("calc.col.ratio"), RATIO_CUTS, RATIO_CUTS[RATIO_CUTS.length - 1] + RATIO_RULER_PAST, fmtRatio);
   // The week has a scale of its own (LOCK_CUTS in core.js): the hours without Claude before the reset
   const lockEnd = LOCK_CUTS[LOCK_CUTS.length - 1];
   levelScale(ladder, t("calc.col.proj"), LOCK_CUTS, lockEnd * LOCK_RULER_PAST, (h) => t("dur.lockHours", { n: h }), -lockEnd * LOCK_RULER_FREE);
+  // The session after its first minutes: the minutes without Claude before it resets (SESSION_LOCK_CUTS in core.js)
+  const sEnd = SESSION_LOCK_CUTS[SESSION_LOCK_CUTS.length - 1];
+  levelScale(ladder, t("calc.col.sessionPace"), SESSION_LOCK_CUTS, sEnd * LOCK_RULER_PAST, (n) => t("dur.lockMin", { n }), -sEnd * LOCK_RULER_FREE);
   ladder.appendChild(node("p", "edge", t("calc.edge", { ratio: fmtRatio(RATIO_CUTS[0]), pct: fmtPct(SESSION_CUTS[0]) })));
+  ladder.appendChild(node("p", "edge", t("calc.sessionNote", { min: SESSION_PACE_AFTER, pause: SESSION_PAUSE_AT, pauseMin: SESSION_PAUSE_MIN })));
   ladder.appendChild(node("p", "edge", t("calc.lockNote", { ...lockCutoffs(), lock: goalSettings().goal })));
   body.appendChild(ladder);
 
@@ -90,7 +93,7 @@ function renderHelpCalc() {
     row.append(node("dt", "", t(`calc.${key}.t`)), node("dd", "", t(`calc.${key}.d`, params)));
     dl.appendChild(row);
   };
-  add("session");
+  add("session", { min: SESSION_PACE_AFTER, ...sessionCutoffs() });
   add("expected", { weights });
   add("budget");
   add("proj", { weeks: LEARN_WEEKS, weekPause: WEEK_PAUSE_AT, pauseHours: WEEK_PAUSE_HOURS, days: fmtNum(MIN_WEIGHTED_DAYS), lock: goalSettings().goal, room: ROOM_GAP, shown: LOCK_HOURS_SHOWN, ...lockCutoffs() });

@@ -16,7 +16,7 @@ function loadCore() {
   vm.createContext(sandbox);
   const code = fs.readFileSync(path.join(__dirname, "..", "renderer", "js", "core.js"), "utf8");
   // const/let declarations stay private to the script; expose the functions under test
-  vm.runInContext(`${code}\nthis.exports = { weightedDays, dayBudget, perNormalDay, nextReset, upsertSession, projectWeek, levelFromRatio, levelFromSession, levelFromLockout, lockShown, weekLockout, paceReaches, slowDownPct, weekLevel, sameReading, expectedUsed, isOverBudget, isDayOff, offDayNumber };`, sandbox);
+  vm.runInContext(`${code}\nthis.exports = { weightedDays, dayBudget, perNormalDay, nextReset, upsertSession, projectWeek, levelFromRatio, levelFromSession, sessionLevel, sessionLockout, levelFromLockout, lockShown, weekLockout, paceReaches, slowDownPct, weekLevel, sameReading, expectedUsed, isOverBudget, isDayOff, offDayNumber };`, sandbox);
   return sandbox.exports;
 }
 
@@ -346,9 +346,59 @@ test("the last partial day before the reset gets everything that is left", () =>
   assert.ok(Math.abs(mon - (12 * 1) / (1 + 8 / 24)) < 1e-9, String(mon));
 });
 
-test("the session is rated on % used: 50, 75 and 90", () => {
+test("the first minutes of a session are rated on % used: 50, 75 and 90", () => {
   assert.deepEqual([0, 50, 51, 75, 76, 90, 91, 100].map(core.levelFromSession), [0, 0, 1, 1, 2, 2, 3, 3]);
   assert.equal(core.levelFromSession(undefined), null);
+});
+
+// A session that resets at 20:50 started at 15:50
+const sAt = (h, mi) => new Date(2026, 10, 23, h, mi).getTime();
+const S_RESET = sAt(20, 50);
+
+test("the session is rated on its pace: the minutes without Claude before the reset", () => {
+  // 54% at 18:52, about 3 h in: the pace ends near 89%, so no time without Claude
+  assert.equal(core.sessionLevel(54, sAt(18, 52), S_RESET), 0);
+  assert.equal(core.sessionLockout(54, sAt(18, 52), S_RESET).at, null);
+  assert.equal(core.sessionLockout(54, sAt(18, 52), S_RESET).minutes, 0);
+  // 30% in the first 30 min: 100% at 17:30, then 200 min without Claude
+  assert.equal(core.sessionLockout(30, sAt(16, 20), S_RESET).minutes, 200);
+  assert.equal(core.sessionLevel(30, sAt(16, 20), S_RESET), 3);
+  // 70% with 15 min left: calm
+  assert.equal(core.sessionLevel(70, sAt(20, 35), S_RESET), 0);
+});
+
+test("the session minute cutoffs: 0, 30 and 90, a value on a cutoff stays in the lower level", () => {
+  // 50% at 2 h in: 100% at 4 h in, 60 min before the reset
+  assert.equal(core.sessionLockout(50, sAt(17, 50), S_RESET).minutes, 60);
+  assert.equal(core.sessionLevel(50, sAt(17, 50), S_RESET), 2);
+  // 60% at 3 h in: 100% at 5 h in, exactly at the reset
+  assert.equal(core.sessionLevel(60, sAt(18, 50), S_RESET), 0);
+  // 75% at 4 h in: 100% at 5 h 20, after the reset
+  assert.equal(core.sessionLevel(75, sAt(19, 50), S_RESET), 0);
+  // 40% at 1 h 40 in (100 min): 100% at 250 min, 50 min before the reset: Tight
+  assert.equal(core.sessionLevel(40, sAt(17, 30), S_RESET), 2);
+  // 45% at 2 h 15 in (135 min): 100% at 300 min: Free
+  assert.equal(core.sessionLevel(45, sAt(18, 5), S_RESET), 0);
+  // 50% at 2 h 24 in (144 min): 100% at 288 min, 12 min before the reset: Moderate
+  assert.equal(core.sessionLevel(50, sAt(18, 14), S_RESET), 1);
+  assert.equal(core.sessionLockout(50, sAt(18, 14), S_RESET).minutes, 12);
+});
+
+test("the session's first 30 minutes and a session with no reset time use % used", () => {
+  assert.equal(core.sessionLockout(30, sAt(16, 10), S_RESET), null);
+  assert.equal(core.sessionLevel(30, sAt(16, 10), S_RESET), 0, "20 min in: 30% is Free on % used");
+  assert.equal(core.sessionLevel(60, sAt(16, 10), S_RESET), 1);
+  assert.equal(core.sessionLevel(60, sAt(18, 0), null), 1);
+  assert.equal(core.sessionLevel(undefined, sAt(18, 0), S_RESET), null);
+});
+
+test("a session above 90% reads Pause while the reset is more than 30 min away", () => {
+  // 91% at 4 h in: the pace locks out 36 min (Tight), but 60 min are left: Pause
+  assert.equal(core.sessionLevel(91, sAt(19, 50), S_RESET), 3);
+  // 90% is not above 90%: the pace decides
+  assert.equal(core.sessionLevel(90, sAt(19, 50), S_RESET), 2);
+  // 95% with 20 min left: the pace decides (100% at ~4 h 52, 8 min before the reset)
+  assert.equal(core.sessionLevel(95, sAt(20, 30), S_RESET), 1);
 });
 
 test("expected usage follows the weighted days that have passed", () => {

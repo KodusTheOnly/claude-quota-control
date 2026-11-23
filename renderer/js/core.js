@@ -321,7 +321,7 @@ function paceReaches(target, used, rate, now, resetsAt, w = weights()) {
 // 0 Free, 1 Moderate, 2 Tight, 3 Pause. null means "not rated yet".
 // Today and the days come from a ratio (used / budget): up to 0.7, 1.0 and 1.4.
 // The projection has its own scale (hours locked out, LOCK_CUTS below), and the week follows it (weekLevel).
-// The 5-hour session is rated on its own % used, not on pace: up to 50, 75 and 90.
+// The 5-hour session is rated like the week, on its pace (sessionLevel below); its first minutes on % used: up to 50, 75 and 90.
 // Every level rates the number the screen shows next to it, so the two never disagree: percents
 // are shown whole, so a percent is rated rounded to a whole number and a ratio to two decimals.
 const RATIO_CUTS = [0.7, 1.0, 1.4];
@@ -340,6 +340,35 @@ function levelByCuts(x, cuts) {
 }
 const levelFromRatio = (r) => levelByCuts(asShownRatio(r), RATIO_CUTS);
 const levelFromSession = (used) => levelByCuts(asShownPct(used), SESSION_CUTS);
+
+// The session's level, like the week's: the minutes it would leave without Claude before it resets if the pace so
+// far holds. The pace is the % used over the time gone since the session started (the Used and Time bars).
+// Free at 0 min, Moderate up to 30, Tight up to 90, Pause above. In its first SESSION_PACE_AFTER minutes the pace
+// says too little, so the level uses % used (SESSION_CUTS), as it does with no reset time. A session
+// above SESSION_PAUSE_AT % reads Pause, whatever the pace, while the reset is more than SESSION_PAUSE_MIN away.
+const SESSION_LEN = 5 * HOUR;
+const SESSION_LOCK_CUTS = [0, 30, 90];
+const SESSION_PACE_AFTER = 30;
+const SESSION_PAUSE_AT = 90; // above this, Pause (the last of SESSION_CUTS)
+const SESSION_PAUSE_MIN = 30;
+// When the pace reaches 100% (at, or null when not before the reset) and the whole minutes from then to the reset.
+// null while there is no pace yet (no reset time, or the session is too young).
+function sessionLockout(used, now, resetsAt) {
+  if (!Number.isFinite(used) || !resetsAt || !(resetsAt > now)) return null;
+  const gone = now - (resetsAt - SESSION_LEN);
+  if (gone < SESSION_PACE_AFTER * MIN) return null;
+  const rate = used / gone; // % per ms
+  const at = used >= 100 ? now : rate > 0 ? now + (100 - used) / rate : null;
+  if (at === null || at >= resetsAt) return { at: null, minutes: 0 };
+  return { at, minutes: Math.round((resetsAt - at) / MIN) };
+}
+function sessionLevel(used, now, resetsAt) {
+  if (!Number.isFinite(used)) return null;
+  const minutesLeft = resetsAt ? (resetsAt - now) / MIN : Infinity;
+  if (asShownPct(used) > SESSION_PAUSE_AT && minutesLeft > SESSION_PAUSE_MIN) return 3;
+  const lock = sessionLockout(used, now, resetsAt);
+  return lock ? levelByCuts(lock.minutes, SESSION_LOCK_CUTS) : levelFromSession(used);
+}
 
 // The projection's level measures how many hours you would be left without Claude before the reset if the
 // pace so far holds. The projection counts up to LOCK_AT (the whole limit), at the time T it

@@ -133,7 +133,7 @@ function computeLevels(m) {
   const lock = proj ? weekLockout(m.w.used, proj.rate, m.now, m.w.resetsAt, proj.w, m.g.goal) : null;
   const lockLevel = lock ? levelFromLockout(lock.hours) : null;
   const lv = {
-    session: m.five ? levelFromSession(m.five.used) : null,
+    session: m.five ? sessionLevel(m.five.used, m.now, m.five.resetsAt) : null,
     week: weekLevel(m.w.used, lock ? lock.hours : null, weekRatio, hoursToReset(m)), // the hours locked out, see core.js
     today: m.dayOff || m.reserveMode ? null : m.budget > 0 || m.spent > 0 ? levelFromRatio(m.todayRatio) : null,
     projection: m.w.used >= 100 ? 3 : lockLevel,
@@ -208,6 +208,11 @@ function lockCutoffs() {
   const [a, b, c] = LOCK_CUTS.map((h) => t("dur.lockHours", { n: h }));
   return { a, b, c };
 }
+// The same for the session's minutes without Claude ({ a: "0 min", b: "30 min", c: "90 min" }), from SESSION_LOCK_CUTS
+function sessionCutoffs() {
+  const [a, b, c] = SESSION_LOCK_CUTS.map((n) => t("dur.lockMin", { n }));
+  return { a, b, c };
+}
 
 // "Show the math": for each module, the rows that explain its number and its level.
 // Each row is [label key, value]; the screens translate the label.
@@ -216,10 +221,21 @@ function mathRows(m) {
   const lvName = (i) => (i === null || i === undefined ? t("level.none.name") : levelName(i));
   const L = m.lv;
   const rows = {};
+  // The session: where its pace so far ends, or % used in its first minutes (sessionLevel in core.js)
+  const sLock = m.five ? sessionLockout(m.five.used, m.now, m.five.resetsAt) : null;
+  const sPause = m.five && m.five.resetsAt
+    && asShownPct(m.five.used) > SESSION_PAUSE_AT && (m.five.resetsAt - m.now) / MIN > SESSION_PAUSE_MIN;
   rows.session = m.five
     ? [
         ["math.used", pct(m.five.used)],
-        ["math.cutoffsSession", t("math.cutoffsSessionValue")],
+        ...(sLock
+          ? [
+              ["math.hitsLock", sLock.at === null ? t("math.notBeforeReset") : fmtWhen(sLock.at, m.now)],
+              ["math.minutesLocked", t("dur.lockMin", { n: sLock.minutes })],
+              ["math.cutoffsSessionPace", t("math.cutoffsSessionPaceValue", sessionCutoffs())],
+            ]
+          : [["math.cutoffsSession", t("math.cutoffsSessionValue")]]),
+        ...(sPause ? [["math.sessionPause", t("math.sessionPauseValue", { pct: `${SESSION_PAUSE_AT}%` })]] : []),
         ["math.level", lvName(L.session)],
         ...(m.five.resetsAt ? [["math.resetsIn", fmtDur(m.five.resetsAt - m.now)]] : []),
       ]

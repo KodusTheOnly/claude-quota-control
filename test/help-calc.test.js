@@ -66,6 +66,9 @@ test("English: the table and the rules show the real cutoffs, weights and the 95
   assert.ok(text.includes("The level counts how many hours you would be without Claude before the reset if you keep the pace of now: 0 h is Free, up to 5 h is Moderate, up to 24 h is Tight and above 24 h is Pause"), "hours rule");
   assert.ok(text.includes("5 h is one session"));
   assert.ok(text.includes("counts up to 100% of the limit, where Claude stops"));
+  assert.ok(text.includes("Session, first 30 min (% used)"), "% used only in the first minutes");
+  assert.ok(text.includes("0 min is Free, up to 30 min is Moderate, up to 90 min is Tight and above 90 min is Pause"), "session minutes rule");
+  assert.ok(text.includes("Above 90% it reads Pause, whatever the pace, while the reset is more than 30 min away"), "session Pause rule");
   assert.ok(text.includes("Cut pace ~N% says how much the pace of the days left has to drop for the week to end at 100% at the reset"), "cut pace");
   assert.ok(text.includes("the verdict reads Warming up"));
   assert.ok(text.includes("Today and days (used ÷ budget)"), "the ratio scale is only for Today and the days");
@@ -93,12 +96,13 @@ test("Portuguese: same page, with decimal commas and the Portuguese names", () =
 
 test("the page follows the code: change a cutoff and Help changes with it", () => {
   const { run, draw } = render("en");
-  run("RATIO_CUTS[0] = 0.5; SESSION_CUTS[2] = 85; LOCK_CUTS[1] = 4;");
+  run("RATIO_CUTS[0] = 0.5; SESSION_CUTS[2] = 85; LOCK_CUTS[1] = 4; SESSION_LOCK_CUTS[1] = 20;");
   const text = draw();
   assert.ok(text.includes("up to 4 h is Moderate"));
   assert.ok(text.includes("4 h is one session"));
   assert.ok(text.includes("up to 0.5"));
   assert.ok(text.includes("above 85%"));
+  assert.ok(text.includes("up to 20 min is Moderate"));
   assert.ok(!text.includes("up to 0.7"));
 });
 
