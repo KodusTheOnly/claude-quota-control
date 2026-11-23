@@ -172,7 +172,7 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 /* What this pace will still use: hatched like the chart's dashed line, from what is used to where the week ends */
 #wBar .pj { position: absolute; top: 0; bottom: 0; left: var(--pj-l, 0%); width: var(--pj-w, 0%); box-sizing: border-box; background: repeating-linear-gradient(135deg, var(--c) 0 2px, transparent 2px 5px); border-right: 2px solid var(--c); opacity: .85; }
 /* What would be left over at the reset: a dashed box in the accent up to the plan's ceiling, with how much */
-#wBar .gh { position: absolute; top: -4px; bottom: -4px; left: var(--gh-l, 0%); width: var(--gh-w, 0%); box-sizing: border-box; display: grid; place-items: center; border: 1.5px dashed var(--crt-accent); background: color-mix(in srgb, var(--crt-accent) 7%, transparent); }
+#wBar .gh { position: absolute; top: 0; bottom: 0; left: var(--gh-l, 0%); width: var(--gh-w, 0%); box-sizing: border-box; display: grid; place-items: center; border: 1.5px dashed var(--crt-accent); background: color-mix(in srgb, var(--crt-accent) 7%, transparent); }
 /* Past the limit: the bar makes room on its right and the hatch runs out of it in red, with the time the limit comes */
 #wBar .bu { position: absolute; top: -1px; bottom: -1px; left: 100%; width: var(--bu-w, 0%); box-sizing: border-box; display: grid; place-items: center; border: 1px solid var(--pause); border-left: 0; background: repeating-linear-gradient(135deg, var(--pause) 0 2px, transparent 2px 5px); }
 #wBar :is(.gh, .bu) b { font: 600 var(--fs-xs)/1 var(--mono); white-space: nowrap; padding: 0 .15rem; background: var(--scr); }
