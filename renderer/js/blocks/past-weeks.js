@@ -34,7 +34,7 @@ function renderPast(m) {
   $("pastKeyText").textContent = t("past.key", { n: PAST_N });
   key.disabled = !pastData.length;
   key.setAttribute("aria-pressed", String(pastOn()));
-  key.title = pastData.length ? t("past.keyTitle", { n: PAST_N }) : t("past.keyNone");
+  setTip(key, "plain", pastData.length ? t("past.keyTitle", { n: PAST_N }) : t("past.keyNone"));
   $("pastTitle").textContent = t("past.title", { n: PAST_N });
 }
 $("pastKey").addEventListener("click", () => saveSetting({ pastWeeks: !(state.settings && state.settings.pastWeeks) }));

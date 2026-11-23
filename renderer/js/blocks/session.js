@@ -17,6 +17,7 @@ function renderSession(m) {
   setLevelClass(bar, level);
   setBar(bar, { fill: f ? f.used : 0, tick: null });
   bar.setAttribute("aria-label", f ? t("mod.aria.session", { used: r0(f.used) }) : t("session.noReading"));
+  for (const el of [bar, $("sPct")]) setTip(el, "sused", f ? `${r0(f.used)}%` : "");
 
   // The time bar needs the reset time; a reading without one (typed in without it) has no clock to show
   const left = f && f.resetsAt ? f.resetsAt - m.now : null;
@@ -26,6 +27,7 @@ function renderSession(m) {
   setBar(time, { fill: passed, tick: null });
   time.setAttribute("aria-label", t("session.timeAria", { pct: r0(passed) }));
   time.classList.toggle("hidden", !timed);
+  setTip(time, "stime", timed ? `${fmtDur(5 * HOUR - left)} / 5 h` : "");
   $("sTimeKey").classList.toggle("hidden", !timed);
 
   const soon = timed && left <= SESSION_SOON;
@@ -33,6 +35,7 @@ function renderSession(m) {
   // "Resets 17:51 · in 2h 04m", or near the reset "Resets in 12 min · 15:59". The words and the second part give way in a
   // narrow tile (overview.css), the time or the countdown stays.
   const box = $("sResetsText");
+  setTip($("sResets"), soon ? "ssoon" : "sreset", timed ? `${fmtWhen(f.resetsAt, m.now)} · ${fmtDur(left)}` : "");
   if (!timed) {
     setText(box, !f ? t("session.noReading") : t("session.logged", { ago: ago(f.at) }));
     return;

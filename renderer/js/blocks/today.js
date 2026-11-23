@@ -34,6 +34,7 @@ function renderToday(m) {
   const past = Math.min(Math.max(ratio - 1, 0), 1) * 100;
   setBar(bar, off ? { fill: 0 } : over ? { fill: past, over: past } : { fill: Math.max(1 - ratio, 0) * 100 });
   bar.setAttribute("aria-label", t("today.barAria", { used: r0(m.spent), budget: r0(m.budget) }));
+  for (const el of [bar, $("tUsed").parentElement]) setTip(el, off ? "plain" : over ? "todayover" : "today", off ? $("tLeft").textContent : t("today.barAria", { used: r0(m.spent), budget: r0(m.budget) }), over);
 }
 
 // The note under the tank gives way when the tile is narrow, and is gone on a normal day

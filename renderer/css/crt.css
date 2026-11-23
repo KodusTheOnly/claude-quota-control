@@ -50,3 +50,27 @@
 .plate { padding: .1rem .45rem; border: 1px solid transparent; background: color-mix(in srgb, var(--st) 8%, transparent); color: var(--sm); font: 600 var(--fs-xs)/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
 .crt .lv.lv-none { color: var(--sm); }
 .crt.fit { flex: none; }
+
+/* ---- Tooltip (tip.js): a small screen of its own, above the part it explains, with an arrow pointing at it ---- */
+.tip-hot { outline: 1.5px dashed var(--crt-accent); outline-offset: 3px; }
+.tip {
+  position: fixed; z-index: 100; left: 0; top: 0; width: max-content; max-width: min(19rem, calc(100vw - 1.5rem));
+  display: grid; gap: .3rem; padding: .55rem .7rem .6rem; border-radius: var(--r-lg); pointer-events: none;
+  background: var(--scr); color: var(--st); border: 1px solid color-mix(in srgb, var(--sm) 45%, var(--crt-border));
+  box-shadow: inset 0 0 0 1px var(--crt-inset), 0 .5rem 1.4rem rgba(0, 0, 0, .35);
+  font: 400 var(--fs-sm)/1.45 var(--sans); text-transform: none; letter-spacing: normal;
+  opacity: 0; transform: scaleY(.55); transform-origin: var(--ax, 50%) 100%; transition: opacity .12s ease-out, transform .14s ease-out;
+}
+.tip.below { transform-origin: var(--ax, 50%) 0; }
+.tip.on { opacity: 1; transform: none; }
+.tip::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: repeating-linear-gradient(0deg, var(--crt-scan) 0 1px, transparent 1px 3px); }
+.tip .ar { position: absolute; left: calc(var(--ax, 50%) - 5px); width: 10px; height: 10px; background: var(--scr); border: 1px solid color-mix(in srgb, var(--sm) 45%, var(--crt-border)); transform: rotate(45deg); }
+.tip.above .ar { bottom: -6px; border-left: 0; border-top: 0; }
+.tip.below .ar { top: -6px; border-right: 0; border-bottom: 0; }
+.tip p { margin: 0; }
+.tip .tt { font: 600 var(--fs-xs)/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--sm); }
+.tip .tv { padding-top: .3rem; border-top: 1px solid var(--sline); font: 600 var(--fs-sm)/1.35 var(--mono); color: var(--crt-accent); white-space: pre-line; font-variant-numeric: tabular-nums; }
+.tip .tv.only { padding-top: 0; border-top: 0; font-weight: 500; color: var(--st); }
+.tip .tv.warn { color: var(--pause); }
+.tip p:empty { display: none; }
+@media (prefers-reduced-motion: reduce) { .tip { transition: none; } }

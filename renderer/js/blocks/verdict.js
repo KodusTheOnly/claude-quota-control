@@ -83,7 +83,8 @@ function paintChips(m) {
     if (c.word) el.append(node("span", "cw", c.word));
     el.append(node("b", "cv", c.value));
     if (c.short) Object.assign(el.dataset, { full: c.value, short: c.short });
-    if (c.title) el.title = c.title;
+    if (c.quiet) setTip(el, "wreset", c.title);
+    else if (c.title) setTip(el, "plain", c.title, Boolean(c.warn));
     return el;
   }));
   fitChips();
@@ -398,8 +399,8 @@ function renderVerdict(m, fresh = false) {
   [...ruler.children].forEach((span, i) => span.classList.toggle("on", i === lit));
   fitBand();
 
-  // The long explanation lives in the Math drawer; the band only carries it as a tooltip
-  $("vScr").title = verdictTexts(m).reason;
+  // The long explanation lives in the Math drawer; the verdict's tip carries the reason
+  setTip($("vScr").querySelector(".vl"), "verdict", verdictTexts(m).reason);
 }
 
 // The first line of the band gives way on its own (the chips under it have fitChips). Measured, since the room changes

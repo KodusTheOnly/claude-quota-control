@@ -90,9 +90,9 @@ function drawHours() {
       if (shown > 0) {
         c.classList.add(b.exact ? "m" : "e", `lv-${lvKey(dayLevel.get(dayKey(b.t0)) ?? 0)}`);
         c.style.setProperty("--a", (0.18 + 0.82 * (b.v / max)).toFixed(2));
-        c.title = t(b.exact ? "hrs.tipMeasured" : "hrs.tipEst", { when, pct: fmtNum(shown, 0, 1) });
+        setTip(c, "plain", t(b.exact ? "hrs.tipMeasured" : "hrs.tipEst", { when, pct: fmtNum(shown, 0, 1) }));
       } else {
-        c.title = t(b.covered ? "hrs.tipNone" : "hrs.tipUnknown", { when });
+        setTip(c, "plain", t(b.covered ? "hrs.tipNone" : "hrs.tipUnknown", { when }));
       }
       return c;
     })
@@ -109,13 +109,13 @@ function drawHours() {
         const bar = node("i", "hact");
         bar.style.left = `${(((from - axisStart) / axisLen) * 100).toFixed(3)}%`;
         bar.style.width = `${(((to - from) / axisLen) * 100).toFixed(3)}%`;
-        bar.title = tip;
+        setTip(bar, "plain", tip);
         box.appendChild(bar);
       }
     }
   }
   // The whole strip says what it is; the note about what could not be placed follows when there is one
-  $("hrs").title = [t("hrs.tip"), left > 0.05 ? t("hrs.left", { pct: Math.round(left * 10) / 10 }) : ""].filter(Boolean).join("\n");
+  setTip($("hrs"), "plain", [t("hrs.tip"), left > 0.05 ? t("hrs.left", { pct: Math.round(left * 10) / 10 }) : ""].filter(Boolean).join("\n"));
 }
 
 new ResizeObserver(() => drawHours()).observe($("hcells"));

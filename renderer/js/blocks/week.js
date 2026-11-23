@@ -95,12 +95,17 @@ function paintWeekEnd(bar, m) {
   gh.style.setProperty("--gh-l", `${clamp100(proj ?? 0)}%`);
   gh.style.setProperty("--gh-w", `${Math.max(clamp100(m.ceiling) - clamp100(proj ?? 0), 0)}%`);
   $("wGhostTx").textContent = `+${spare}%`;
+  setTip(gh, "ghost", `+${spare}%`);
+  setTip(bar.querySelector(".pj"), "pj", end === null ? "" : `+${r0(Math.max(Math.min(end, 100) - used, 0))}% → ~${r0(Math.min(proj, 100))}%`, over);
+  setTip(bar, "wused", `${r0(m.w.used)}%`);
 
   const bu = $("wBurst");
   bu.classList.toggle("hidden", !over);
   bu.style.setProperty("--bu-w", over ? `${end - 100}%` : "0%");
   const lock = m.lv.lock;
-  $("wBurstTx").textContent = over && lock && lock.at !== null ? `⊘ ${fmtTime(lock.at)}` : "";
+  const lockWhen = over && lock && lock.at !== null ? `${shortWeekday(new Date(lock.at))} ${fmtTime(lock.at)}` : "";
+  $("wBurstTx").textContent = lockWhen ? `⊘ ${fmtTime(lock.at)}` : "";
+  setTip(bu, "burst", lockWhen ? `⊘ ${lockWhen}` : "", true);
   fitWeekEnd();
 }
 
@@ -118,6 +123,7 @@ function renderWeek(m) {
   buildDays();
   const level = verdictLevel(m);
   setNum($("wUsed"), `${r0(m.w.used)}%`);
+  setTip($("wUsed"), "wused", `${r0(m.w.used)}%`);
   paintLevel($("wLevel"), level);
   const wBar = $("wBar");
   // The bar and the chart's projection take the week's level, or the accent on the last day with room (the used line
@@ -169,7 +175,7 @@ function renderWeek(m) {
     })
   );
   $("planSum").textContent = planSummary(m).join(" · ");
-  $("planSum").title = t("plan.label");
+  setTip($("planSum"), "plain", t("plan.label"));
   $("daysEndText").textContent = `${shortWeekday(new Date(m.w.resetsAt))} ${fmtTime(m.w.resetsAt)}`;
   $("wResets").textContent = t("chart.resets", { when: `${shortWeekday(new Date(m.w.resetsAt))} ${fmtTime(m.w.resetsAt)}` });
 
@@ -237,9 +243,8 @@ function renderWeek(m) {
       r.b.setAttribute("aria-haspopup", "dialog");
     }
     const status = known ? `${lvName(d.level)}, ${t(isOverBudget(d.ratio) ? "day.over" : "day.within")}` : d.idle ? t("day.idle") : d.kind === "off" ? t("day.off") : d.kind === "future" ? t(`plan.${d.name}`) : t("day.noData");
-    r.b.title = i === 0 ? `${t("day.reset")} ${fmtTime(m.w.resetsAt)}` : "";
     r.b.setAttribute("aria-label", `${nm} ${date}, ${t(`plan.${d.name}`)}, ${shownNum}, ${status}${i === 0 ? `, ${t("day.reset")} ${fmtTime(m.w.resetsAt)}` : ""}${fig ? `, ${figPhrase}` : d.budget ? `, ${t("day.budgetAria", { pct: r0(d.budget) })}` : ""}${lostPhrase}${weekPhrase}${d.isToday ? `, ${t("day.today")}` : ""}`);
-    r.b.title = r.b.getAttribute("aria-label"); // the narrow columns hide the date and the level word; hover shows them
+    setTip(r.b, "plain", r.b.getAttribute("aria-label")); // the narrow columns hide the date and the level word; hover shows them
   });
 
   // The frame around today runs from the top of the chart down through the hours and the day column
@@ -280,8 +285,9 @@ function renderPaceGauge(m) {
   zones.forEach((z, i) => z.classList.toggle("on", i === zone));
   zones[zone].append(g.querySelector(".ndl")); // the needle sits inside its zone, so the zones can be of any width
   g.style.setProperty("--nx", `${Math.min(Math.max(f * 100, 4), 96)}%`);
-  g.title = t("pace.title", { doing: r0(doing), need: r0(need) });
-  g.setAttribute("aria-label", `${t("pace.label")}: ${t(PACE_ZONES[zone])}. ${g.title}`);
+  const paceNow = t("pace.title", { doing: r0(doing), need: r0(need) });
+  setTip(g, "pace", `${t(PACE_ZONES[zone])} · ${paceNow}`);
+  g.setAttribute("aria-label", `${t("pace.label")}: ${t(PACE_ZONES[zone])}. ${paceNow}`);
   fitGauge();
 }
 

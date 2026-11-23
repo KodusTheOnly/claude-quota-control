@@ -31,6 +31,7 @@ function render(opts = {}) {
   $("dash").classList.toggle("is-stale", st === "stale");
   $("dash").classList.toggle("is-offline", st === "offline");
   renderOverview(m, Boolean(opts.fresh));
+  tipRefresh();
   placeOvKeys();
   if (state.view === "history") renderHistory();
   updateTray(m);
