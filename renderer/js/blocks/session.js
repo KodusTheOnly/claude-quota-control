@@ -1,40 +1,48 @@
 // 03 Session: "will I be cut off right now?" The 5-hour window is rated on its own % used.
+// Two bars: how much of the session is used, and how much of its 5 hours has passed. Used ahead of time means the
+// session runs out before it resets. Under them, the reset time; in its last minutes that line turns into a warning.
+
+const SESSION_SOON = 50 * MIN; // how long before the reset the warning shows
 
 function renderSession(m) {
   const f = m.five;
   const level = f ? m.lv.session : null;
 
   setNum($("sPct"), f ? `${r0(f.used)}%` : "–");
-  $("sOf").textContent = f ? t("session.of5h") : "";
   // Like Today, the level only shows when it matters (Tight or Pause): the number and the bar already say the rest
   paintLevel($("sLevel"), level);
   $("sLevel").classList.toggle("hidden", !(level >= 2));
-  $("sResets").textContent = !f ? t("session.noReading") : f.resetsAt ? t("mod.sessionResets", { dur: fmtDur(f.resetsAt - m.now) }) : t("session.logged", { ago: ago(f.at) });
 
   const bar = $("sBar");
   setLevelClass(bar, level);
-  // No mark on this bar: the session is already a hard limit, so the app does not pace it (the week and today do that)
   setBar(bar, { fill: f ? f.used : 0, tick: null });
   bar.setAttribute("aria-label", f ? t("mod.aria.session", { used: r0(f.used) }) : t("session.noReading"));
 
-  // Detail: how fast it is climbing, once two readings of the same window exist
-  const p = m.pace;
-  const fills = p && p.known && p.fullAt;
-  // Filling up before the reset: say how long the rest of the window stays locked. Full already, or no reset known: the plain text.
-  const locked = fills && f.resetsAt && f.used < 100 && p.fullAt > m.now ? f.resetsAt - p.fullAt : 0;
-  const time = fills ? fmtTime(p.fullAt) : "";
-  // Longest first; fitSessionPace() takes the first that fits, so "· Xh Ym locked" is the first part to go
-  sessionPaceTexts = !fills ? [""] : locked > 0 ? [t("session.fillsLocked", { time, dur: fmtDur(locked) }), t("session.fillsShort", { time })] : [t("session.fillsAround", { time })];
-  fitSessionPace();
-  $("sPace").classList.toggle("hidden", !fills);
-}
+  // The time bar needs the reset time; a reading without one (typed in without it) has no clock to show
+  const left = f && f.resetsAt ? f.resetsAt - m.now : null;
+  const timed = left !== null && left > 0;
+  const passed = timed ? clamp100(100 - (left / (5 * HOUR)) * 100) : 0;
+  const time = $("sTime");
+  setBar(time, { fill: passed, tick: null });
+  time.setAttribute("aria-label", t("session.timeAria", { pct: r0(passed) }));
+  time.classList.toggle("hidden", !timed);
+  $("sTimeKey").classList.toggle("hidden", !timed);
 
-let sessionPaceTexts = [""];
-function fitSessionPace() {
-  const el = $("sPace");
-  for (const text of sessionPaceTexts) {
-    setText(el, text);
-    if (el.scrollWidth <= el.clientWidth + 1) return;
+  const soon = timed && left <= SESSION_SOON;
+  $("sScr").classList.toggle("soon", soon);
+  // "Resets 17:51 · in 2h 04m", or near the reset "Resets in 12 min · 15:59". The words and the second part give way in a
+  // narrow tile (overview.css), the time or the countdown stays.
+  const box = $("sResetsText");
+  if (!timed) {
+    setText(box, !f ? t("session.noReading") : t("session.logged", { ago: ago(f.at) }));
+    return;
   }
+  const when = fmtWhen(f.resetsAt, m.now);
+  const dur = fmtDur(left);
+  box.replaceChildren(
+    "↻ ",
+    node("span", "rs-a", `${t(soon ? "session.resetInWord" : "session.resetWord")} `),
+    node("b", "", soon ? dur : when),
+    node("span", "rs-b", ` · ${soon ? when : t("session.inDur", { dur })}`)
+  );
 }
-new ResizeObserver(() => fitSessionPace()).observe($("sPace"));

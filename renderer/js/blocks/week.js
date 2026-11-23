@@ -73,11 +73,51 @@ function paintWeekZones(bar, m) {
   bar.style.setProperty("--rf-w", `${clamp100(fromReserve)}%`);
 }
 
+// Where the week ends, on its bar. The projection is hatched like the chart's dashed line, from what is used to where the
+// week ends. Under the plan's ceiling, what would be left over is a dashed box at the end ("+9%"). Past the limit the bar
+// makes room on its right and the hatch runs out of it in red, with the time the limit comes. On the reserve, or with no
+// projection yet, only the use shows.
+const WEEK_OVER_MAX = 150; // the red stub stops growing here, so the bar never gets too short
+function paintWeekEnd(bar, m) {
+  const proj = m.lv.proj && !m.reserveMode ? m.lv.proj.projected : null;
+  const used = clamp100(m.w.used);
+  const end = proj === null ? null : Math.min(proj, WEEK_OVER_MAX);
+  const over = end !== null && end > 100;
+  bar.parentElement.style.setProperty("--bw", over ? `${(100 / end) * 100}%` : "100%");
+  bar.style.setProperty("--pj-l", `${used}%`);
+  bar.style.setProperty("--pj-w", end === null ? "0%" : `${Math.max(Math.min(end, 100) - used, 0)}%`);
+
+  const shown = proj === null ? null : asShownPct(proj);
+  const ceil = asShownPct(m.ceiling);
+  const spare = shown !== null && shown < ceil ? ceil - shown : 0;
+  const gh = $("wGhost");
+  gh.classList.toggle("hidden", !(spare >= 1));
+  gh.style.setProperty("--gh-l", `${clamp100(proj ?? 0)}%`);
+  gh.style.setProperty("--gh-w", `${Math.max(clamp100(m.ceiling) - clamp100(proj ?? 0), 0)}%`);
+  $("wGhostTx").textContent = `+${spare}%`;
+
+  const bu = $("wBurst");
+  bu.classList.toggle("hidden", !over);
+  bu.style.setProperty("--bu-w", over ? `${end - 100}%` : "0%");
+  const lock = m.lv.lock;
+  $("wBurstTx").textContent = over && lock && lock.at !== null ? `⊘ ${fmtTime(lock.at)}` : "";
+  fitWeekEnd();
+}
+
+// The figures in the dashed box and the red stub only show when they fit inside them
+function fitWeekEnd() {
+  for (const id of ["wGhost", "wBurst"]) {
+    const box = $(id);
+    const tx = box.firstElementChild;
+    tx.classList.remove("hidden");
+    if (!box.classList.contains("hidden") && tx.offsetWidth > box.clientWidth - 4) tx.classList.add("hidden");
+  }
+}
+
 function renderWeek(m) {
   buildDays();
   const level = verdictLevel(m);
   setNum($("wUsed"), `${r0(m.w.used)}%`);
-  $("wUsedWord").textContent = t("week.usedLong");
   paintLevel($("wLevel"), level);
   const wBar = $("wBar");
   // The bar and the chart's projection take the week's level, or the accent on the last day with room (the used line
@@ -87,29 +127,15 @@ function renderWeek(m) {
     wBar.classList.add("lv-room");
   } else setLevelClass(wBar, m.lv.week);
   paintWeekZones(wBar, m);
-  if (m.reserveMode) {
-    // On the reserve the white mark is the plan's ceiling: "▲ 87% plan"
-    setBar(wBar, { fill: m.w.used, tick: clamp100(m.ceiling) });
-    wBar.setAttribute("aria-label", t("week.barAriaReserve", { used: r0(m.w.used), left: r0(reserveLeft(m.w.used, m.g)) }));
-    setBarLabel($("wBl"), pct(m.ceiling), t("week.planWord"));
-  } else {
-    setBar(wBar, { fill: m.w.used, tick: clamp100(m.lv.expected) });
-    wBar.setAttribute("aria-label", t("week.barAria", { used: r0(m.w.used), expected: r0(m.lv.expected) }));
-    // The white mark, labeled as in Session and Today: "▲ 37% expected" (the word goes when the half is narrow)
-    setBarLabel($("wBl"), pct(m.lv.expected), t("week.expectedWord"));
-  }
-
-  // The projection, hatched like the chart's dashed line: from what is used to where the week ends (at most the goal)
-  const projTo = m.lv.proj && !m.reserveMode ? Math.min(clamp100(m.lv.proj.projected), m.g.goal) : null;
-  wBar.style.setProperty("--pj-l", `${clamp100(m.w.used)}%`);
-  wBar.style.setProperty("--pj-w", projTo === null ? "0%" : `${Math.max(projTo - clamp100(m.w.used), 0)}%`);
+  setBar(wBar, { fill: m.w.used, tick: null });
+  wBar.setAttribute("aria-label", m.reserveMode
+    ? t("week.barAriaReserve", { used: r0(m.w.used), left: r0(reserveLeft(m.w.used, m.g)) })
+    : t("week.barAria", { used: r0(m.w.used), expected: r0(m.lv.expected) }));
+  paintWeekEnd(wBar, m);
   renderPaceGauge(m);
 
   renderPaceChart(m);
   const s = chartInput.series;
-  // The room left before the reset, outlined on the bar too: from what is used to the plan's ceiling at the reset
-  wBar.style.setProperty("--rm-l", `${clamp100(m.w.used)}%`);
-  wBar.style.setProperty("--rm-w", s.room ? `${clamp100(s.room.y1) - clamp100(s.room.y0)}%` : "0%");
   // The axis runs from a0 (the reset, or earlier when it is late in the day) to the next reset, in days. The first day's
   // column holds only its part on the axis, and the days leave the stretch after the seventh midnight empty, as the chart does.
   const gridBox = $("days").parentElement;
@@ -269,4 +295,7 @@ function fitGauge() {
   g.classList.add("solo");
   if (over()) g.classList.replace("solo", "mute");
 }
-new ResizeObserver(() => fitGauge()).observe($("wScr"));
+new ResizeObserver(() => {
+  fitGauge();
+  fitWeekEnd();
+}).observe($("wScr"));

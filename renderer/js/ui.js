@@ -55,18 +55,6 @@ function setBar(bar, { fill, over = 0, tick = null }) {
     mark.classList.toggle("hidden", tick === null);
     if (tick !== null) bar.style.setProperty("--tx", `${clamp100(tick)}%`);
   }
-  // The label under the mark keeps its arrow exactly under the mark; the words extend toward the roomier side
-  const label = bar.querySelector(".bl");
-  if (label) label.classList.toggle("rt", tick !== null && tick < 50);
-}
-
-// Writes a label under the white mark: an arrow that sits under the mark, then the words ("14%", or "4% budget limit")
-function setBarLabel(label, text, word) {
-  label.replaceChildren();
-  if (!text) return;
-  const words = node("span", "tx", text);
-  if (word) words.append(node("i", "bwd", word));
-  label.append(node("i", "ar", "▲"), words);
 }
 
 // Bars that can pass their limit (today, the days of the week) use a 125% scale, with the limit at 80% of the bar

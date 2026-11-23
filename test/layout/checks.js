@@ -139,7 +139,7 @@ function checkPage({ format, scrolls: formatScrolls, view = "panel" }) {
 
   // 5. What must always be visible (in the wide and medium formats, without scrolling)
   // (#tLevel and #sLevel are not here: Today and Session show their level only when it is Tight or Pause)
-  const must = firstRun || view !== "panel" ? [] : ["vAns", "vRuler", "tUsed", "sPct", "wUsed", "plot", "days", "hrs", "syncBtn", "lamp"];
+  const must = firstRun || view !== "panel" ? [] : ["vAns", "tUsed", "sPct", "sResets", "wUsed", "plot", "days", "hrs", "syncBtn", "lamp"];
   for (const id of must) {
     const e = document.getElementById(id);
     if (!e) {

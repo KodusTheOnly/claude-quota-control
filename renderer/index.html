@@ -114,7 +114,8 @@
                 <div class="vtxt">
                 <div class="vtop" id="vTop">
                 <p class="ans"><span id="vAns"></span><span class="cur" aria-hidden="true"></span></p>
-                <div class="ruler" id="vRuler" role="img">
+                <!-- The level for screen readers: the answer, the face and its color already show it -->
+                <div class="ruler sr-only" id="vRuler" role="img">
                   <span class="lv-room"><span class="shp"></span><span data-i18n="level.room.name">Room</span></span>
                   <span class="lv-free"><span class="shp"></span><span data-i18n="level.free.name">Free</span></span>
                   <span class="lv-moderate"><span class="shp"></span><span data-i18n="level.moderate.name">Moderate</span></span>
@@ -128,8 +129,10 @@
                 </div>
               </div>
               <div class="wk" id="wScr">
-                <span class="wbig" id="wUsed"></span><span class="mu" id="wUsedWord"></span>
-                <div class="sbar" id="wBar" role="img"><div class="tr"><i class="rz"></i><i class="fill"></i><i class="rf"></i></div><i class="rm"></i><i class="pj"></i><b class="tick"></b><span class="bl" id="wBl"></span></div>
+                <span class="wlab"><span class="tl" data-i18n="card.week">Week</span><span class="wbig" id="wUsed"></span></span>
+                <!-- The week bar: used (solid), what this pace will still use (hatched), what is left over at the reset (dashed box),
+                     and past the limit (red stub out of the bar's end) -->
+                <div class="wbw"><div class="sbar" id="wBar" role="img"><div class="tr"><i class="rz"></i><i class="fill"></i><i class="rf"></i></div><i class="pj"></i><i class="gh hidden" id="wGhost"><b id="wGhostTx"></b></i><i class="bu hidden" id="wBurst"><b id="wBurstTx"></b></i></div></div>
                 <!-- The pace: three named zones, the lit one is where the pace is, the needle where in it -->
                 <span class="pl" id="pLab" data-i18n="pace.label">Pace</span>
                 <div class="gauge" id="pGauge" role="img"><span class="z z0" data-i18n="pace.slow">slow</span><span class="z z1" data-i18n="pace.ok">on pace</span><span class="z z2" data-i18n="pace.fast">fast</span><b class="ndl"></b></div>
@@ -140,19 +143,24 @@
             <div class="now">
               <article class="blk blk--session" id="blkSession" aria-labelledby="tSession">
                 <div class="crt" id="sScr">
-                  <div class="th"><h2 class="tl" id="tSession" data-i18n="mod.sessionShort">Session</h2><span class="lv lv-none" id="sLevel"><span class="shp"></span><span class="lvn"></span></span><span class="mu sub" id="sResets"></span></div>
-                  <div class="meter"><span class="big" id="sPct">–</span><span class="mu" id="sOf"></span>
-                    <div class="sbar t2" id="sBar" role="img"><div class="tr"><i class="fill"></i></div><b class="tick"></b></div>
+                  <div class="th"><h2 class="tl" id="tSession" data-i18n="mod.sessionShort">Session</h2><span class="lv lv-none" id="sLevel"><span class="shp"></span><span class="lvn"></span></span><span class="big" id="sPct">–</span></div>
+                  <!-- Used against time: how much of the session is spent, and how much of its 5 hours has passed -->
+                  <div class="sbars">
+                    <span class="k" data-i18n="session.usedKey">Used</span>
+                    <div class="sbar" id="sBar" role="img"><div class="tr"><i class="fill"></i></div></div>
+                    <span class="k" id="sTimeKey" data-i18n="session.timeKey">Time</span>
+                    <div class="sbar" id="sTime" role="img"><div class="tr"><i class="fill"></i><i class="rest"></i></div></div>
                   </div>
-                  <p class="mu t3" id="sPace"></p>
+                  <!-- Always there, so the tile keeps its size: the reset time, and in the last 50 minutes the warning -->
+                  <p class="strip" id="sResets"><i class="dot" aria-hidden="true"></i><span id="sResetsText"></span></p>
                 </div>
               </article>
               <article class="blk blk--today" id="blkToday" aria-labelledby="tToday">
                 <div class="crt" id="tScr">
-                  <div class="th"><h2 class="tl" id="tToday" data-i18n="card.today">Today</h2><span class="lv lv-none" id="tLevel"><span class="shp"></span><span class="lvn"></span></span><span class="mu sub" id="tLeft"></span></div>
-                  <div class="meter"><span class="big" id="tUsed">–</span><span class="mu" id="tUsedWord" data-i18n="today.usedWord">used</span>
-                    <div class="sbar t2" id="tBar" role="img"><div class="tr"><i class="cf"></i><i class="fill"></i><i class="ov"></i></div><b class="tick"></b></div>
-                  </div>
+                  <div class="th"><h2 class="tl" id="tToday" data-i18n="card.today">Today</h2><span class="lv lv-none" id="tLevel"><span class="shp"></span><span class="lvn"></span></span><span class="tnum"><span class="big" id="tUsed">–</span><span class="mu" id="tUsedWord" data-i18n="today.leftWord">left</span></span></div>
+                  <!-- A tank: full at the start of the day, it empties as the day's budget is used; past the budget it turns red -->
+                  <div class="sbar tank" id="tBar" role="img"><div class="tr"><i class="fill"></i><i class="ov"></i></div></div>
+                  <p class="mu sub" id="tLeft"></p>
                 </div>
               </article>
             </div>
@@ -566,6 +574,7 @@
                 <header class="pl"><h2 class="pn" id="tHelpSession"><b>03</b><span data-i18n="help.g.session">5-hour session</span></h2></header>
                 <dl class="help-list">
                   <div class="ent"><dt data-i18n="help.pace.t"></dt><dd data-i18n="help.pace.d"></dd></div>
+                  <div class="ent"><dt data-i18n="help.sbars.t"></dt><dd data-i18n="help.sbars.d"></dd></div>
                   <div class="ent"><dt data-i18n="help.fills.t"></dt><dd data-i18n="help.fills.d"></dd></div>
                   <div class="ent"><dt data-i18n="help.spike.t"></dt><dd data-i18n="help.spike.d"></dd></div>
                 </dl>
@@ -573,6 +582,7 @@
               <article class="blk" id="helpWeek" aria-labelledby="tHelpWeek">
                 <header class="pl"><h2 class="pn" id="tHelpWeek"><b>04</b><span data-i18n="help.g.week">Week</span></h2></header>
                 <dl class="help-list">
+                  <div class="ent"><dt data-i18n="help.wbar.t"></dt><dd data-i18n="help.wbar.d"></dd></div>
                   <div class="ent"><dt data-i18n="help.forecast.t"></dt><dd data-i18n="help.forecast.d"></dd></div>
                   <div class="ent"><dt data-i18n="help.perday.t"></dt><dd data-i18n="help.perday.d"></dd></div>
                   <div class="ent"><dt data-i18n="help.plan.t"></dt><dd data-i18n="help.plan.d"></dd></div>

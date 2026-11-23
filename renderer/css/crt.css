@@ -25,9 +25,7 @@
 .sbar .tr { position: absolute; inset: 0; -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(5% - 2px), transparent calc(5% - 2px) 5%); mask: repeating-linear-gradient(90deg, #000 0 calc(5% - 2px), transparent calc(5% - 2px) 5%); }
 /* The week bar's zones: the reserve still held (hatched, from the plan's ceiling to the goal) and the part of the
    use that came from the reserve (solid accent). Unset, they are empty. */
-.sbar .fill, .sbar .ov, .sbar .rz, .sbar .rf, .sbar .cf { position: absolute; top: 0; bottom: 0; }
-/* Today's bar: the part of the budget carried over from earlier days (hatched accent), after the plan's own share */
-.sbar .cf { left: var(--cf-l, 0%); width: var(--cf-w, 0%); background: repeating-linear-gradient(135deg, var(--crt-accent) 0 2px, transparent 2px 5px); opacity: .7; }
+.sbar .fill, .sbar .ov, .sbar .rz, .sbar .rf { position: absolute; top: 0; bottom: 0; }
 .sbar .rz { left: var(--rz-l, 100%); width: var(--rz-w, 0%); background: repeating-linear-gradient(135deg, var(--crt-accent) 0 2px, var(--crt-reserve) 2px 6px); }
 .sbar .rf { left: var(--rf-l, 0%); width: var(--rf-w, 0%); background: var(--crt-accent); }
 .sbar .fill { left: 0; width: var(--fill, 0%); background: var(--c); }

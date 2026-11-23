@@ -116,7 +116,7 @@ function publishSummary(m, src) {
         kind: "session",
         label: t("pop.session"),
         text: t("today.used", { pct: r0(f.used) }),
-        caption: f.resetsAt ? t("mod.sessionResets", { dur: fmtDur(f.resetsAt - m.now) }) : t("session.logged", { ago: ago(f.at) }),
+        caption: f.resetsAt ? t("mod.sessionResets", { time: fmtWhen(f.resetsAt, m.now), dur: fmtDur(f.resetsAt - m.now) }) : t("session.logged", { ago: ago(f.at) }),
         level: m.lv.session,
         fill: clamp100(f.used),
         over: 0,

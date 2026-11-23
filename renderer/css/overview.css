@@ -2,7 +2,7 @@
    screw in each corner, so the theme (light or dark panel) reads around the data.
      keys          Type it in, Math (in the header from 1100px up, in the "..." menu below that)
      verdict band  two screens on one row: the verdict and its level on the left, the week's % and bar on the right
-     Now           Session | Today, two slim one-row tiles: the title and its note, then the number and the bar
+     Now           Session | Today: the title and the number, then the bars (session: used and time, with the reset line under them)
      graph         a header row (legend, plan, reset time), the pace chart with its % scale in a gutter on the left, the HRS strip
                    (when in the week the usage happened) and the seven day columns, all on one grid
      extra         a slim strip, only when Extra usage is set up
@@ -12,8 +12,7 @@
      Under 720px     vertical: the same pieces packed tighter. Scrolls only when the window is too short.
 
    Sizes are in rem (see tokens.css), so a bigger window shows more information, not bigger text.
-   Tiles are containers and decide how much to show by their own size: essentials always (no class),
-   secondary info (.t2) and detail (.t3) only when the tile has room. */
+   Tiles are containers and decide how much to show by their own size. */
 
 .dash {
   position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--well-gap); margin: 0; padding: var(--well-pad);
@@ -48,18 +47,44 @@
 .blk--session { container-name: session; }
 .blk--today { container-name: today; }
 .blk--week { container-name: week; flex: 1 1 auto; gap: var(--well-gap); }
-/* The title and its note on the left (the level next to the title, only when it matters), the number and the bar on the right.
-   The session's pace, when there is one, takes a second line under both. */
-.now .crt { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, max-content) minmax(6rem, 1fr); align-items: center; gap: .1rem .9rem; padding: .35rem .65rem; }
-.th { display: grid; grid-template-columns: auto auto; justify-content: start; align-items: center; gap: 0 .5rem; min-width: 0; }
-.th .sub { grid-column: 1 / -1; grid-row: 2; min-width: 0; overflow: hidden; white-space: nowrap; font-size: var(--fs-xs); }
-#sPace { grid-column: 1 / -1; }
+/* The title (the level next to it, only when it matters) and the number under it on the left, the bars on the right.
+   Session: two bars, used and time, and a line along the bottom with the reset (the warning near it). Today: the tank, and a
+   note under it only on a day that is not rated. */
+.now .crt { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, max-content) minmax(6rem, 1fr); align-items: center; gap: .2rem .9rem; padding: .35rem .65rem; }
+.th { display: grid; grid-template-columns: auto auto; justify-content: start; align-items: center; gap: .15rem .5rem; min-width: 0; }
+.th .big, .th .tnum { grid-column: 1 / -1; grid-row: 2; font-size: var(--fs-3xl); }
+.th .tnum { display: flex; align-items: baseline; gap: .4rem; font-size: inherit; }
+.th .tnum .mu { font-size: var(--fs-xs); white-space: nowrap; }
+.now .sub { grid-column: 1 / -1; min-width: 0; overflow: hidden; white-space: nowrap; font-size: var(--fs-xs); }
 .tl { margin: 0; font: 600 var(--fs-xs)/1.2 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--sm); }
-.meter { display: flex; align-items: center; gap: .6rem; min-width: 0; }
-.meter .big { font-size: var(--fs-3xl); }
-.meter .sbar { flex: 1 1 auto; min-width: 3rem; }
-.meter .mu { white-space: nowrap; font-size: var(--fs-xs); }
-@container session (max-width: 24rem) { #sResets { display: none; } }
+.sbars { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .45rem .55rem; min-width: 0; }
+.sbars .k { font: 600 var(--fs-xs)/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--sm); }
+#sTime { --c: color-mix(in srgb, var(--sm) 70%, transparent); }
+#sTime .rest { position: absolute; top: 0; bottom: 0; left: var(--fill, 0%); right: 0; }
+.tank { height: .95rem; }
+/* The reset line: the whole width of the tile, along its bottom edge */
+.now .strip {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: .45rem; min-width: 0; margin: .15rem -.65rem -.35rem; padding: .25rem .65rem;
+  border-top: 1px solid var(--sline); font: 500 var(--fs-xs)/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden;
+  color: var(--sm); font-variant-numeric: tabular-nums;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--crt-accent) 16%, transparent) 50%, transparent) no-repeat -60% 0 / 40% 100%;
+}
+.now .strip b { font-weight: 600; color: var(--st); }
+.now .strip .dot { display: none; flex: none; width: .45rem; height: .45rem; border-radius: 50%; background: var(--crt-accent); }
+/* The last 50 minutes: the line turns into the warning (the accent, a blinking dot, a light sweeping across), and what is left
+   of the time bar pulses. The tile keeps its size. */
+#sScr.soon .strip { border-top: 1px dashed color-mix(in srgb, var(--crt-accent) 60%, transparent); color: var(--crt-accent); font-weight: 600; animation: strip-sweep 2.4s linear infinite; }
+#sScr.soon .strip b { color: var(--crt-accent); }
+#sScr.soon .strip .dot { display: inline-block; animation: blink 1s steps(2) infinite; }
+#sScr.soon #sTime { --c: var(--crt-accent); }
+#sScr.soon #sTime .rest { background: color-mix(in srgb, var(--crt-accent) 45%, transparent); animation: rest-pulse 1.4s ease-in-out infinite; }
+@keyframes strip-sweep { from { background-position: -60% 0; } to { background-position: 160% 0; } }
+@keyframes rest-pulse { 50% { opacity: .15; } }
+@media (prefers-reduced-motion: reduce) { #sScr.soon :is(.strip, .strip .dot, #sTime .rest) { animation: none; } }
+/* A narrow tile: first the bar names go, then the second part of the reset line, then its word */
+@container session (max-width: 22rem) { .sbars { grid-template-columns: minmax(0, 1fr); } .sbars .k { display: none; } }
+@container session (max-width: 20rem) { .now .strip .rs-b { display: none; } }
+@container session (max-width: 13rem) { .now .strip .rs-a { display: none; } }
 /* A narrow tile keeps the level's shape and drops its name, as the ruler does: the name ran into the number ("PAUSE" over "93%" at 420px) */
 @container session (max-width: 26rem) { #sLevel .lvn { display: none; } }
 @container today (max-width: 26rem) { #tLevel .lvn { display: none; } }
@@ -122,6 +147,11 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 .chip.plain .cv { font-weight: 400; color: var(--sm); }
 .chip.plain { flex: 0 1 auto; min-width: 0; white-space: normal; } /* words only ("Too early to tell"): they wrap rather than run out of a narrow verdict */
 .chip.bare .cw { display: none; }
+/* The weekly reset: no box, muted, as a note */
+.chip.quiet { background: none; padding-left: 0; padding-right: 0; }
+.chip.quiet .ci, .chip.quiet .cv { color: var(--sm); }
+.chip.quiet .cv { font-weight: 500; }
+.chip.quiet + .chip.quiet, .chip:not(.quiet) + .chip.quiet { margin-left: .4rem; }
 .band .vl.lit-bare .ruler > span.on > span:not(.shp) { display: none; }
 .band #vLevel { display: none; } /* the ruler already lights the level */
 .band .ruler { flex: none; display: flex; gap: 2px; }
@@ -131,17 +161,23 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 .ruler > span:not(.on) > span:not(.shp) { display: none; }
 .ruler > span.on { background: var(--c); border-color: var(--c); color: var(--scr); }
 .ruler .shp { background: currentColor; }
+.wk .wlab { display: grid; justify-items: end; gap: .15rem; }
 .wk .wbig { flex: none; font: 500 var(--fs-xl)/1 var(--mono); white-space: nowrap; }
-.wk .mu { flex: none; white-space: nowrap; font-size: var(--fs-xs); }
-.wk .sbar { flex: 1 1 auto; min-width: 3rem; }
-/* Two rows: the week's % and bar (its white mark labeled under it, "▲ 37% expected"), then the pace gauge.
-   The projection is hatched on the bar, like the chart's dashed line. */
-.band .wk { container-type: inline-size; container-name: weekbar; display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 1.45rem .6rem; padding-top: .45rem; padding-bottom: .45rem; }
-/* The room left to the plan's ceiling, outlined in the accent (under the projection's hatch) */
-#wBar .rm { position: absolute; top: -1px; bottom: -1px; left: var(--rm-l, 0%); width: var(--rm-w, 0%); box-sizing: border-box; border: 1px solid var(--crt-accent); }
-#wBar .pj { position: absolute; top: 0; bottom: 0; left: var(--pj-l, 0%); width: var(--pj-w, 0%); box-sizing: border-box; background: repeating-linear-gradient(135deg, var(--c) 0 2px, transparent 2px 5px); border-right: 2px solid var(--c); opacity: .8; }
-.band .wk .pl { grid-column: 1 / 3; justify-self: end; font: 600 var(--fs-xs)/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--sm); }
-.gauge { grid-column: 3; position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; height: 1.1rem; }
+/* Two rows: the week's % and bar, then the pace gauge */
+.band .wk { container-type: inline-size; container-name: weekbar; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .9rem .7rem; padding-top: .45rem; padding-bottom: .45rem; }
+.wbw { min-width: 3rem; }
+#wBar { height: 1rem; width: var(--bw, 100%); }
+/* What this pace will still use: hatched like the chart's dashed line, from what is used to where the week ends */
+#wBar .pj { position: absolute; top: 0; bottom: 0; left: var(--pj-l, 0%); width: var(--pj-w, 0%); box-sizing: border-box; background: repeating-linear-gradient(135deg, var(--c) 0 2px, transparent 2px 5px); border-right: 2px solid var(--c); opacity: .85; }
+/* What would be left over at the reset: a dashed box in the accent up to the plan's ceiling, with how much */
+#wBar .gh { position: absolute; top: -4px; bottom: -4px; left: var(--gh-l, 0%); width: var(--gh-w, 0%); box-sizing: border-box; display: grid; place-items: center; border: 1.5px dashed var(--crt-accent); background: color-mix(in srgb, var(--crt-accent) 7%, transparent); }
+/* Past the limit: the bar makes room on its right and the hatch runs out of it in red, with the time the limit comes */
+#wBar .bu { position: absolute; top: -1px; bottom: -1px; left: 100%; width: var(--bu-w, 0%); box-sizing: border-box; display: grid; place-items: center; border: 1px solid var(--pause); border-left: 0; background: repeating-linear-gradient(135deg, var(--pause) 0 2px, transparent 2px 5px); }
+#wBar :is(.gh, .bu) b { font: 600 var(--fs-xs)/1 var(--mono); white-space: nowrap; padding: 0 .15rem; background: var(--scr); }
+#wBar .gh b { color: var(--crt-accent); }
+#wBar .bu b { color: var(--pause); }
+.band .wk .pl { grid-column: 1; justify-self: end; font: 600 var(--fs-xs)/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--sm); }
+.gauge { grid-column: 2; position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; height: 1.1rem; }
 .gauge .z { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; padding: 0 .4rem; overflow: hidden; background: color-mix(in srgb, var(--zc) 16%, transparent); font: 600 var(--fs-xs)/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; color: var(--sm); }
 .gauge .z0 { --zc: var(--free); }
 .gauge.end .z0 { --zc: var(--crt-accent); } /* the last day with room: slow means there is still some to use */
@@ -160,9 +196,6 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 .gauge.solo:has(.z1.on) { grid-template-columns: minmax(0, 1fr) minmax(max-content, 2fr) minmax(0, 1fr); }
 .gauge.solo:has(.z2.on) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(max-content, 2fr); }
 .band .wk .pl.hidden, .gauge.hidden { display: none; }
-.blk--week #wBar .bl { display: block; }
-.blk--week #wBar .bl .bwd { font-style: normal; }
-@container weekbar (max-width: 26rem) { .blk--week #wBar .bl .bwd { display: none; } }
 .wk .lc { display: none; } /* the verdict already says the level */
 
 /* ---- Graph: header row, chart, hours, days ---- */
@@ -282,12 +315,7 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 .xcell .sbar .fill { background: var(--crt-accent); }
 .xcell #xInfo { display: none; }
 
-/* ---- Bars with a label under the white mark (the week) ---- */
-.sbar .bl { display: none; position: absolute; top: calc(100% + .35rem); left: var(--tx, 80%); width: 0; height: 1rem; font: 400 var(--fs-xs)/1 var(--mono); letter-spacing: .04em; white-space: nowrap; color: var(--sm); }
-.sbar .bl .ar { position: absolute; left: 0; top: 0; transform: translateX(-50%); font-style: normal; }
-.sbar .bl .tx { position: absolute; top: 0; right: .9rem; text-align: right; }
-.sbar .bl.rt .tx { right: auto; left: .9rem; text-align: left; }
-/* Under 22rem the word "used" goes and the number stays */
+/* Under 22rem the word "left" goes and the number stays */
 @container today (max-width: 22rem) { #tUsedWord { display: none; } }
 
 /* ---- Tall: fixed summary line ---- */
@@ -312,9 +340,6 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
   /* About 36rem is everything else in the window: the chart takes what is left, between 9 and 17rem */
   .gbody { grid-template-rows: clamp(9rem, 100vh - 36rem, 17rem) auto auto; }
   .osc { min-height: 0; }
-  .wk #wUsedWord { display: none; }
-  .band .wk #wBar { grid-column: 2 / -1; } /* the word "used" is hidden: the bar takes its column too */
-  .band .wk:has(.gauge.hidden) { padding-bottom: 1.6rem; } /* no pace row: room for the bar's label ("▲ 23% expected") under it */
   .ghead { flex-wrap: wrap; gap: .1rem .6rem; padding-left: .6rem; padding-right: .6rem; }
   /* The days as rows. The column tiers further down (@container days) are for the columns: the rows undo them. */
   .dg, .todaybox, .dend { display: none; }
@@ -358,8 +383,10 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
   .dash { --well-pad: .35rem; --well-gap: .3rem; }
   .band .vl { padding-top: .25rem; padding-bottom: .25rem; }
   .band .vface { min-height: 3rem; }
-  .band .wk { row-gap: 1.25rem; padding-top: .3rem; padding-bottom: .3rem; }
-  .now .crt { padding-top: .2rem; padding-bottom: .2rem; }
+  .band .wk { row-gap: .7rem; padding-top: .3rem; padding-bottom: .3rem; }
+  .now .crt { padding-top: .2rem; padding-bottom: .2rem; row-gap: .1rem; }
+  .now .strip { margin-bottom: -.2rem; padding-top: .15rem; padding-bottom: .15rem; }
+  .th .big, .th .tnum { font-size: var(--fs-2xl); }
   .hrs { height: 1.3rem; }
   .day { gap: 0; padding-top: .2rem; padding-bottom: .25rem; }
   .day .pr { min-height: 1.35rem; }
@@ -368,14 +395,8 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 }
 
 /* =================== Tiers =================== */
-/* .t2 is secondary info, .t3 is detail. Thresholds are in rem, so they follow the scale (npm run test:layout checks that
-   nothing is cut off). Session and Today decide by their width. */
-.t2, .t3 { display: none; }
-#sPace { white-space: nowrap; overflow: hidden; min-width: 0; }
-@container today (min-width: 14rem) { .t2 { display: block; } }
-@container session (min-width: 14rem) { .t2 { display: block; } }
-@container session (min-width: 30rem) { .t3 { display: block; } }
-/* The week: the band and the day columns give up their extras as they get narrow. A column needs about 110px for the
+/* Thresholds are in rem, so they follow the scale (npm run test:layout checks that nothing is cut off).
+   The week: the band and the day columns give up their extras as they get narrow. A column needs about 110px for the
    tag and the level word, 100px for the date. The columns measure the row of days (the "days" container), which
    leaves room after the seventh day for the week's last hours, so its width changes with the time of the reset. */
 /* Cut order, widest first: the word "budget", then the tag (and the budget moves under the bar), then the date and the

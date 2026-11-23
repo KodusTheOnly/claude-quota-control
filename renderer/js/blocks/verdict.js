@@ -30,11 +30,19 @@ function verdictFigures(m) {
 
 // The chips of the second line. The first one says the most; fitChips() drops the last ones first when the line is narrow.
 //   on its way to the goal   ◷ goal ~Mon 20:00 · ⊘ locked 12 h · ▼ slow down ~15%
-//   under the plan           ◎ at reset 84–97% · + to spend ~6%
+//   under the plan           nothing: the week bar shows where the week ends and what is left over
 //   on the reserve           ◫ reserve 6% · ◷ lasts ~3h 20m
 //   warming up               "Too early to tell" (words only)
 // Then "! session first ~14:00" when the session runs out before the week, and "◫ reserve 10%" while a reserve is held.
+// The weekly reset always comes last, quiet: "↻ Tue 08:00 · 16h 13m".
 function bandChips(m) {
+  return [...stateChips(m), resetChip(m)];
+}
+function resetChip(m) {
+  const when = `${shortWeekday(new Date(m.w.resetsAt))} ${fmtTime(m.w.resetsAt)}`;
+  return { icon: "↻", value: `${when} · ${fmtDur(m.w.resetsAt - m.now)}`, short: when, title: t("chip.resetTitle", { when }), quiet: true };
+}
+function stateChips(m) {
   if (m.forecast.kind === "out") return [{ icon: "⊘", value: t("forecast.out"), title: t("hero.sub.out"), warn: true }];
   if (m.reserveMode) {
     const rate = weekPaceRecent(m.now);
@@ -53,17 +61,6 @@ function bandChips(m) {
     chips.push({ icon: "⊘", word: t("chip.locked"), value: lockDur(lock.hours), title: t("band.early", { dur: lockDur(lock.hours) }), warn: true });
     // Slowing down by 90% or more means stopping: the chip says so instead of "slow down ~100%"
     if (m.lv.slow !== null) chips.push(m.lv.slow >= 90 ? { icon: "■", value: t("chip.stop"), title: t("band.slow", { pct: m.lv.slow }), warn: true } : { icon: "▼", word: t("chip.slow"), value: `~${m.lv.slow}%`, title: t("band.slow", { pct: m.lv.slow }) });
-    // The likely range still starts under the limit: the week may fit after all
-    const rg = rangeShown(m.lv.proj);
-    if (rg.low < m.g.goal) chips.push({ icon: "◎", word: t("chip.atReset"), value: rg.text, title: t("band.rangeMayFit", { low: rg.low, high: rg.high }) });
-  } else {
-    // Under the plan's ceiling: where the week ends (the likely range, or one number when it has no width), and how
-    // much would be left to spend at this pace
-    const shown = asShownPct(m.lv.proj.projected);
-    const ceil = asShownPct(m.ceiling);
-    const rg = rangeShown(m.lv.proj);
-    chips.push({ icon: "◎", word: t("chip.atReset"), value: rg.text, title: rg.low === rg.high ? `${shown}% ${t("band.atReset")}` : t("band.range", { low: rg.low, high: rg.high, pct: shown }) });
-    if (shown < ceil) chips.push({ icon: "+", word: t("chip.toSpend"), value: `~${ceil - shown}%`, title: t("band.toSpend", { pct: ceil - shown }) });
   }
   // "Session first" only for the session: when the week comes first, the goal chip already says it
   const first = limitsFirst(m);
@@ -81,23 +78,30 @@ function bandChips(m) {
 
 function paintChips(m) {
   $("vChips").replaceChildren(...bandChips(m).map((c) => {
-    const el = node("span", `chip${c.warn ? " warn" : ""}${c.icon ? "" : " plain"}`);
+    const el = node("span", `chip${c.warn ? " warn" : ""}${c.icon ? "" : " plain"}${c.quiet ? " quiet" : ""}`);
     if (c.icon) el.append(node("i", "ci", c.icon));
     if (c.word) el.append(node("span", "cw", c.word));
     el.append(node("b", "cv", c.value));
+    if (c.short) Object.assign(el.dataset, { full: c.value, short: c.short });
     if (c.title) el.title = c.title;
     return el;
   }));
   fitChips();
 }
 
-// The chips that do not fit go, last first; then the first one loses its word (the icon and the value stay)
+// The chips that do not fit go, last first; then the first one loses its word (the icon and the value stay), and a value
+// with a shorter form (the reset without its countdown) takes it
 function fitChips() {
   const box = $("vChips");
   const chips = [...box.children];
-  chips.forEach((c) => c.classList.remove("hidden", "bare"));
-  for (let i = chips.length - 1; i > 0 && box.scrollWidth > box.clientWidth + 1; i--) chips[i].classList.add("hidden");
-  if (chips[0] && box.scrollWidth > box.clientWidth + 1) chips[0].classList.add("bare");
+  const over = () => box.scrollWidth > box.clientWidth + 1;
+  chips.forEach((c) => {
+    c.classList.remove("hidden", "bare");
+    if (c.dataset.full) c.querySelector(".cv").textContent = c.dataset.full;
+  });
+  for (let i = chips.length - 1; i > 0 && over(); i--) chips[i].classList.add("hidden");
+  if (chips[0] && over()) chips[0].classList.add("bare");
+  if (chips[0] && chips[0].dataset.short && over()) chips[0].querySelector(".cv").textContent = chips[0].dataset.short;
 }
 new ResizeObserver(() => fitChips()).observe($("vChips"));
 

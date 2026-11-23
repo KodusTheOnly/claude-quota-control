@@ -104,6 +104,11 @@ const SCENARIOS = {
     s.manual.fiveHour = null;
     return s;
   },
+  // The session resets in 12 minutes: its reset line turns into the warning
+  sessionsoon: (s) => {
+    s.manual.fiveHour = { used: 74, resetsAt: NOW + 12 * 60000, at: NOW - 2 * 60000 };
+    return s;
+  },
   // The reading is over an hour old
   stale: (s) => {
     s.manual.updatedAt = NOW - (1 * HOUR + 12 * 60000);
