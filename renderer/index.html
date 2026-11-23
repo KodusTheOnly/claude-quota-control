@@ -134,14 +134,12 @@
                      left over at the reset (dashed box), past the limit (red stub out of the bar's end), and where the week can go
                      today (the white mark) -->
                 <div class="wbw"><div class="sbar" id="wBar" role="img"><div class="tr"><i class="rz"></i><i class="fill"></i><i class="rf"></i><i class="pd"></i></div><i class="pj"></i><b class="tick hidden"></b><i class="gh hidden" id="wGhost"><b id="wGhostTx"></b></i><i class="bu hidden" id="wBurst"><b id="wBurstTx"></b></i></div></div>
-                <!-- Today: where the week can go today (the white mark on the bar), or why the day is not rated. On its right, the
-                     week's pace: nine LEDs, three per zone (slow, on pace, fast); the lit zone says where the pace is, the white LED
-                     where in it. -->
-                <span class="pl tdl" id="tToday" data-i18n="card.today">Today</span>
+                <!-- Under the bar, two small screens set into the week's: today (where the week can go today, the white mark on
+                     the bar, or why the day is not rated) and the week's pace (nine LEDs, three per zone: slow, on pace, fast; the
+                     lit zone says where the pace is, the white LED where in it) -->
                 <div class="trow">
-                  <p class="tday" id="tLine"><span class="lv lv-none hidden" id="tLevel"><span class="shp"></span><span class="lvn"></span></span><span id="tText"></span></p>
-                  <span class="tpace"><span class="pl plab" id="pLab" data-i18n="pace.label">Pace</span>
-                  <div class="pleds" id="pGauge" role="img"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></span>
+                  <div class="twell"><span class="pl" id="tToday" data-i18n="card.today">Today</span><p class="tday" id="tLine"><span class="lv lv-none hidden" id="tLevel"><span class="shp"></span><span class="lvn"></span></span><span id="tText"></span></p></div>
+                  <div class="twell"><span class="pl" id="pLab" data-i18n="pace.label">Pace</span><div class="pleds" id="pGauge" role="img"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
                 </div>
                 <span class="lc lv-none" id="wLevel"><span class="shp"></span><span class="lvn"></span></span>
               </div>

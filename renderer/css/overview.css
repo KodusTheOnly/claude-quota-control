@@ -181,21 +181,19 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 #wBar .gh b { color: var(--crt-accent); }
 #wBar .bu b { color: var(--pause); }
 .band .wk .pl { grid-column: 1; justify-self: end; font: 600 var(--fs-xs)/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--sm); }
-/* Today's line: where the week can go today and how much of that is left, or why the day is not rated. The pace LEDs sit
-   at its right end. */
-/* Today on the left, as wide as its words; a divider like the screens' inner lines; then the pace, stretched over the rest */
-.trow { grid-column: 2; display: flex; align-items: stretch; min-width: 0; }
-.tday { flex: none; max-width: 100%; padding-right: .8rem; display: flex; align-items: center; gap: .5rem; min-width: 0; margin: 0; overflow: hidden; font: 500 var(--fs-xs)/1.3 var(--mono); color: var(--sm); white-space: nowrap; }
+/* Under the bar, two small screens set into the week's, side by side: today, then the pace. Each has its name on top. */
+.trow { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; min-width: 0; }
+.twell { display: flex; flex-direction: column; justify-content: center; gap: .3rem; min-width: 0; padding: .3rem .5rem .35rem; border: 1px solid var(--crt-border); border-radius: var(--r-sm); background: color-mix(in srgb, var(--sl) 45%, transparent); box-shadow: inset 0 1px 3px var(--well-lo); }
+.band .wk .twell .pl { justify-self: start; }
+.tday { display: flex; align-items: center; gap: .5rem; min-width: 0; margin: 0; overflow: hidden; font: 500 var(--fs-xs)/1.3 var(--mono); color: var(--sm); white-space: nowrap; }
 .tday #tText { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tday b { font-weight: 600; color: var(--st); }
 .tday.over b { color: var(--pause); }
 .tday .lv { flex: none; }
 .tday .lv .lvn { display: none; }
-.tpace { flex: 1 1 auto; min-width: 8rem; display: flex; align-items: center; gap: .6rem; padding-left: .8rem; border-left: 1px solid var(--sline); }
-.band .wk .plab { flex: none; }
 /* The pace LEDs: three per zone (slow, on pace, fast). The zone the pace is in lights up, the white LED is where in it.
    With no pace yet (the first days, the reserve) they all stay dark. */
-.pleds { flex: 1 1 auto; min-width: 5.5rem; display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 2px; }
+.pleds { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 2px; }
 .pleds i { height: .75rem; --zc: var(--free); background: color-mix(in srgb, var(--zc) 18%, transparent); transition: background-color .3s; }
 .pleds.end i:nth-child(-n + 3) { --zc: var(--crt-accent); } /* the last day with room: slow means there is still some to use */
 .pleds i:nth-child(n + 4) { --zc: var(--moderate); }
@@ -203,14 +201,8 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 .pleds i.on { background: var(--zc); }
 .pleds i.at { background: var(--st); box-shadow: 0 0 .3rem color-mix(in srgb, var(--st) 50%, transparent); }
 html[data-screens="paper"]:not([data-theme="dark"]) .pleds i.at { box-shadow: none; }
-/* A narrow week: the pace goes under today's words, the divider turns into a line above it; then the word "Pace" goes
-   (the LEDs keep their tooltip) */
-@container weekbar (max-width: 34rem) {
-  .trow { flex-wrap: wrap; }
-  .tday { padding-right: 0; }
-  .tpace { flex-basis: 100%; margin-top: .35rem; padding: .35rem 0 0; border-left: 0; border-top: 1px solid var(--sline); }
-}
-@container weekbar (max-width: 26rem) { .band .wk .plab { display: none; } }
+/* A narrow week: the two small screens stack */
+@container weekbar (max-width: 30rem) { .trow { grid-template-columns: minmax(0, 1fr); } }
 .wk .lc { display: none; } /* the verdict already says the level */
 
 /* ---- Graph: header row, chart, hours, days ---- */
