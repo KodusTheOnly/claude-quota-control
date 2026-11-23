@@ -133,7 +133,8 @@ function renderWeek(m) {
     wBar.classList.add("lv-room");
   } else setLevelClass(wBar, m.lv.week);
   paintWeekZones(wBar, m);
-  setBar(wBar, { fill: m.w.used, tick: null });
+  setBar(wBar, { fill: m.w.used });
+  paintTodayMark(wBar, m);
   wBar.setAttribute("aria-label", m.reserveMode
     ? t("week.barAriaReserve", { used: r0(m.w.used), left: r0(reserveLeft(m.w.used, m.g)) })
     : t("week.barAria", { used: r0(m.w.used), expected: r0(m.lv.expected) }));
@@ -257,8 +258,9 @@ function renderWeek(m) {
   }
 }
 
-// The pace: what the week is doing per day against what still fits, in three named zones. Slow under 85% of what fits,
-// on pace up to 110%, fast above. The lit zone says where the pace is, the needle where in that zone; the numbers are in the title.
+// The pace: what the week is doing per day against what still fits, in three zones. Slow under 85% of what fits, on pace
+// up to 110%, fast above. Nine LEDs at the end of today's line, three per zone: the lit zone says where the pace is, the white LED where
+// in that zone; the words and the numbers are in the tooltip.
 const PACE_ZONES = ["pace.slow", "pace.ok", "pace.fast"];
 // The zone the pace is in (0 slow, 1 on pace, 2 fast), or null when there is no pace to show. The verdict's face takes
 // its energy from it.
@@ -272,36 +274,25 @@ function paceZone(m) {
 function renderPaceGauge(m) {
   const g = $("pGauge");
   const zone = paceZone(m);
-  const show = zone !== null;
-  g.classList.toggle("hidden", !show);
+  const leds = [...g.children];
   g.classList.toggle("end", Boolean(m.endRoom));
-  $("pLab").classList.toggle("hidden", !show);
-  if (!show) return;
+  if (zone === null) {
+    leds.forEach((l) => l.classList.remove("on", "at"));
+    setTip(g, "pace", t("pace.none"));
+    g.setAttribute("aria-label", `${t("pace.label")}: ${t("pace.none")}`);
+    return;
+  }
   const need = m.lv.need;
   const doing = m.lv.doing;
   const r = doing / need;
   const f = zone === 0 ? r / 0.85 : zone === 1 ? (r - 0.85) / 0.25 : Math.min((r - 1.1) / 0.9, 1);
-  const zones = [...g.querySelectorAll(".z")];
-  zones.forEach((z, i) => z.classList.toggle("on", i === zone));
-  zones[zone].append(g.querySelector(".ndl")); // the needle sits inside its zone, so the zones can be of any width
-  g.style.setProperty("--nx", `${Math.min(Math.max(f * 100, 4), 96)}%`);
+  const at = zone * 3 + Math.min(Math.max(Math.floor(f * 3), 0), 2);
+  leds.forEach((l, i) => {
+    l.classList.toggle("on", Math.floor(i / 3) === zone);
+    l.classList.toggle("at", i === at);
+  });
   const paceNow = t("pace.title", { doing: r0(doing), need: r0(need) });
   setTip(g, "pace", `${t(PACE_ZONES[zone])} · ${paceNow}`);
   g.setAttribute("aria-label", `${t("pace.label")}: ${t(PACE_ZONES[zone])}. ${paceNow}`);
-  fitGauge();
 }
-
-// The zone names give way when the week half is narrow: all three, then only the lit one (its zone grows to hold it), then none
-function fitGauge() {
-  const g = $("pGauge");
-  if (g.classList.contains("hidden")) return;
-  const over = () => g.scrollWidth > g.clientWidth + 1 || [...g.querySelectorAll(".z")].some((z) => z.scrollWidth > z.clientWidth + 1);
-  g.classList.remove("solo", "mute");
-  if (!over()) return;
-  g.classList.add("solo");
-  if (over()) g.classList.replace("solo", "mute");
-}
-new ResizeObserver(() => {
-  fitGauge();
-  fitWeekEnd();
-}).observe($("wScr"));
+new ResizeObserver(() => fitWeekEnd()).observe($("wScr"));

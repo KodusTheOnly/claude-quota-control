@@ -3,6 +3,8 @@
 // session runs out before it resets. Under them, the reset time; in its last minutes that line turns into a warning.
 
 const SESSION_SOON = 50 * MIN; // how long before the reset the warning shows
+const SESSION_NEAR = 30 * MIN; // the warning turns yellow
+const SESSION_LAST = 10 * MIN; // the warning turns red
 
 function renderSession(m) {
   const f = m.five;
@@ -32,6 +34,8 @@ function renderSession(m) {
 
   const soon = timed && left <= SESSION_SOON;
   $("sScr").classList.toggle("soon", soon);
+  $("sScr").classList.toggle("s30", soon && left <= SESSION_NEAR && left > SESSION_LAST);
+  $("sScr").classList.toggle("s10", soon && left <= SESSION_LAST);
   // "Resets 17:51 · in 2h 04m", or near the reset "Resets in 12 min · 15:59". The words and the second part give way in a
   // narrow tile (overview.css), the time or the countdown stays.
   const box = $("sResetsText");

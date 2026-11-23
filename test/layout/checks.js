@@ -129,7 +129,7 @@ function checkPage({ format, scrolls: formatScrolls, view = "panel" }) {
     const rb = b.getBoundingClientRect();
     return Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left) > 1.5 && Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top) > 1.5;
   };
-  // The blocks are compared with the blocks beside them (Session and Today sit inside the Week block, next to each other)
+  // The blocks are compared with the blocks beside them (the verdict, Session and the week sit side by side in the band)
   const blocks = [...document.querySelectorAll("#dash .blk")].filter(visible);
   const byParent = [...new Set(blocks.map((e) => e.parentElement))].map((p) => blocks.filter((e) => e.parentElement === p));
   const groups = [...byParent,...[".hd", ".keys", ".sync"].map((q) => [...document.querySelector(q).children].filter(visible)), ...[...document.querySelectorAll("#dash .crt, #dash .days, #dash .osc")].map((e) => [...e.children].filter((c) => visible(c) && getComputedStyle(c).position !== "absolute"))];
@@ -138,8 +138,8 @@ function checkPage({ format, scrolls: formatScrolls, view = "panel" }) {
   }
 
   // 5. What must always be visible (in the wide and medium formats, without scrolling)
-  // (#tLevel and #sLevel are not here: Today and Session show their level only when it is Tight or Pause)
-  const must = firstRun || view !== "panel" ? [] : ["vAns", "tUsed", "sPct", "sResets", "wUsed", "plot", "days", "hrs", "syncBtn", "lamp"];
+  // (#tLevel and #sLevel are not here: today's line and Session show their level only when it is Tight or Pause)
+  const must = firstRun || view !== "panel" ? [] : ["vAns", "tLine", "sPct", "sResets", "wUsed", "plot", "days", "hrs", "syncBtn", "lamp"];
   for (const id of must) {
     const e = document.getElementById(id);
     if (!e) {

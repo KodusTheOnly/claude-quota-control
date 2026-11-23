@@ -121,6 +121,13 @@ function drawPaceChart() {
   const nx = X(s.nowX);
   if (nx < W - R) add("rect", { x: nx, y: T, width: W - R - nx, height: H - T - B, fill: PAL.shade, opacity: ".6" });
 
+  // Where the week can go today (today.js): a dashed line across today's column, the white mark of the week bar
+  const limit = todayLimit(m);
+  const tx0 = X(Math.max(s.todayIdx, s.s0));
+  const tx1 = X(Math.min(s.todayIdx + 1, s.span));
+  const limitLine = limit !== null && tx1 - tx0 > 2 ? [{ x: tx0, y: Y(limit) }, { x: tx1, y: Y(limit) }] : null;
+  if (limitLine) add("line", { x1: tx0, x2: tx1, y1: Y(limit), y2: Y(limit), stroke: PAL.white, opacity: ".7", "stroke-width": 1.25, "stroke-dasharray": "4 3", class: "tdlim" });
+
   // The past weeks (the "4 wk" key, past-weeks.js), faint and dashed under every line of this week
   const past = pastInChart() ? pastData : [];
   for (const w of past) add("polyline", { points: fmt(w.pts), fill: "none", stroke: w.fullDay ? PAL.red : PAL.muted, opacity: w.fullDay ? ".8" : ".75", "stroke-width": 1.5, "stroke-dasharray": "5 3" });
@@ -256,6 +263,7 @@ function drawPaceChart() {
     ...(spend ? [{ pts: [{ x: spend.x, y: spend.y0 }, { x: spend.x, y: spend.y1 }], w: 14 }] : []),
     ...past.map((w) => ({ pts: px(w.pts), w: 6 })),
     { pts: [{ x: L, y: lockY }, { x: W - R, y: lockY }], w: 4 },
+    ...(limitLine ? [{ pts: limitLine, w: 4 }] : []),
     { pts: [{ x: nx, y: T }, { x: nx, y: H - B }], w: 4 },
     ...s.starts.map((st) => ({ pts: [{ x: X(st.x), y: H - B - TICK }, { x: X(st.x), y: H - B }], w: 4 })),
     ...(startX !== null ? [{ pts: [{ x: startX, y: T }, { x: startX, y: H - B }], w: 4 }] : []),

@@ -1,8 +1,9 @@
 /* Overview: one panel with the screens set into it. A narrow gutter of panel shows around and between them, with a
    screw in each corner, so the theme (light or dark panel) reads around the data.
      keys          Type it in, Math (in the header from 1100px up, in the "..." menu below that)
-     verdict band  two screens on one row: the verdict and its level on the left, the week's % and bar on the right
-     Now           Session | Today: the title and the number, then the bars (session: used and time, with the reset line under them)
+     band          the verdict on the left (the face, the answer and the chips), and on the right the week (its % and bar with
+                   today's mark, then a line on today with the pace LEDs at its end) over the session (used and time, with the
+                   reset line under them). Under 720px the three stack.
      graph         a header row (legend, plan, reset time), the pace chart with its % scale in a gutter on the left, the HRS strip
                    (when in the week the usage happened) and the seven day columns, all on one grid
      extra         a slim strip, only when Extra usage is set up
@@ -32,7 +33,7 @@
 .dash .band::after { display: none; }
 .dash .band > :is(.vl, .wk) { position: relative; overflow: hidden; background: var(--scr) repeating-linear-gradient(0deg, var(--crt-scan) 0 1px, transparent 1px 3px); border: 1px solid var(--crt-border); border-radius: var(--r-sm); box-shadow: inset 0 1px 3px var(--well-lo), 0 1px 0 var(--well-hi); }
 /* Old data: the numbers and levels fade (see --stale-fade in tokens.css). Labels keep their color, so the small text stays readable. */
-:is(.is-stale, .is-offline) :is(.big, .mid-num, .chip, .gauge, .wbig, .day .nu, .lv, .lc, .ruler, .ans, .vface, .sbar, .plot, .hrs, #sumLeft, #sumProj) {
+:is(.is-stale, .is-offline) :is(.big, .mid-num, .chip, .pleds, .wbig, .day .nu, .lv, .lc, .ruler, .ans, .vface, .sbar, .plot, .hrs, #sumLeft, #sumProj) {
   filter: saturate(var(--stale-sat)); opacity: var(--stale-fade);
 }
 
@@ -41,21 +42,15 @@
 .sync .pl-keys.hidden { display: none; }
 .mb { min-height: 2rem; padding: .1rem .6rem; font-size: var(--fs-xs); background: var(--win); }
 
-/* ---- Now: Session | Today ---- */
-.now { flex: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--well-gap); }
+/* ---- Session ---- */
 .blk { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; container-type: inline-size; }
 .blk--session { container-name: session; }
-.blk--today { container-name: today; }
 .blk--week { container-name: week; flex: 1 1 auto; gap: var(--well-gap); }
-/* The title (the level next to it, only when it matters) and the number under it on the left, the bars on the right.
-   Session: two bars, used and time, and a line along the bottom with the reset (the warning near it). Today: the tank, and a
-   note under it only on a day that is not rated. */
-.now .crt { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, max-content) minmax(6rem, 1fr); align-items: center; gap: .2rem .9rem; padding: .35rem .65rem; }
+/* The title (the level next to it, only when it matters) and the number under it on the left, the bars on the right:
+   used and time, and a line along the bottom with the reset (the warning near it). */
+.blk--session .crt { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, max-content) minmax(6rem, 1fr); align-items: center; gap: .2rem .9rem; padding: .35rem .65rem; }
 .th { display: grid; grid-template-columns: auto auto; justify-content: start; align-items: center; gap: .15rem .5rem; min-width: 0; }
-.th .big, .th .tnum { grid-column: 1 / -1; grid-row: 2; font-size: var(--fs-3xl); }
-.th .tnum { display: flex; align-items: baseline; gap: .4rem; font-size: inherit; }
-.th .tnum .mu { font-size: var(--fs-xs); white-space: nowrap; }
-.now .sub { grid-column: 1 / -1; min-width: 0; overflow: hidden; white-space: nowrap; font-size: var(--fs-xs); }
+.th .big { grid-column: 1 / -1; grid-row: 2; font-size: var(--fs-3xl); }
 .tl { margin: 0; font: 600 var(--fs-xs)/1.2 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--sm); }
 .sbars { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .45rem .55rem; min-width: 0; }
 .sbars .k { font: 600 var(--fs-xs)/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--sm); }
@@ -63,43 +58,49 @@
 /* The time bar has 5 segments, one per hour of the session (the used bar keeps 20) */
 #sTime .tr { -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(20% - 2px), transparent calc(20% - 2px) 20%); mask: repeating-linear-gradient(90deg, #000 0 calc(20% - 2px), transparent calc(20% - 2px) 20%); }
 #sTime .rest { position: absolute; top: 0; bottom: 0; left: var(--fill, 0%); right: 0; }
-.tank { height: .95rem; }
 /* The reset line: the whole width of the tile, along its bottom edge */
-.now .strip {
+.blk--session .strip {
   grid-column: 1 / -1; display: flex; align-items: center; gap: .45rem; min-width: 0; margin: .15rem -.65rem -.35rem; padding: .25rem .65rem;
   border-top: 1px solid var(--sline); font: 500 var(--fs-xs)/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden;
   color: var(--sm); font-variant-numeric: tabular-nums;
   background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--crt-accent) 16%, transparent) 50%, transparent) no-repeat -60% 0 / 40% 100%;
 }
-.now .strip b { font-weight: 600; color: var(--st); }
-.now .strip .dot { display: none; flex: none; width: .45rem; height: .45rem; border-radius: 50%; background: var(--crt-accent); }
+.blk--session .strip b { font-weight: 600; color: var(--st); }
+.blk--session .strip .dot { display: none; flex: none; width: .45rem; height: .45rem; border-radius: 50%; background: var(--crt-accent); }
 /* The last 50 minutes: the line turns into the warning (the accent, a blinking dot, a light sweeping across), and what is left
-   of the time bar pulses. The tile keeps its size. */
-#sScr.soon .strip { border-top: 1px dashed color-mix(in srgb, var(--crt-accent) 60%, transparent); color: var(--crt-accent); font-weight: 600; animation: strip-sweep 2.4s linear infinite; }
-#sScr.soon .strip b { color: var(--crt-accent); }
-#sScr.soon .strip .dot { display: inline-block; animation: blink 1s steps(2) infinite; }
-#sScr.soon #sTime { --c: var(--crt-accent); }
-#sScr.soon #sTime .rest { background: color-mix(in srgb, var(--crt-accent) 45%, transparent); animation: rest-pulse 1.4s ease-in-out infinite; }
+   of the time bar pulses. The tile keeps its size. From 30 minutes the warning turns yellow, from 10 red. */
+#sScr.soon { --soon-c: var(--crt-accent); }
+#sScr.soon.s30 { --soon-c: var(--moderate); }
+#sScr.soon.s10 { --soon-c: var(--pause); }
+#sScr.soon .strip {
+  border-top: 1px dashed color-mix(in srgb, var(--soon-c) 60%, transparent); color: var(--soon-c); font-weight: 600; animation: strip-sweep 2.4s linear infinite;
+  background-image: linear-gradient(90deg, transparent, color-mix(in srgb, var(--soon-c) 16%, transparent) 50%, transparent);
+}
+#sScr.soon .strip b { color: var(--soon-c); }
+#sScr.soon .strip .dot { display: inline-block; background: var(--soon-c); animation: blink 1s steps(2) infinite; }
+#sScr.soon #sTime { --c: var(--soon-c); }
+#sScr.soon #sTime .rest { background: color-mix(in srgb, var(--soon-c) 45%, transparent); animation: rest-pulse 1.4s ease-in-out infinite; }
 @keyframes strip-sweep { from { background-position: -60% 0; } to { background-position: 160% 0; } }
 @keyframes rest-pulse { 50% { opacity: .15; } }
 @media (prefers-reduced-motion: reduce) { #sScr.soon :is(.strip, .strip .dot, #sTime .rest) { animation: none; } }
 /* A narrow tile: first the bar names go, then the second part of the reset line, then its word */
 @container session (max-width: 22rem) { .sbars { grid-template-columns: minmax(0, 1fr); } .sbars .k { display: none; } }
-@container session (max-width: 20rem) { .now .strip .rs-b { display: none; } }
-@container session (max-width: 13rem) { .now .strip .rs-a { display: none; } }
+@container session (max-width: 20rem) { .blk--session .strip .rs-b { display: none; } }
+@container session (max-width: 13rem) { .blk--session .strip .rs-a { display: none; } }
 /* A narrow tile keeps the level's shape and drops its name, as the ruler does: the name ran into the number ("PAUSE" over "93%" at 420px) */
 @container session (max-width: 26rem) { #sLevel .lvn { display: none; } }
-@container today (max-width: 26rem) { #tLevel .lvn { display: none; } }
 
-/* ---- Verdict band: verdict | week ---- */
-.band { flex: none; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: stretch; padding: 0; }
+/* ---- Band: the verdict on the left, the week over the session on the right ---- */
+.band { flex: none; display: grid; grid-template-columns: minmax(13rem, .8fr) minmax(0, 2.2fr); grid-template-rows: auto auto; align-items: stretch; padding: 0; }
+.band .vl { grid-column: 1; grid-row: 1 / 3; }
+.band .wk, .band .blk--session { grid-column: 2; }
 .band .vl, .band .wk { display: flex; align-items: center; gap: .2rem .9rem; min-width: 0; padding: .4rem .8rem; }
 .band .wk { gap: .5rem; }
-/* The face's screen on the left, then two lines: the answer and the level, then the chips. fitBand() and fitChips() in
+/* A column: the face's screen, then the answer, then the chips. fitBand() and fitChips() in
    verdict.js make each line give way on its own. */
-.band .vl { align-items: stretch; gap: .8rem; container-type: inline-size; container-name: vband; }
-.band .vtxt { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: .3rem; min-width: 0; container-type: inline-size; container-name: verdict; }
-.band .vtop { display: flex; align-items: center; justify-content: space-between; gap: .2rem .9rem; min-width: 0; }
+.band .vl { flex-direction: column; justify-content: center; gap: .6rem; padding-top: .6rem; padding-bottom: .6rem; container-type: inline-size; container-name: vband; }
+.band .vtxt { flex: none; align-self: stretch; display: flex; flex-direction: column; align-items: center; gap: .35rem; min-width: 0; container-type: inline-size; container-name: verdict; }
+.band .vtop { display: flex; align-items: center; justify-content: center; gap: .2rem .9rem; min-width: 0; max-width: 100%; }
 .band .vtop.wrap { flex-wrap: wrap; }
 /* Snug (fitBand, before wrapping): less room between the pieces and no blinking cursor */
 .band .vtop.snug { column-gap: .4rem; }
@@ -112,14 +113,12 @@
 /* The face: second only to the chart, so it has a small screen of its own, in the level's color (muted while the app reads,
    fails or sleeps) with a phosphor glow (paper does not glow). verdict.js swaps the frames, plays the effects below and turns
    the head toward the pointer (translate). A long face gets a smaller size there. It shrinks with a narrow verdict. */
-.band .vface { position: relative; flex: none; display: grid; place-items: center; width: 8.5rem; min-height: 3.6rem; padding: 0 .4rem; overflow: hidden; border-radius: var(--r-sm); --fcol: var(--c, var(--sm)); border: 1px solid color-mix(in srgb, var(--fcol) 40%, transparent); background: color-mix(in srgb, var(--fcol) 7%, transparent); transition: border-color .3s, background-color .3s; }
+.band .vface { position: relative; flex: none; display: grid; place-items: center; width: 10rem; max-width: 100%; min-height: 4.6rem; padding: 0 .4rem; overflow: hidden; border-radius: var(--r-sm); --fcol: var(--c, var(--sm)); border: 1px solid color-mix(in srgb, var(--fcol) 40%, transparent); background: color-mix(in srgb, var(--fcol) 7%, transparent); transition: border-color .3s, background-color .3s; }
 .band .vface.muted { --fcol: var(--sm); }
 .band .fc { display: block; font: 500 var(--fs-5xl)/1 var(--mono); color: var(--fcol); white-space: pre; transition: translate .25s ease-out, color .3s, opacity .3s; text-shadow: 0 0 .16em color-mix(in srgb, var(--fcol) 75%, transparent), 0 0 .6em color-mix(in srgb, var(--fcol) 40%, transparent); }
 html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: none; }
 .band .vface.dim .fc { opacity: .6; }
-@container vband (max-width: 36rem) { .band .vface { width: 6.5rem; } .band .fc { font-size: var(--fs-4xl); } }
-@container vband (max-width: 26rem) { .band .vl { gap: .5rem; } .band .vface { width: 5rem; min-height: 3rem; } .band .fc { font-size: var(--fs-2xl); } }
-@container vband (max-width: 20rem) { .band .vl { gap: .4rem; } .band .vface { width: 3.2rem; padding: 0 .2rem; } .band .fc { font-size: var(--fs-lg); } }
+@container vband (max-width: 14rem) { .band .vface { width: 8.5rem; } .band .fc { font-size: var(--fs-4xl); } }
 .band .fc.hop { animation: face-hop .45s ease-out; }
 .band .fc.shake { animation: face-shake .45s linear; }
 .band .fc.squash { animation: face-squash .35s ease-out; }
@@ -139,7 +138,7 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
   .band .fc { transition: none; }
 }
 /* The chips: an icon, a word or two (muted) and the value. A warning chip (locked) takes the Pause color. */
-.chips { display: flex; align-items: center; gap: .4rem; min-width: 0; overflow: hidden; }
+.chips { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .3rem .4rem; max-width: 100%; min-width: 0; overflow: hidden; }
 .chip { flex: none; display: inline-flex; align-items: baseline; gap: .35rem; padding: .15rem .45rem; border: 1px solid transparent; background: color-mix(in srgb, var(--st) 8%, transparent); font: 400 var(--fs-xs)/1.3 var(--mono); color: var(--sm); white-space: nowrap; }
 .chip .ci { font-style: normal; color: var(--st); }
 .chip .cv { font: 600 var(--fs-sm)/1.2 var(--mono); color: var(--st); }
@@ -165,10 +164,13 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 .ruler .shp { background: currentColor; }
 .wk .wlab { display: grid; justify-items: end; gap: .15rem; }
 .wk .wbig { flex: none; font: 500 var(--fs-xl)/1 var(--mono); white-space: nowrap; }
-/* Two rows: the week's % and bar, then the pace gauge */
-.band .wk { container-type: inline-size; container-name: weekbar; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .9rem .7rem; padding-top: .45rem; padding-bottom: .45rem; }
+/* Two rows: the week's % and bar, then today's line */
+.band .wk { container-type: inline-size; container-name: weekbar; display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: center; align-items: center; gap: .6rem .7rem; padding-top: .45rem; padding-bottom: .45rem; }
 .wbw { min-width: 3rem; }
 #wBar { height: 1rem; width: var(--bw, 100%); }
+/* Today's mark: the use before today is dimmer than today's, and a white mark stands where the week can go today */
+#wBar .pd { position: absolute; top: 0; bottom: 0; left: 0; width: var(--pd, 0%); background: color-mix(in srgb, var(--scr) 45%, transparent); }
+#wBar .tick { top: -.3rem; bottom: -.3rem; width: 3px; margin-left: -1.5px; z-index: 3; box-shadow: 0 0 0 1px var(--scr); }
 /* What this pace will still use: hatched like the chart's dashed line, from what is used to where the week ends */
 #wBar .pj { position: absolute; top: 0; bottom: 0; left: var(--pj-l, 0%); width: var(--pj-w, 0%); box-sizing: border-box; background: repeating-linear-gradient(135deg, var(--c) 0 2px, transparent 2px 5px); border-right: 2px solid var(--c); opacity: .85; }
 /* What would be left over at the reset: a dashed box in the accent up to the plan's ceiling, with how much */
@@ -179,25 +181,36 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 #wBar .gh b { color: var(--crt-accent); }
 #wBar .bu b { color: var(--pause); }
 .band .wk .pl { grid-column: 1; justify-self: end; font: 600 var(--fs-xs)/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--sm); }
-.gauge { grid-column: 2; position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; height: 1.1rem; }
-.gauge .z { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; padding: 0 .4rem; overflow: hidden; background: color-mix(in srgb, var(--zc) 16%, transparent); font: 600 var(--fs-xs)/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; color: var(--sm); }
-.gauge .z0 { --zc: var(--free); }
-.gauge.end .z0 { --zc: var(--crt-accent); } /* the last day with room: slow means there is still some to use */
-.gauge .z1 { --zc: var(--moderate); }
-.gauge .z2 { --zc: var(--tight); }
-.gauge .z.on { background: var(--zc); color: var(--scr); }
-/* The needle: two notches that straddle the top and the bottom edge, so the zone's name stays clear between them
-   (inside the edges they ran into the letters) */
-.gauge .ndl { position: absolute; z-index: 2; top: -1px; bottom: -2px; left: var(--nx, 50%); width: 6px; margin-left: -3px; pointer-events: none; }
-.gauge .ndl::before, .gauge .ndl::after { content: ""; position: absolute; left: 0; right: 0; height: 3px; background: var(--st); box-shadow: 0 0 0 1px var(--scr); }
-.gauge .ndl::before { top: 0; }
-.gauge .ndl::after { bottom: 0; }
-/* fitGauge(): the three names, then only the lit one (its zone grows to hold it), then none (the colors and the needle) */
-.gauge.solo .z:not(.on), .gauge.mute .z { padding: 0; font-size: 0; }
-.gauge.solo:has(.z0.on) { grid-template-columns: minmax(max-content, 2fr) minmax(0, 1fr) minmax(0, 1fr); }
-.gauge.solo:has(.z1.on) { grid-template-columns: minmax(0, 1fr) minmax(max-content, 2fr) minmax(0, 1fr); }
-.gauge.solo:has(.z2.on) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(max-content, 2fr); }
-.band .wk .pl.hidden, .gauge.hidden { display: none; }
+/* Today's line: where the week can go today and how much of that is left, or why the day is not rated. The pace LEDs sit
+   at its right end. */
+/* Today on the left, as wide as its words; a divider like the screens' inner lines; then the pace, stretched over the rest */
+.trow { grid-column: 2; display: flex; align-items: stretch; min-width: 0; }
+.tday { flex: none; max-width: 100%; padding-right: .8rem; display: flex; align-items: center; gap: .5rem; min-width: 0; margin: 0; overflow: hidden; font: 500 var(--fs-xs)/1.3 var(--mono); color: var(--sm); white-space: nowrap; }
+.tday #tText { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tday b { font-weight: 600; color: var(--st); }
+.tday.over b { color: var(--pause); }
+.tday .lv { flex: none; }
+.tday .lv .lvn { display: none; }
+.tpace { flex: 1 1 auto; min-width: 8rem; display: flex; align-items: center; gap: .6rem; padding-left: .8rem; border-left: 1px solid var(--sline); }
+.band .wk .plab { flex: none; }
+/* The pace LEDs: three per zone (slow, on pace, fast). The zone the pace is in lights up, the white LED is where in it.
+   With no pace yet (the first days, the reserve) they all stay dark. */
+.pleds { flex: 1 1 auto; min-width: 5.5rem; display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 2px; }
+.pleds i { height: .75rem; --zc: var(--free); background: color-mix(in srgb, var(--zc) 18%, transparent); transition: background-color .3s; }
+.pleds.end i:nth-child(-n + 3) { --zc: var(--crt-accent); } /* the last day with room: slow means there is still some to use */
+.pleds i:nth-child(n + 4) { --zc: var(--moderate); }
+.pleds i:nth-child(n + 7) { --zc: var(--tight); }
+.pleds i.on { background: var(--zc); }
+.pleds i.at { background: var(--st); box-shadow: 0 0 .3rem color-mix(in srgb, var(--st) 50%, transparent); }
+html[data-screens="paper"]:not([data-theme="dark"]) .pleds i.at { box-shadow: none; }
+/* A narrow week: the pace goes under today's words, the divider turns into a line above it; then the word "Pace" goes
+   (the LEDs keep their tooltip) */
+@container weekbar (max-width: 34rem) {
+  .trow { flex-wrap: wrap; }
+  .tday { padding-right: 0; }
+  .tpace { flex-basis: 100%; margin-top: .35rem; padding: .35rem 0 0; border-left: 0; border-top: 1px solid var(--sline); }
+}
+@container weekbar (max-width: 26rem) { .band .wk .plab { display: none; } }
 .wk .lc { display: none; } /* the verdict already says the level */
 
 /* ---- Graph: header row, chart, hours, days ---- */
@@ -317,9 +330,6 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 .xcell .sbar .fill { background: var(--crt-accent); }
 .xcell #xInfo { display: none; }
 
-/* Under 22rem the word "left" goes and the number stays */
-@container today (max-width: 22rem) { #tUsedWord { display: none; } }
-
 /* ---- Tall: fixed summary line ---- */
 .sum {
   display: none; position: sticky; top: 0; z-index: 5; align-items: center; gap: .8rem; padding: .45rem .8rem; flex: none;
@@ -328,7 +338,7 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 
 /* =================== Layouts =================== */
 
-/* Vertical: under 720px. The band stacks (the verdict on one row, the week with its bar and pace gauge on the next), the
+/* Vertical: under 720px. The band stacks (the verdict as a row, the week with its bar and today, then the session), the
    chart keeps between 9 and 17rem (it does not stretch to the window's height), and the seven days are rows under the
    hours instead of columns: name and date, the % with its shape and tag, the state, the budget bar, where the week
    should stand. The chart names the days on its own axis (pace-chart.js), since the rows no longer sit under them.
@@ -338,6 +348,14 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
   #view-panel, .dash { flex: 1 0 auto; }
   .dash { --gut: 2.4rem; --well-pad: .3rem; --well-gap: .3rem; }
   .band { grid-template-columns: minmax(0, 1fr); }
+  .band :is(.vl, .wk, .blk--session) { grid-column: 1; grid-row: auto; }
+  /* The verdict is a row again: the face's screen on the left, the answer and the chips next to it */
+  .band .vl { flex-direction: row; justify-content: flex-start; gap: .7rem; padding-top: .4rem; padding-bottom: .4rem; }
+  .band .vface { width: 7rem; }
+  .band .vface { min-height: 3rem; }
+  .band .fc { font-size: var(--fs-2xl); }
+  .band .vtxt { flex: 1 1 auto; align-items: flex-start; }
+  .band .vtop, .chips { justify-content: flex-start; }
   .graph, .gbody { flex: none; }
   /* About 36rem is everything else in the window: the chart takes what is left, between 9 and 17rem */
   .gbody { grid-template-rows: clamp(9rem, 100vh - 36rem, 17rem) auto auto; }
@@ -385,10 +403,11 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
   .dash { --well-pad: .35rem; --well-gap: .3rem; }
   .band .vl { padding-top: .25rem; padding-bottom: .25rem; }
   .band .vface { min-height: 3rem; }
-  .band .wk { row-gap: .7rem; padding-top: .3rem; padding-bottom: .3rem; }
-  .now .crt { padding-top: .2rem; padding-bottom: .2rem; row-gap: .1rem; }
-  .now .strip { margin-bottom: -.2rem; padding-top: .15rem; padding-bottom: .15rem; }
-  .th .big, .th .tnum { font-size: var(--fs-2xl); }
+  .band .vl { gap: .35rem; padding-top: .3rem; padding-bottom: .3rem; }
+  .band .wk { row-gap: .4rem; padding-top: .3rem; padding-bottom: .3rem; }
+  .blk--session .crt { padding-top: .2rem; padding-bottom: .2rem; row-gap: .1rem; }
+  .blk--session .strip { margin-bottom: -.2rem; padding-top: .15rem; padding-bottom: .15rem; }
+  .th .big { font-size: var(--fs-2xl); }
   .hrs { height: 1.3rem; }
   .day { gap: 0; padding-top: .2rem; padding-bottom: .25rem; }
   .day .pr { min-height: 1.35rem; }
