@@ -54,6 +54,13 @@
 .tl { margin: 0; font: 600 var(--fs-xs)/1.2 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--sm); }
 .sbars { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .45rem .55rem; min-width: 0; }
 .sbars .k { font: 600 var(--fs-xs)/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--sm); }
+/* The used bar is a gauge: fixed color zones by position (the session cuts, set from SESSION_CUTS in session.js),
+   cut off at the % used. The level stays in its label. */
+#sBar .fill {
+  width: 100%; clip-path: inset(0 calc(100% - var(--fill, 0%)) 0 0);
+  background: linear-gradient(90deg, var(--free) 0 var(--z1, 50%), var(--moderate) 0 var(--z2, 75%), var(--tight) 0 var(--z3, 90%), var(--pause) 0);
+}
+@media (prefers-reduced-motion: no-preference) { #sBar .fill { transition: clip-path .22s ease-out; } }
 #sTime { --c: color-mix(in srgb, var(--sm) 70%, transparent); }
 /* The time bar has 5 segments, one per hour of the session (the used bar keeps 20) */
 #sTime .tr { -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(20% - 2px), transparent calc(20% - 2px) 20%); mask: repeating-linear-gradient(90deg, #000 0 calc(20% - 2px), transparent calc(20% - 2px) 20%); }

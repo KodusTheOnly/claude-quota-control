@@ -15,8 +15,9 @@ function renderSession(m) {
   paintLevel($("sLevel"), level);
   $("sLevel").classList.toggle("hidden", !(level >= 2));
 
+  // The used bar is a gauge: its color zones are the session cuts (overview.css), not the level
   const bar = $("sBar");
-  setLevelClass(bar, level);
+  SESSION_CUTS.forEach((cut, i) => bar.style.setProperty(`--z${i + 1}`, `${cut}%`));
   setBar(bar, { fill: f ? f.used : 0, tick: null });
   bar.setAttribute("aria-label", f ? t("mod.aria.session", { used: r0(f.used) }) : t("session.noReading"));
   for (const el of [bar, $("sPct")]) setTip(el, "sused", f ? `${r0(f.used)}%` : "");
