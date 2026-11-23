@@ -14,23 +14,32 @@ function compute(src) {
     ds = { day: today, at: Math.max(lastReset, startOfDay(now)), used: 0 };
     f = null;
     rolled = lastReset;
+  } else if (w.resetsAt - now > WEEK) {
+    // A reset more than a week away cannot be this week's: it is the same weekly cycle, some weeks ahead
+    w = { ...w, resetsAt: nextReset(w.resetsAt, now) };
   }
 
   const days = mergedDays();
   const entry = !rolled && days[today];
   const g = goalSettings();
   // Where the week stood when today began. Without a reading yet today, the budget starts from what is left now.
-  const usedStart = ds && ds.day === today ? ds.used : w.used;
+  const dsToday = Boolean(ds && ds.day === today);
+  let usedStart = dsToday ? ds.used : w.used;
+  const spent = dsToday ? (entry ? entry.spent : Math.max(w.used - ds.used, 0)) : 0;
+  // The week went down without a reset (Claude gave part of it back): today's use counts from the lower number,
+  // as if the give-back came first. saveManual keeps dayStart that way; this covers a record saved before it did.
+  if (dsToday && w.used + 0.5 < usedStart) usedStart = Math.max(w.used - spent, 0);
   // The budget uses the current weights, goal and reserve; spend comes from the day record
   const budget = planBudget(usedStart, w.resetsAt, now, g);
-  const spent = ds && ds.day === today ? (entry ? entry.spent : Math.max(w.used - ds.used, 0)) : 0;
   const leftAtDayStart = 100 - usedStart;
   // Above the plan's ceiling the use comes from the emergency reserve: the reserve mode, until the goal
   const ceiling = planCeiling(now, w.resetsAt, g);
   const reserveMode = g.reserve > 0 && asShownPct(w.used) > asShownPct(ceiling) && asShownPct(w.used) < g.goal;
   // An Off day has no budget, so no ratio: it is not rated, whatever was used. Nor is a day on the reserve:
   // its plan is spent, so it shows what came from the reserve instead.
-  const dayOff = isDayOff(now);
+  // Nor are the hours after a reset that falls past the end of the active hours (dayIdle): no plan time today
+  const idle = dayIdle(now, w.resetsAt);
+  const dayOff = isDayOff(now) || idle;
   const todayRatio = dayOff || reserveMode ? 0 : budget > 0 ? spent / budget : spent > 0 ? 2 : 0;
   const perDay = perNormalDay(100 - w.used, w.resetsAt, now);
 
@@ -40,8 +49,14 @@ function compute(src) {
     if (valid) five = f;
   }
   const pace = sessionPace(five, now);
-  const forecast = forecastWeek(w, now);
-  const m = { now, today, g, usedStart, ceiling, reserveMode, budget, spent, dayOff, todayRatio, leftAtDayStart, w, perDay, five, pace, days, rolled, forecast };
+  // What the past weeks taught (learn.js) and where this week ends with it
+  const learn = learnProfile(days, w.resetsAt);
+  const drops = rolled ? [] : weekDrops((state.settings && state.settings.readings) || [], w.resetsAt - WEEK, now);
+  // What Claude gave back this week: it still counts toward the pace, since it was used
+  const given = drops.reduce((s, d) => s + d.from - d.to, 0);
+  const proj = learnedProjection(w.used, w.resetsAt, now, weights(), learn, given);
+  const forecast = forecastWeek(w, now, proj);
+  const m = { now, today, g, usedStart, ceiling, reserveMode, budget, spent, dayOff, idle, todayRatio, leftAtDayStart, w, perDay, five, pace, days, rolled, forecast, learn, proj, drops, given };
   m.lv = computeLevels(m);
   m.head = headroom(m);
   // The last day with room to spend: the risk is leaving it unused, not running out, so the week takes the accent
@@ -53,15 +68,28 @@ function compute(src) {
   return m;
 }
 
-// Forecast from the average pace per weighted day since the last weekly reset
-function forecastWeek(w, now) {
+// Forecast from the projection p (learnedProjection in learn.js). With no past week to learn from it waits for
+// 1% used, since a pace of nothing says nothing; with past weeks the usual pace answers from the start.
+// Where the week's use went down without a reset (Claude gave part of the week back), from the readings log
+// (core.js): [{ at, from, to }], at being the reading that first showed the lower number. A drop under one point is noise.
+function weekDrops(readings, weekStart, now) {
+  const out = [];
+  let last = null;
+  const list = (readings || []).filter((r) => r && Number.isFinite(r.at) && Number.isFinite(r.w) && r.at >= weekStart && r.at <= now);
+  for (const r of list.sort((a, b) => a.at - b.at)) {
+    if (last && r.w < last.w - 0.5) out.push({ at: r.at, from: last.w, to: r.w });
+    last = r;
+  }
+  return out;
+}
+
+function forecastWeek(w, now, p) {
   if (w.used >= 100) return { kind: "out" };
-  const p = projectWeek(w.used, w.resetsAt, now);
-  if (!p) return { kind: "early" };
+  if (!p || (!p.weeks && w.used < 1)) return { kind: "early" };
   // Judged on the projection as shown (whole percent), the same number the levels rate
   if (asShownPct(p.projected) <= 100) return { kind: "fits", spare: Math.max(100 - p.projected, 0), perDay: p.rate };
   // The walk can run past the reset when the last day is short; fall back to the reset itself
-  return { kind: "short", eta: p.eta || w.resetsAt, perDay: p.rate };
+  return { kind: "short", eta: paceReaches(100, w.used, p.rate, now, w.resetsAt, p.w) || w.resetsAt, perDay: p.rate };
 }
 
 // Status level
@@ -74,27 +102,35 @@ function warnAt() {
   return Number(state.settings && state.settings.fiveHourThreshold) || 75;
 }
 
-// Where the week ends at the pace so far. Unlike projectWeek this still answers when almost
-// nothing was used, and it stays null only while the week is too young to project.
-function projection(w, now) {
-  const elapsed = weightedDays(w.resetsAt - WEEK, now);
-  if (elapsed < MIN_WEIGHTED_DAYS) return null;
-  const rate = w.used / elapsed; // % per weighted day
-  return { elapsed, left: weightedDays(now, w.resetsAt), rate, projected: w.used + rate * weightedDays(now, w.resetsAt) };
-}
-
 // Hours from now to the week's reset
 const hoursToReset = (m) => (m.w.resetsAt - m.now) / HOUR;
 
+// The plan's expected line, ms -> % of the week. After a give-back it starts again from where the week fell to and
+// walks to the goal at the reset with the plan's own shape, so "expected" keeps meaning "on plan from here".
+// Without a give-back it is expectedUsed (core.js).
+function expectedLine(m, w = weights()) {
+  let f = (ms) => expectedUsed(m.w.resetsAt, ms, w, m.g);
+  for (const d of [...(m.drops || [])].sort((x, y) => x.at - y.at)) {
+    const prev = f;
+    const e0 = prev(d.at);
+    const room = m.g.goal - e0;
+    if (!(room > 0.5)) continue; // at the very end of the plan there is nothing left to start again
+    const scale = (m.g.goal - d.to) / room;
+    f = (ms) => (ms < d.at ? prev(ms) : d.to + (prev(ms) - e0) * scale);
+  }
+  return f;
+}
+
 // One level per module, from the cutoffs in core.js, plus the numbers behind them
 function computeLevels(m) {
-  const expected = expectedUsed(m.w.resetsAt, m.now, weights(), m.g);
+  const expected = expectedLine(m)(m.now);
   const weekRatio = expected > 0 ? m.w.used / expected : null;
-  const proj = projection(m.w, m.now);
+  // Where the week ends (m.proj, from compute): null only while the week is too young and there is no past week
+  const proj = m.proj;
   // As shown: the projection appears as a whole percent
   const projRatio = proj ? asShownPct(proj.projected) / 100 : null;
   // The same pace as the projection and the dashed line: when it reaches LOCK_AT and how long before the reset
-  const lock = proj ? weekLockout(m.w.used, proj.rate, m.now, m.w.resetsAt, weights(), m.g.goal) : null;
+  const lock = proj ? weekLockout(m.w.used, proj.rate, m.now, m.w.resetsAt, proj.w, m.g.goal) : null;
   const lockLevel = lock ? levelFromLockout(lock.hours) : null;
   const lv = {
     session: m.five ? levelFromSession(m.five.used) : null,
@@ -200,7 +236,8 @@ function mathRows(m) {
   const total = weightedDays(m.w.resetsAt - WEEK, m.w.resetsAt);
   rows.week = [
     ["math.used", pct(m.w.used)],
-    ["math.expected", `${pct(L.expected)} (${fmtNum(elapsed)} / ${fmtNum(total)})`],
+    // After a give-back the line starts again from the drop, so the share of plan days no longer explains it
+    ["math.expected", m.drops && m.drops.length ? pct(L.expected) : `${pct(L.expected)} (${fmtNum(elapsed)} / ${fmtNum(total)})`],
     ["math.usedOverExpected", f2(L.weekRatio)],
     // The reserve and the plan's ceiling now (100% minus the reserve still held)
     ...(m.g.reserve
@@ -223,18 +260,29 @@ function mathRows(m) {
     ...(weekAtPause(m.w.used, hoursToReset(m)) ? [["math.weekPause", t("math.weekPauseValue", { pct: `${WEEK_PAUSE_AT}%` })]] : []),
     ["math.level", lvName(L.week)],
   ];
+  // Past today's budget: what the days ahead give up for it, split by their weights (see weekPlan)
+  const overBy = m.reserveMode ? 0 : m.w.used - (m.usedStart + m.budget);
   rows.today = [
     ["math.spentToday", pct(m.spent)],
     ["math.budgetToday", pct(m.budget)],
+    ...(asShownPct(overBy) >= 1 ? [["math.overToday", t("math.overTodayValue", { pct: pct(overBy) })]] : []),
     ["math.usedOverBudget", f2(m.budget > 0 ? m.todayRatio : null)],
     ["math.cutoffsRatio", t("math.cutoffsRatioValue")],
     ["math.level", lvName(L.today)],
   ];
   rows.projection = L.proj
     ? [
-        ["math.pace", t("math.paceValue", { rate: fmtNum(L.proj.rate) })],
+        // With past weeks: this week's pace, the usual one, and the mix of the two the projection walks at
+        ...(L.proj.weeks
+          ? [
+              ["math.paceOwn", L.proj.own === null ? "–" : t("math.paceValue", { rate: fmtNum(L.proj.own) })],
+              ["math.paceUsual", t("math.paceUsualValue", { rate: fmtNum(L.proj.usual), n: L.proj.weeks })],
+            ]
+          : []),
+        [L.proj.weeks ? "math.paceMixed" : "math.pace", t("math.paceValue", { rate: fmtNum(L.proj.rate) })],
         ["math.daysLeft", fmtNum(L.proj.left)],
         ["math.projected", pct(L.proj.projected)],
+        ["math.range", rangeShown(L.proj).text],
         ...lockRows,
         ["math.cutoffsProjection", t("math.cutoffsProjectionValue", lockCutoffs())],
         ["math.level", lvName(L.projection)],
@@ -246,12 +294,20 @@ function mathRows(m) {
 // The seven days of the plan, starting on the weekday of the weekly reset.
 // Past days use what was recorded; today uses the live budget; days ahead split what was
 // left at the start of today in proportion to their weights (the same rule as dayBudget).
+// Once today goes past its budget the days ahead pay for it: they split what is really left now among
+// themselves (what tomorrow's budget will be if nothing more is used today). planned keeps the morning's
+// number, so the screen can say how much today took from each day (planned - budget).
 function weekPlan(m, w = weights()) {
   const first = startOfDay(m.w.resetsAt - WEEK);
   const todayIdx = Math.round((startOfDay(m.now) - first) / DAY);
   const f = new Date(first);
   const from = Math.max(startOfDay(m.now), m.w.resetsAt - WEEK);
   const totalW = weightedDays(from, m.w.resetsAt, w);
+  // Today's budget with these weights (m.budget, unless the plan menu is trying another plan)
+  const overToday = m.w.used > m.usedStart + planBudget(m.usedStart, m.w.resetsAt, m.now, m.g, w) + 1e-9;
+  const now = new Date(m.now);
+  const tomorrow = Math.min(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime(), m.w.resetsAt);
+  const totalAhead = weightedDays(tomorrow, m.w.resetsAt, w);
   const out = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(f.getFullYear(), f.getMonth(), f.getDate() + i);
@@ -261,6 +317,7 @@ function weekPlan(m, w = weights()) {
     const isToday = i === todayIdx;
     let when = i < todayIdx ? "past" : isToday ? "today" : "future";
     let budget = null;
+    let planned = null;
     let spent = null;
     if (when === "today") {
       budget = m.budget;
@@ -277,21 +334,27 @@ function weekPlan(m, w = weights()) {
       const share = dayShare(ms, m.w.resetsAt, w);
       const planLeft = Math.max(m.g.goal - m.g.reserve - m.usedStart, 0);
       const end = Math.min(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime(), m.w.resetsAt);
-      budget = share > 0
-        ? (planLeft * share) / Math.max(totalW, share) + reserveReleased(reserveLeft(m.usedStart, m.g), Math.max(ms, from), end, from, m.w.resetsAt, m.g)
+      planned = share > 0
+        ? (planLeft * share) / Math.max(totalW, share) + reserveReleased(reserveLeft(m.usedStart, m.g), Math.max(ms, from), end, from, m.w.resetsAt, m.g, w)
         : 0;
+      budget = planned;
+      if (overToday && share > 0) {
+        const leftNow = Math.max(m.g.goal - m.g.reserve - m.w.used, 0);
+        const live = (leftNow * share) / Math.max(totalAhead, share) + reserveReleased(reserveLeft(m.w.used, m.g), Math.max(ms, tomorrow), end, tomorrow, m.w.resetsAt, m.g, w);
+        budget = Math.min(planned, live);
+      }
     }
     const known = spent !== null && budget !== null;
     const ratio = known ? (budget > 0 ? spent / budget : spent > 0 ? 2 : 0) : null;
     // A day off with nothing spent reads as off, whatever came before. Today off is always off, even
     // with use: it has no budget to rate it against (it shows what was used instead, see week.js)
-    const off = wt === 0 && (isToday || !(spent > 0));
+    const off = (wt === 0 && (isToday || !(spent > 0))) || (isToday && Boolean(m.idle));
     const kind = off ? "off" : when;
     // Today on the reserve is not rated either: its plan is spent (see compute)
     const rated = (off && isToday) || (isToday && m.reserveMode) ? null : ratio;
     out.push({
-      i, ms, dow, weight: wt, name: WEIGHT_NAME[wt] || "normal", kind, when, isToday,
-      budget, spent, ratio: rated,
+      i, ms, dow, weight: wt, name: WEIGHT_NAME[wt] || "normal", kind, when, isToday, idle: isToday && Boolean(m.idle),
+      budget, planned, spent, ratio: rated,
       level: kind === "past" || kind === "today" ? levelFromRatio(rated) : null,
       fill: rated === null ? 0 : Math.min(rated / 1.5, 1) * 100,
     });
@@ -344,6 +407,7 @@ function limitsFirst(m) {
 //   over      the parts of the used line that went past the day's budget (that spend is "borrowed" from other days)
 //   proj      where the pace so far leads: until the reset, or until T when the level counts hours locked out (it reaches 100%)
 //   lock      from T to the reset along the 100% line, the time without Claude (null when there is none)
+//   band      the likely range at the reset, a fan from now (null when there is none)
 //   end       what the projection says at its end: { kind: "reset", pct }, { kind: "lock", ms } (T) or { kind: "limit", ms }
 //   room      what is still free before the reset: a box from now to the reset, from what is used to the plan's
 //             ceiling at the reset ({ x0, x1, y0, y1 }), null when nothing is left or on the reserve. With a projection that
@@ -364,13 +428,19 @@ function paceSeries(m, cells = null, starts = []) {
   const span = toX(m.w.resetsAt);
   const nowX = Math.min(toX(m.now), span);
 
-  // A point wherever the slope changes: every midnight and, with active hours, every edge of the window
+  // A point wherever the slope changes: every midnight and, with active hours, every edge of the window.
+  // A give-back drops the line straight down where it happened (expectedLine).
+  const expAt = expectedLine(m, w);
   const expected = [{ x: s0, y: 0 }];
   const bends = new Set();
   for (const p of weightPieces(weekStart, m.w.resetsAt, w)) bends.add(p.from).add(p.to);
   for (let k = 1; k <= 8; k++) bends.add(midnight(k));
   for (const ms of [...bends].sort((a, b) => a - b)) {
-    if (ms > weekStart && ms < m.w.resetsAt) expected.push({ x: toX(ms), y: expectedUsed(m.w.resetsAt, ms, w, m.g) });
+    if (ms > weekStart && ms < m.w.resetsAt) expected.push({ x: toX(ms), y: expAt(ms) });
+  }
+  for (const d of m.drops || []) {
+    if (d.at <= weekStart || d.at >= m.w.resetsAt) continue;
+    expected.push({ x: toX(d.at), y: expAt(d.at - 1) }, { x: toX(d.at), y: expAt(d.at) });
   }
   // The hours outside the active window (none without one), inside the week: [{ x0, x1 }]
   const rest = [];
@@ -385,15 +455,23 @@ function paceSeries(m, cells = null, starts = []) {
     }
   }
   // The released reserve bends the line in its last hours: a point where the release starts
-  const relStart = m.g.reserve && m.g.release ? m.w.resetsAt - m.g.release * HOUR : null;
+  const rw = reserveWindow(m.w.resetsAt, m.g, w);
+  const relStart = rw ? rw.from : null;
   if (relStart !== null && relStart > weekStart) {
-    expected.push({ x: toX(relStart), y: expectedUsed(m.w.resetsAt, relStart, w, m.g) });
-    expected.sort((a, b) => a.x - b.x);
+    expected.push({ x: toX(relStart), y: expAt(relStart) });
   }
+  expected.sort((a, b) => a.x - b.x); // stable: the two points of a drop keep their order
   expected.push({ x: span, y: m.g.goal });
-  // The reserve, between the plan's ceiling and the goal: its lower edge rises while it is released
+  // The reserve, between the plan's ceiling and the goal: its lower edge rises while it is released, following the
+  // plan (a point wherever the slope changes)
+  const relBends = relStart === null ? [] : [...bends].filter((ms) => ms > relStart && ms < m.w.resetsAt).sort((x, y) => x - y);
   const reserve = m.g.reserve
-    ? [{ x: s0, y: m.g.goal - m.g.reserve }, ...(relStart !== null && relStart > weekStart ? [{ x: toX(relStart), y: m.g.goal - m.g.reserve }] : []), { x: span, y: planCeiling(m.w.resetsAt, m.w.resetsAt, m.g) }]
+    ? [
+        { x: s0, y: m.g.goal - m.g.reserve },
+        ...(relStart !== null && relStart > weekStart ? [{ x: toX(relStart), y: m.g.goal - m.g.reserve }] : []),
+        ...relBends.map((ms) => ({ x: toX(ms), y: planCeiling(ms, m.w.resetsAt, m.g, w) })),
+        { x: span, y: planCeiling(m.w.resetsAt, m.w.resetsAt, m.g, w) },
+      ]
     : null;
 
   // Past days, from what was recorded. A day without a record keeps the line flat.
@@ -415,11 +493,44 @@ function paceSeries(m, cells = null, starts = []) {
     const steps = cells ? hourlySteps({ cells, from: fromMs, to: toMs, y0, y1 }) : null;
     return steps && steps.map((p) => (p.est ? { x: toX(p.ms), y: p.y, est: true } : { x: toX(p.ms), y: p.y }));
   };
+  // A stretch with drops in it (m.drops): it rises to the number before each drop, falls straight down to the one
+  // after, and goes on from there to y1. Returns its points after the first, and pre: the line up to the first drop
+  // (the part that can go over the day's budget; after a give-back the day is judged from the lower number).
+  const dropsIn = (fromMs, toMs) => (m.drops || []).filter((d) => d.at > fromMs && d.at <= toMs);
+  const withDrops = (fromMs, toMs, x0, y0, y1, ds) => {
+    const pts = [];
+    let y = y0;
+    let a = fromMs;
+    let pre = null;
+    const piece = (b, ya, yb) => {
+      const st = stepsFor(a, b, ya, yb);
+      return st ? st.slice(1) : [{ x: toX(b), y: yb }];
+    };
+    for (const d of ds) {
+      const top = Math.max(y, d.from);
+      pts.push(...piece(d.at, y, top));
+      if (!pre) pre = [{ x: x0, y: y0 }, ...pts];
+      y = Math.min(d.to, top);
+      a = d.at;
+      pts.push({ x: toX(a), y });
+    }
+    pts.push(...piece(toMs, y, Math.max(y, y1)));
+    return { pts, pre };
+  };
   let end = 0;
   for (let i = 0; i < Math.min(todayIdx, 7); i++) {
     const rec = m.days[dayKey(midnight(i))];
     const x0 = Math.max(i, s0);
     const y0 = end;
+    const ds = rec && typeof rec.endUsed === "number" ? dropsIn(Math.max(midnight(i), weekStart), midnight(i + 1)) : [];
+    if (ds.length) {
+      end = Math.max(rec.endUsed, 0);
+      const d = withDrops(Math.max(midnight(i), weekStart), midnight(i + 1), x0, y0, end, ds);
+      d.pts[d.pts.length - 1].x = i + 1;
+      used.push(...d.pts);
+      addOver(x0, i + 1, y0, rec.spent, rec.budget, d.pre);
+      continue;
+    }
     if (rec) end = typeof rec.endUsed === "number" ? Math.max(rec.endUsed, end) : end + rec.spent;
     const steps = stepsFor(Math.max(midnight(i), weekStart), midnight(i + 1), y0, end);
     if (steps) used.push(...steps.slice(1));
@@ -431,15 +542,21 @@ function paceSeries(m, cells = null, starts = []) {
   if (todayIdx >= 0 && nowX >= s0) {
     if (startToday > end || used.length === 1) used.push({ x: Math.max(todayIdx, s0), y: Math.max(startToday, end) });
     const y0 = Math.max(startToday, end);
-    const steps = stepsFor(Math.max(midnight(todayIdx), weekStart), m.now, y0, m.w.used);
-    if (steps) {
+    const todayFrom = Math.max(midnight(todayIdx), weekStart);
+    const ds = dropsIn(todayFrom, m.now);
+    const dropped = ds.length ? withDrops(todayFrom, m.now, Math.max(todayIdx, s0), y0, m.w.used, ds) : null;
+    const steps = dropped ? null : stepsFor(todayFrom, m.now, y0, m.w.used);
+    if (dropped) {
+      dropped.pts[dropped.pts.length - 1].x = nowX;
+      used.push(...dropped.pts);
+    } else if (steps) {
       steps[steps.length - 1].x = nowX; // the line ends at the NOW marker, exactly
       used.push(...steps.slice(1));
     } else {
       used.push({ x: nowX, y: m.w.used });
     }
     // An Off day has no budget, so nothing it uses is "over" it
-    if (!m.dayOff && !m.reserveMode) addOver(Math.max(todayIdx, s0), nowX, y0, m.spent, m.budget, steps);
+    if (!m.dayOff && !m.reserveMode) addOver(Math.max(todayIdx, s0), nowX, y0, m.spent, m.budget, dropped ? dropped.pre : steps);
   }
 
   // Where the pace so far leads: walk forward piece by piece (weightPieces), since the slope changes at every
@@ -456,7 +573,8 @@ function paceSeries(m, cells = null, starts = []) {
     proj = [{ x: nowX, y: m.w.used }];
     let y = m.w.used;
     const xOf = (ms) => (ms >= m.w.resetsAt ? span : toX(ms));
-    const pieces = m.now < m.w.resetsAt ? weightPieces(m.now, m.w.resetsAt, w) : [];
+    // The projection walks on its own weights (the plan's, pulled toward the past weeks: learn.js)
+    const pieces = m.now < m.w.resetsAt ? weightPieces(m.now, m.w.resetsAt, m.lv.proj.w) : [];
     // Lockout at or before the first piece starts (it sits at its start, or now)
     if (lockAt !== null && (!pieces.length || lockAt <= pieces[0].from)) {
       if (lockAt > m.now) proj.push({ x: toX(lockAt), y: m.g.goal });
@@ -497,7 +615,14 @@ function paceSeries(m, cells = null, starts = []) {
     const spend = mid !== null ? asShownPct(m.ceiling) - asShownPct(m.lv.proj.projected) : 0;
     room = { x0: nowX, x1: span, y0: m.w.used, y1: top, mid, spend: Math.max(spend, 0) };
   }
-  return { a0: toX(chartAxisStart(weekStart)), s0, span, nowX, todayIdx, rest, expected, used, over, proj, lock, reserve, room, goal: m.g.goal, end: endLabel, usedNow: m.w.used, starts: startsOut };
+  // The likely range at the reset, as a fan from now: { x0, x1, y0, low, high } (null with no projection or no width)
+  let band = null;
+  if (m.lv.proj && m.w.used < 100 && nowX < span) {
+    const low = Math.min(m.lv.proj.low, 100);
+    const high = Math.min(m.lv.proj.high, 100);
+    if (high - low >= 1) band = { x0: nowX, x1: span, y0: m.w.used, low, high };
+  }
+  return { a0: toX(chartAxisStart(weekStart)), s0, span, nowX, todayIdx, rest, expected, used, over, proj, lock, band, reserve, room, goal: m.g.goal, end: endLabel, usedNow: m.w.used, starts: startsOut };
 }
 
 // Saving a reading (typed in or read from Claude)
@@ -528,9 +653,12 @@ async function saveManual({ weekly, session, sessionReset, sessionResetAt, ancho
   const entry = (sameWeek && days[today]) || {};
   days[today] = {
     spent: round2((entry.spent || 0) + delta),
-    budget: round2(planBudget(dayStart.used, resetsAt, now, goalSettings())),
     endUsed: weekly,
   };
+  // The week went down without a reset (Claude gave part of it back): the day's start moves down by as much, so
+  // what today used counts from the lower number. Normally weekly - spent is exactly where the day started.
+  if (sameWeek && dayStart.used > weekly - days[today].spent + 0.5) dayStart = { ...dayStart, used: Math.max(round2(weekly - days[today].spent), 0) };
+  days[today].budget = round2(planBudget(dayStart.used, resetsAt, now, goalSettings()));
   const cutoff = dayKey(now - 120 * DAY);
   for (const k of Object.keys(days)) if (k < cutoff) delete days[k];
 
@@ -566,6 +694,9 @@ async function saveManual({ weekly, session, sessionReset, sessionResetAt, ancho
 // The reset day belongs to the new week, so a week's points are its first seven days. A first day that only has a
 // reading from before its reset still holds the week before's number: when it is higher than the next day's, it is dropped.
 // A week with no day recorded is left out. end is where the week finished, fullDay the day it reached 100% (or null).
+// gross is what the week really used, give-backs included, and gpts its line on the same axis (it can pass 100%):
+// a day adds the rise of its end, or its own use when that is more (a day Claude gave part of the week back ends
+// lower, but what it used still counts). A day at 100% only adds its rise, since nothing more can be used there.
 function pastWeeks(days, resetsAt, n = 4) {
   const out = [];
   for (let k = 1; k <= n; k++) {
@@ -576,19 +707,27 @@ function pastWeeks(days, resetsAt, n = 4) {
     for (let i = 0; i < 7; i++) {
       const ms = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + i).getTime();
       const rec = days && days[dayKey(ms)];
-      if (rec && typeof rec.endUsed === "number") raw.push({ i, ms, y: Math.min(Math.max(rec.endUsed, 0), 100) });
+      if (rec && typeof rec.endUsed === "number") raw.push({ i, ms, y: Math.min(Math.max(rec.endUsed, 0), 100), spent: Number.isFinite(rec.spent) ? rec.spent : 0 });
     }
     if (raw.length > 1 && raw[0].i === 0 && raw[0].y > raw[1].y) raw.shift();
     if (!raw.length) continue;
     const pts = [{ x: (start - first) / DAY, y: 0 }];
+    const gpts = [{ ...pts[0] }];
     let end = 0;
     let fullDay = null;
-    for (const r of raw) {
+    let gross = 0;
+    let prev = 0;
+    for (const [j, r] of raw.entries()) {
       end = Math.max(end, r.y);
       pts.push({ x: r.i + 1, y: end });
       if (fullDay === null && end >= 100) fullDay = r.ms;
+      // The first day's own use can hold hours from before the reset: it only adds its rise from 0
+      const rise = r.y - prev;
+      gross += j === 0 || r.y >= 100 ? Math.max(rise, 0) : Math.max(rise, r.spent, 0);
+      prev = r.y;
+      gpts.push({ x: r.i + 1, y: gross });
     }
-    out.push({ start, end, fullDay, pts });
+    out.push({ start, end, fullDay, pts, gross, gpts });
   }
   return out;
 }

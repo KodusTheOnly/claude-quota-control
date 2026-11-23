@@ -17,6 +17,10 @@ autoUpdater.autoInstallOnAppQuit = false;
 autoUpdater.logger = null;
 autoUpdater.on("error", () => {}); // errors come back through the promises below
 
+// A release the app will offer: plain x.y.z and nothing else. The number is shown on screen and names what gets
+// installed, so anything unexpected in it (from a release edited by mistake, or by someone else) is not a version.
+const isVersion = (v) => typeof v === "string" && /^\d{1,4}\.\d{1,4}\.\d{1,4}$/.test(v);
+
 function newerThan(a, b) {
   const pa = String(a).split(".").map(Number), pb = String(b).split(".").map(Number);
   for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
@@ -32,9 +36,10 @@ async function checkOnGitHub() {
   if (res.status === 404) return { status: "none" };
   if (!res.ok) return { status: "error" };
   const rel = await res.json();
-  const version = String(rel.tag_name || "").replace(/^v/i, "");
-  if (!version) return { status: "none" };
-  return newerThan(version, app.getVersion()) ? { status: "newer", version, url: rel.html_url, canInstall: false } : { status: "latest", version };
+  const version = String((rel && rel.tag_name) || "").replace(/^v/i, "");
+  if (!isVersion(version)) return { status: "none" };
+  // The link is built here, never taken from the answer: it can only lead to this project's releases
+  return newerThan(version, app.getVersion()) ? { status: "newer", version, url: releaseUrl(version), canInstall: false } : { status: "latest", version };
 }
 
 async function check() {
@@ -43,7 +48,7 @@ async function check() {
     try {
       const res = await autoUpdater.checkForUpdates();
       const version = res && res.updateInfo && res.updateInfo.version;
-      if (version) {
+      if (isVersion(version)) {
         if (!newerThan(version, app.getVersion())) return { status: "latest", version };
         installable = version;
         return { status: "newer", version, url: releaseUrl(version), canInstall: true };
@@ -60,8 +65,9 @@ async function check() {
 }
 
 // Called once the app is ready. send(channel, value) reaches the window, notify(title, body) shows a notification.
-function setupUpdates({ loadSettings, saveSettings, send, notify }) {
-  ipcMain.handle("check-update", async () => {
+// handle(channel, fn) registers an IPC answer (main.js passes the one that checks who is asking).
+function setupUpdates({ handle = ipcMain.handle.bind(ipcMain), loadSettings, saveSettings, send, notify }) {
+  handle("check-update", async () => {
     const res = await check();
     if (res.status !== "error") {
       res.checkedAt = Date.now();
@@ -70,23 +76,24 @@ function setupUpdates({ loadSettings, saveSettings, send, notify }) {
     return res;
   });
 
-  ipcMain.handle("install-update", async () => {
+  handle("install-update", async () => {
     if (!installable || busy) return { status: "error" };
     busy = true;
+    const version = installable; // the version this click is about, whatever a later check finds
     const onProgress = (p) => send("update-progress", Math.round((p && p.percent) || 0));
     autoUpdater.on("download-progress", onProgress);
     try {
       await autoUpdater.downloadUpdate();
     } catch {
       busy = false;
-      return { status: "error", url: releaseUrl(installable) };
+      return { status: "error", url: releaseUrl(version) };
     } finally {
       autoUpdater.off("download-progress", onProgress);
     }
-    saveSettings({ ...loadSettings(), updateTo: installable });
+    saveSettings({ ...loadSettings(), updateTo: version });
     // A moment for the window to show "Installing", then the app quits (before-quit lets the window close)
     setTimeout(() => autoUpdater.quitAndInstall(true, true), 800);
-    return { status: "installing", version: installable };
+    return { status: "installing", version };
   });
 
   // The first start after an update says whether it worked
@@ -99,4 +106,4 @@ function setupUpdates({ loadSettings, saveSettings, send, notify }) {
   }
 }
 
-module.exports = { setupUpdates, newerThan };
+module.exports = { setupUpdates, newerThan, isVersion };

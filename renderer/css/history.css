@@ -63,6 +63,10 @@
 .wrow:first-child { padding-top: .1rem; border-top: 0; }
 .wtop { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
 .wrow .sbar { --c: var(--crt-accent); }
+/* A product's name comes from Claude and can be long: it ends in an ellipsis instead of pushing the number out */
+#products .plate.clamp { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#products .mid-num { flex: none; }
+#resetsNote:empty { display: none; }
 
 /* When sessions start: 24 hours, the busiest one in bone with its time above */
 .session-map { position: relative; padding-top: 1.5rem; }

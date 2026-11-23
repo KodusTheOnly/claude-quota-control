@@ -52,6 +52,8 @@ function buildCases() {
           for (const scenario of scenarios) cases.push({ ...size, language, theme, scenario, interaction: null, view: "panel" });
           if (QUICK_LEVEL_SIZES.includes(`${size.w}x${size.h}`)) for (const scenario of quickLevels) cases.push({ ...size, language, theme, scenario, interaction: null, view: "panel" });
           for (const interaction of ["math", "type", "plan", "toast"]) cases.push({ ...size, language, theme, scenario: "moderate", interaction, view: "panel" });
+          // The plan menu with past weeks on record: it also suggests a plan
+          cases.push({ ...size, language, theme, scenario: "pastweeks", interaction: "plan", view: "panel" });
         }
         for (const view of views.filter((v) => v !== "panel" && v !== "tray" && v !== "history" && v !== "about")) {
           for (const [scenario, shortcut] of docStates) cases.push({ ...size, language, theme, scenario, interaction: null, view, shortcut });

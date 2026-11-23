@@ -104,14 +104,16 @@ function readNumber(input) {
   return Number.isFinite(n) && n >= 0 && n <= 100 ? n : NaN;
 }
 
-// The weekly reset is fixed: from a known reset, find the next one after now
+// A moment a reset can really be at: a number inside the range of dates. Anything else (a damaged file, a value
+// edited by hand) is no reset at all, or the week's math would walk day by day toward it.
+const isMoment = (ms) => typeof ms === "number" && Number.isFinite(ms) && ms > 0 && ms < 8.64e15;
+
+// The weekly reset is fixed: from a known reset, find the next one after now (whole weeks forward, or back when the
+// known one is more than a week ahead). Worked out in one step, however far the known reset is.
 function nextReset(anchor, now = Date.now()) {
-  if (!anchor) return null;
-  let r = anchor;
-  if (r <= now) r += Math.ceil((now - r) / WEEK) * WEEK;
-  if (r <= now) r += WEEK;
-  while (r - WEEK > now) r -= WEEK;
-  return r;
+  if (!isMoment(anchor)) return null;
+  const r = anchor + Math.ceil((now - anchor) / WEEK) * WEEK;
+  return r <= now ? r + WEEK : r;
 }
 
 // Weekday weights
@@ -149,8 +151,11 @@ function activeSpans(ms, a) {
 }
 // The pieces of time between from and to over which the plan's weight runs at a steady rate:
 // [{ from, to, wt, len }], where a piece is worth ((to - from) / len) * wt weighted days. Without active hours
-// each calendar day is one piece (len = DAY); with them, each part of the window is one (len = the window's
-// length that day) and the time outside the window is left out.
+// each calendar day is one piece (len = that day's own length: 23 or 25 hours when the clock changes, so the day
+// still weighs its whole weight); with them, each part of the window is one (len = the window's length that day)
+// and the time outside the window is left out.
+// w is the plan's weights by weekday. The projection passes a function instead (ms -> the weight of that calendar
+// day), since what it learned is by day of the week's seven, not by weekday (learn.js).
 function weightPieces(from, to, w = weights(), a = activeHours()) {
   const out = [];
   let cur = from;
@@ -158,8 +163,8 @@ function weightPieces(from, to, w = weights(), a = activeHours()) {
     const d = new Date(cur);
     const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
     const end = Math.min(next, to);
-    const wt = w[d.getDay()];
-    if (!a) out.push({ from: cur, to: end, wt, len: DAY });
+    const wt = typeof w === "function" ? w(cur) : w[d.getDay()];
+    if (!a) out.push({ from: cur, to: end, wt, len: next - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() });
     else {
       const spans = activeSpans(cur, a);
       const len = spans.reduce((s, [x, y]) => s + y - x, 0);
@@ -197,6 +202,11 @@ const offDayNumber = (spent) => (Math.round(spent) > 0 ? `${Math.round(spent)}%`
 function weekEndsUnplanned(now, resetsAt, w = weights()) {
   return !isDayOff(now, w) && weightedDays(Math.max(startOfDay(now), resetsAt - WEEK), resetsAt, w) <= 0;
 }
+// Today (not an Off day) has no plan time inside this week, and the week does not end today: the hours after a reset
+// that falls past the end of the active hours. The budget is 0 there by design, so the day is not rated, like an Off day.
+function dayIdle(now, resetsAt, w = weights()) {
+  return !isDayOff(now, w) && dayShare(now, resetsAt, w) <= 0 && !weekEndsUnplanned(now, resetsAt, w);
+}
 // Today's budget: today's share of what is left, counting the week from the start of the day
 function dayBudget(remaining, resetsAt, now, w = weights()) {
   const share = dayShare(now, resetsAt, w);
@@ -225,23 +235,41 @@ function goalSettings(s = state.settings) {
   const rel = num(s && s.reserveRelease);
   return { goal: GOAL, reserve, release: RELEASE_CHOICES.includes(rel) ? rel : RELEASE_DEFAULT };
 }
-// How much of the reserve is still held back at `ms`: all of it until the release starts, then less and
-// less (in a straight line) until the reset, when none is held. Without a release it is held to the end.
-function reserveHeld(ms, resetsAt, g) {
+// Where the release runs: { from, span }. It starts `release` hours before the reset and follows the plan, like the
+// rest of the week: a heavy day gets more of it, an Off day and the hours outside the active hours none. When those
+// hours hold no plan time at all (a reset after a weekend Off, say), the reserve joins the last planned stretch before
+// them instead, so it is never lost. span is the plan time it spreads over. null: no release, or no plan time at all.
+function reserveWindow(resetsAt, g, w = weights(), a = activeHours()) {
+  if (!g.reserve || !g.release) return null;
+  let from = Math.max(resetsAt - g.release * HOUR, resetsAt - WEEK);
+  let span = weightedDays(from, resetsAt, w, a);
+  if (span <= 0) {
+    const planned = weightPieces(resetsAt - WEEK, from, w, a).filter((p) => p.wt > 0);
+    if (!planned.length) return null;
+    from = planned[planned.length - 1].from;
+    span = weightedDays(from, resetsAt, w, a);
+  }
+  return { from, span };
+}
+// How much of the reserve is still held back at `ms`: all of it until the release starts, then less and less, as the
+// plan time of the release goes by, until the reset, when none is held. Without a release it is held to the end.
+function reserveHeld(ms, resetsAt, g, w = weights(), a = activeHours()) {
   if (!g.reserve) return 0;
-  if (!g.release) return g.reserve;
-  return g.reserve * Math.min(Math.max((resetsAt - ms) / (g.release * HOUR), 0), 1);
+  const win = reserveWindow(resetsAt, g, w, a);
+  if (!win || ms <= win.from) return g.reserve;
+  if (ms >= resetsAt) return 0;
+  return g.reserve * Math.min(weightedDays(ms, resetsAt, w, a) / win.span, 1);
 }
 // The plan's ceiling at `ms`: the goal minus the reserve still held. Use above it comes from the reserve.
-const planCeiling = (ms, resetsAt, g) => g.goal - reserveHeld(ms, resetsAt, g);
+const planCeiling = (ms, resetsAt, g, w = weights()) => g.goal - reserveHeld(ms, resetsAt, g, w);
 // What is left of the reserve after `used`% of the week: use above goal - reserve was taken from it
 const reserveLeft = (used, g) => Math.min(Math.max(g.goal - Math.max(used, g.goal - g.reserve), 0), g.reserve);
 // The part of the reserve left (`left`) that the release hands to the plan between a and b, counted from
-// `from` (the start of today): it spreads over the release still to come, in proportion to time.
-function reserveReleased(left, a, b, from, resetsAt, g) {
-  const held = reserveHeld(from, resetsAt, g);
+// `from` (the start of today): it spreads over the release still to come, as the release does (reserveHeld).
+function reserveReleased(left, a, b, from, resetsAt, g, w = weights()) {
+  const held = reserveHeld(from, resetsAt, g, w);
   if (!(left > 0) || held <= 0) return 0;
-  return (left * Math.max(reserveHeld(a, resetsAt, g) - reserveHeld(b, resetsAt, g), 0)) / held;
+  return (left * Math.max(reserveHeld(a, resetsAt, g, w) - reserveHeld(b, resetsAt, g, w), 0)) / held;
 }
 // Today's budget with the goal and the reserve: today's share of the plan (goal - reserve) left at the
 // start of the day, plus the part of the reserve that today's release hands over. An Off day stays at 0.
@@ -253,7 +281,7 @@ function planBudget(usedStart, resetsAt, now, g, w = weights()) {
   const from = Math.max(startOfDay(now), resetsAt - WEEK);
   const d = new Date(now);
   const to = Math.min(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime(), resetsAt);
-  return plan + reserveReleased(reserveLeft(usedStart, g), from, to, from, resetsAt, g);
+  return plan + reserveReleased(reserveLeft(usedStart, g), from, to, from, resetsAt, g, w);
 }
 // How much fits in a normal day from now until the reset
 function perNormalDay(remaining, resetsAt, now, w = weights()) {
@@ -335,9 +363,17 @@ function levelFromLockout(hours) {
   return levelByCuts(lockShown(hours).hours, LOCK_CUTS);
 }
 // When the pace reaches LOCK_AT (at, or null) and the hours from then to the reset (0 without a T)
-function weekLockout(used, rate, now, resetsAt, w = weights(), target = LOCK_AT) {
+// The hours locked out are the active hours between the limit and the reset: a night outside them is not time
+// without Claude, since it would not be used anyway. Without active hours every hour counts.
+function weekLockout(used, rate, now, resetsAt, w = weights(), target = LOCK_AT, a = activeHours()) {
   const at = paceReaches(target, used, rate, now, resetsAt, w);
-  return { at, hours: at === null ? 0 : Math.max(resetsAt - at, 0) / HOUR };
+  return { at, hours: at === null ? 0 : activeHoursBetween(at, resetsAt, a) };
+}
+// Hours between two times that fall inside the active hours (all of them without active hours)
+function activeHoursBetween(from, to, a = activeHours()) {
+  if (!(to > from)) return 0;
+  if (!a) return (to - from) / HOUR;
+  return weightPieces(from, to, [1, 1, 1, 1, 1, 1, 1], a).reduce((s, p) => s + p.to - p.from, 0) / HOUR;
 }
 // How much the pace of the days left has to drop for the projection to end at LOCK_AT at the reset, as a
 // whole percent rounded up: 1 - (LOCK_AT - used) / (projected - used). null when the pace adds nothing.
@@ -371,7 +407,7 @@ function expectedUsed(resetsAt, now, w = weights(), g = FULL_WEEK) {
   const total = weightedDays(resetsAt - WEEK, resetsAt, w);
   if (total <= 0) return 0;
   const at = Math.min(now, resetsAt);
-  return ((g.goal - g.reserve) * weightedDays(resetsAt - WEEK, at, w)) / total + (g.reserve - reserveHeld(at, resetsAt, g));
+  return ((g.goal - g.reserve) * weightedDays(resetsAt - WEEK, at, w)) / total + (g.reserve - reserveHeld(at, resetsAt, g, w));
 }
 
 // The plan's own share of the day at `ms` (the rise of the expected line over that day, inside the week), with no
@@ -385,13 +421,15 @@ function planDayShare(ms, resetsAt, w = weights(), g = FULL_WEEK) {
 
 // Data sources
 
+// A reading counts when its week has a % used and a reset time that can be real
+const weekIsSound = (w) => Boolean(w) && typeof w.used === "number" && Number.isFinite(w.used) && isMoment(w.resetsAt);
 function manualSource() {
   const m = state.settings && state.settings.manual;
-  return m && m.weekly ? { kind: "manual", data: m } : null;
+  return m && weekIsSound(m.weekly) ? { kind: "manual", data: m } : null;
 }
 function autoSource() {
   const a = state.data;
-  return a && a.weekly && a.weekly.resetsAt ? { kind: "auto", data: a } : null;
+  return a && weekIsSound(a.weekly) ? { kind: "auto", data: a } : null;
 }
 // Settings > Sources: the reset form is for manual use. With the account connected, each reading brings the reset
 // time, so the form only shows when the account has not given one (a reading without a reset time sends you there).
@@ -447,7 +485,8 @@ function logReading(reading) {
 async function writeReading({ at, weekly, session, sessionResetsAt }) {
   const list = [...((state.settings && state.settings.readings) || [])];
   const last = list[list.length - 1];
-  if (last && last.at === at) return; // same reading
+  // Same reading, or one older than the last one saved (the collector's file read again at start): nothing new
+  if (last && at <= (last.to || last.at)) return;
   const s = session ?? null;
   const sr = sessionResetsAt ?? null;
   const sameWindow = last && (last.sr === sr || (last.sr != null && sr != null && Math.abs(last.sr - sr) < 10 * MIN));

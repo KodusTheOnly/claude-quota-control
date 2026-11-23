@@ -83,3 +83,45 @@ test("the shape description keeps names and types, and no values", () => {
   assert.match(shape, /"resets_at":"string"/);
   assert.doesNotMatch(shape, /2026/);
 });
+
+// Use per product and Claude's resets are optional parts of the answer: never a reason for a failed reading
+const { parseProducts, parseResets } = require("../usage-json");
+const NOW = Date.parse("2026-11-20T12:00:00Z");
+
+test("the products are read from seven_day_breakdown, biggest first", () => {
+  const data = { seven_day_breakdown: { as_of: "x", window_started_at: "x", rows: [
+    { key: "chat", display_name: "Chat", percent: 25, percent_of_limit: 5 },
+    { key: "code", display_name: "Claude Code", percent: 75, percent_of_limit: 15 },
+  ] } };
+  assert.deepEqual(parseProducts(data), [{ key: "code", name: "Claude Code", pct: 15 }, { key: "chat", name: "Chat", pct: 5 }]);
+});
+
+test("products that look different are left out, and the reading still works", () => {
+  assert.equal(parseProducts({}), null);
+  assert.equal(parseProducts({ seven_day_breakdown: null }), null);
+  assert.equal(parseProducts({ seven_day_breakdown: { rows: [] } }), null);
+  assert.equal(parseProducts({ seven_day_breakdown: { rows: [{ display_name: "Chat", percent_of_limit: "5" }] } }), null);
+  assert.equal(parseProducts({ seven_day_breakdown: { rows: [{ display_name: "", percent_of_limit: 5 }] } }), null);
+  const full = { seven_day: { utilization: 20, resets_at: "2026-11-24T08:00:00Z" }, five_hour: null, seven_day_breakdown: { rows: "?" }, cedar_ember: 7 };
+  assert.equal(parseUsageJson(full).ok, true);
+});
+
+const grant = (over = {}) => ({ id: "g", label: "x", resets_total: 2, resets_left: 1, ends_at: "2026-12-01T00:00:00Z", usable_now: true, gives_back_weekly: true, ...over });
+
+test("the resets count the offers that give the week back and have not ended", () => {
+  const data = { cedar_ember: { grants: [
+    grant(),
+    grant({ resets_total: 1, resets_left: 1, ends_at: "2026-11-25T00:00:00Z", usable_now: false }),
+    grant({ gives_back_weekly: false, resets_total: 5, resets_left: 5 }),
+    grant({ ends_at: "2026-11-01T00:00:00Z" }),
+  ] } };
+  assert.deepEqual(parseResets(data, NOW), { left: 2, total: 3, endsAt: Date.parse("2026-11-25T00:00:00Z"), usableNow: true });
+});
+
+test("resets that look different, or none on offer, are left out", () => {
+  assert.equal(parseResets({}, NOW), null);
+  assert.equal(parseResets({ cedar_ember: { grants: [] } }, NOW), null);
+  assert.equal(parseResets({ cedar_ember: { grants: [grant({ resets_left: 3 })] } }, NOW), null, "more left than in all");
+  assert.equal(parseResets({ cedar_ember: { grants: [grant({ ends_at: "soon" })] } }, NOW), null);
+  assert.equal(parseResets({ cedar_ember: { grants: [grant({ resets_left: 1.5 })] } }, NOW), null);
+});

@@ -97,7 +97,7 @@ html { font-size: 16px; }
 
   /* Old data (stale or offline): the numbers, levels, bars and chart lose some color and light, so they do not
      read as current. The screens, labels and the STALE chip keep theirs. */
-  --stale-fade: .72;
+  --stale-fade: .88; /* .72 took the small text under 4.5:1 */
   --stale-sat: .35;
   color-scheme: light;
 }
@@ -148,6 +148,7 @@ html[data-screens="paper"]:not([data-theme="dark"]) {
   --crt-cell-mark: rgba(0, 0, 0, .22);
   --crt-shade: rgba(90, 80, 60, .14);
   --crt-band: rgba(90, 80, 60, .04);
+  --stale-fade: 1; /* the paper inks sit near 5:1: old data loses color only, any fade takes them under 4.5:1 */
   --num-flash: #1F3FA6; --num-halo: transparent; /* paper does not glow: the number flashes in the accent */
   --well-lo: rgba(0, 0, 0, .18);
 }

@@ -17,15 +17,20 @@ function verdictReason(m) {
 function verdictFigures(m) {
   const proj = m.lv.proj;
   const out = m.forecast.kind === "out";
+  // On its way past the limit: the week cannot end above 100%, so it says 100% and when the limit comes, as the band's chip does
+  const lock = m.lv.lock;
+  if (!out && proj && m.lv.projection >= 1 && lock && lock.at !== null) {
+    return { pct: "100%", when: `${t("chip.goal")} ~${shortWeekday(new Date(lock.at))} ${fmtTime(lock.at)}` };
+  }
   return {
-    pct: out ? "100%" : proj ? `${r0(proj.projected)}%` : "–",
+    pct: out ? "100%" : proj ? `${r0(Math.min(proj.projected, 100))}%` : "–",
     when: out ? t("forecast.out") : proj ? t("verdict.when", { dur: fmtDur(m.w.resetsAt - m.now) }) : t("forecast.early"),
   };
 }
 
 // The chips of the second line. The first one says the most; fitChips() drops the last ones first when the line is narrow.
 //   on its way to the goal   ◷ goal ~Mon 20:00 · ⊘ locked 12 h · ▼ slow down ~15%
-//   under the plan           ◎ at reset 91% · + to spend ~6%
+//   under the plan           ◎ at reset 84–97% · + to spend ~6%
 //   on the reserve           ◫ reserve 6% · ◷ lasts ~3h 20m
 //   warming up               "Too early to tell" (words only)
 // Then "! session first ~14:00" when the session runs out before the week, and "◫ reserve 10%" while a reserve is held.
@@ -48,11 +53,16 @@ function bandChips(m) {
     chips.push({ icon: "⊘", word: t("chip.locked"), value: lockDur(lock.hours), title: t("band.early", { dur: lockDur(lock.hours) }), warn: true });
     // Slowing down by 90% or more means stopping: the chip says so instead of "slow down ~100%"
     if (m.lv.slow !== null) chips.push(m.lv.slow >= 90 ? { icon: "■", value: t("chip.stop"), title: t("band.slow", { pct: m.lv.slow }), warn: true } : { icon: "▼", word: t("chip.slow"), value: `~${m.lv.slow}%`, title: t("band.slow", { pct: m.lv.slow }) });
+    // The likely range still starts under the limit: the week may fit after all
+    const rg = rangeShown(m.lv.proj);
+    if (rg.low < m.g.goal) chips.push({ icon: "◎", word: t("chip.atReset"), value: rg.text, title: t("band.rangeMayFit", { low: rg.low, high: rg.high }) });
   } else {
-    // Under the plan's ceiling: where the week ends, and how much would be left to spend at this pace
+    // Under the plan's ceiling: where the week ends (the likely range, or one number when it has no width), and how
+    // much would be left to spend at this pace
     const shown = asShownPct(m.lv.proj.projected);
     const ceil = asShownPct(m.ceiling);
-    chips.push({ icon: "◎", word: t("chip.atReset"), value: `${shown}%`, title: `${shown}% ${t("band.atReset")}` });
+    const rg = rangeShown(m.lv.proj);
+    chips.push({ icon: "◎", word: t("chip.atReset"), value: rg.text, title: rg.low === rg.high ? `${shown}% ${t("band.atReset")}` : t("band.range", { low: rg.low, high: rg.high, pct: shown }) });
     if (shown < ceil) chips.push({ icon: "+", word: t("chip.toSpend"), value: `~${ceil - shown}%`, title: t("band.toSpend", { pct: ceil - shown }) });
   }
   // "Session first" only for the session: when the week comes first, the goal chip already says it
@@ -60,7 +70,8 @@ function bandChips(m) {
   if (first && first.kind === "session") chips.push({ icon: "!", word: t("chip.first"), value: `~${fmtTime(first.ms)}`, title: t("band.first", { what: t("band.firstSession"), when: fmtTime(first.ms) }) });
   const held = Math.min(reserveHeld(m.now, m.w.resetsAt, m.g), reserveLeft(m.w.used, m.g));
   if (held > 0) {
-    const relStart = m.g.release ? m.w.resetsAt - m.g.release * HOUR : null;
+    const rw = reserveWindow(m.w.resetsAt, m.g);
+    const relStart = rw ? rw.from : null;
     const pctLeft = asShownPct(reserveLeft(m.w.used, m.g));
     const title = relStart !== null && relStart > m.now ? t("band.reserveMelts", { pct: pctLeft, when: fmtWhen(relStart, m.now) }) : t("band.reserveHeld", { pct: asShownPct(held) });
     chips.push({ icon: "◫", word: t("chip.reserve"), value: `${asShownPct(held)}%`, title });

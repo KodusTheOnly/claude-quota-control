@@ -18,7 +18,7 @@ function load() {
     I18N: { t: (k) => k, getLang: () => "en", locale: () => "en-US" },
   };
   vm.createContext(sandbox);
-  for (const f of ["core.js", "compute.js", "ui.js", "blocks/verdict.js"]) {
+  for (const f of ["core.js", "learn.js", "compute.js", "ui.js", "blocks/verdict.js"]) {
     vm.runInContext(fs.readFileSync(path.join(ROOT, "renderer", "js", f), "utf8"), sandbox);
   }
   return vm.runInContext("({ FACES, FACE_MOMENTS, FACE_RANK, FACE_GAPS, verdictMode, faceKey, state })", sandbox);

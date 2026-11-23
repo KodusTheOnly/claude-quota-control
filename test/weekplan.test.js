@@ -18,7 +18,7 @@ function load(nowMs, settings = {}) {
     I18N: { t: (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k), getLang: () => "en", locale: () => "en-US" },
   };
   vm.createContext(sandbox);
-  for (const f of ["core.js", "compute.js"]) {
+  for (const f of ["core.js", "learn.js", "compute.js"]) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "renderer", "js", f), "utf8"), sandbox);
   }
   vm.runInContext(`state.settings = ${JSON.stringify(settings)};`, sandbox);
@@ -147,4 +147,62 @@ test("the figures are whole numbers, rounded as on screen", () => {
   assert.deepEqual(figures({ budget: 16.5, spent: 9.5, ratio: 0.5757 }), { used: 10, budget: 17 });
   assert.deepEqual(figures({ budget: 16.49, spent: 9.49, ratio: 0.5755 }), { used: 9, budget: 16 });
   assert.deepEqual(figures({ budget: 14.3, spent: 0.2, ratio: 0.014 }), { used: 0, budget: 14 });
+});
+
+// Today's use against the days ahead. The same week: the day began at 35% used, so Friday's budget is 65 / 5.333 (the
+// five whole days to Tuesday and the 8 hours of Wednesday before the reset) = 12.19% of the week.
+function weekAt(used, settings = {}) {
+  const now = at(2026, 10, 30, 20);
+  const src = {
+    kind: "manual",
+    data: {
+      updatedAt: now,
+      weekly: { used, resetsAt: at(2026, 11, 4, 8) },
+      fiveHour: null,
+      dayStart: { day: "2026-10-30", at: at(2026, 10, 30), used: 35 },
+      days: { "2026-10-30": { spent: used - 35, budget: 12.19, endUsed: used } },
+    },
+  };
+  const sb = load(now, { manual: src.data, ...settings });
+  return JSON.parse(vm.runInContext(`JSON.stringify(compute(${JSON.stringify(src)}).week)`, sb));
+}
+const TODAY_BUDGET = 65 / (5 + 8 / 24);
+
+test("while today is within its budget the days ahead keep the morning's split", () => {
+  for (const used of [35, 40, 35 + TODAY_BUDGET]) {
+    for (const d of weekAt(used).filter((x) => x.when === "future")) {
+      assert.ok(Math.abs(d.budget - TODAY_BUDGET) < 1e-9, `used ${used}`);
+      assert.equal(d.budget, d.planned);
+    }
+  }
+});
+
+test("once today goes past its budget the days ahead split what is really left, and say what they lost", () => {
+  const over = 8;
+  const used = 35 + TODAY_BUDGET + over;
+  const ahead = weekAt(used).filter((x) => x.when === "future");
+  assert.equal(ahead.length, 4);
+  for (const d of ahead) {
+    assert.ok(Math.abs(d.planned - TODAY_BUDGET) < 1e-9, "the morning's number is kept");
+    assert.ok(Math.abs(d.budget - (100 - used) / (4 + 8 / 24)) < 1e-9, "what tomorrow's budget will be");
+  }
+  // What the four days and the last 8 hours lose adds up to what today went over
+  const lost = ahead.reduce((s, d) => s + d.planned - d.budget, 0) * ((4 + 8 / 24) / 4);
+  assert.ok(Math.abs(lost - over) < 1e-9, `lost ${lost}`);
+});
+
+test("a heavier day ahead pays more of it, and a day off pays nothing", () => {
+  const used = 35 + 20;
+  const w = weekAt(used, { weights: [0, 1, 1, 1, 1, 1, 2] }); // Saturday Heavy, Sunday Off
+  const sat = w.find((d) => d.dow === 6);
+  const sun = w.find((d) => d.dow === 0);
+  const mon = w.find((d) => d.dow === 1);
+  assert.ok(sat.planned - sat.budget > 0);
+  assert.ok(Math.abs((sat.planned - sat.budget) - 2 * (mon.planned - mon.budget)) < 1e-9);
+  assert.equal(sun.budget, 0);
+  assert.equal(sun.planned, 0);
+});
+
+test("with the week used up the days ahead have nothing left, never a negative budget", () => {
+  for (const d of weekAt(100).filter((x) => x.when === "future")) assert.equal(d.budget, 0);
 });

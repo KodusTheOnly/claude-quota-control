@@ -166,6 +166,8 @@
                 <div class="hrs" id="hrs" role="img" aria-label="Usage by hour" data-i18n-aria="hrs.aria"><div class="hcells" id="hcells"></div></div>
                 <span class="dg" aria-hidden="true"></span>
                 <div class="days" id="days" role="group" aria-label="This week" data-i18n-aria="week.aria"></div>
+                <!-- The stretch after the seventh midnight, up to the reset: named, so it does not read as a missing day (week.js) -->
+                <span class="dend" id="daysEnd" aria-hidden="true"><b data-i18n="days.reset">Reset</b><span id="daysEndText"></span></span>
                 <i class="todaybox hidden" id="todayBox" aria-hidden="true"></i>
               </div>
               <!-- Under the days: the legend on the left, how the week is planned and when it resets on the right -->
@@ -230,7 +232,7 @@
                 </div>
               </div>
               <div class="crt hempty hidden" id="daysEmpty">
-                <span class="lv lv-none"><span class="shp"></span><span data-i18n="level.none.name">Not rated</span></span>
+                <span class="lv lv-none"><span class="shp"></span><span data-i18n="day.noData">No data</span></span>
                 <span class="mu" id="daysEmptyText"></span>
               </div>
             </article>
@@ -246,6 +248,13 @@
               <div class="crt">
                 <div class="session-map" id="sessionMap" role="img" aria-label="Hour of day when your 5-hour sessions start" data-i18n-aria="map.aria"></div>
                 <span class="cap" id="mapNote"></span>
+              </div>
+            </article>
+            <article class="blk hidden" id="histProducts" aria-labelledby="tHistProducts">
+              <header class="pl"><h2 class="pn" id="tHistProducts"><b>03</b><span data-i18n="products.title">This week from Claude</span></h2></header>
+              <div class="crt">
+                <div id="products"></div>
+                <span class="cap" id="resetsNote"></span>
               </div>
             </article>
           </div>
@@ -311,9 +320,19 @@
                 </div>
               </article>
 
-              <!-- 02 Plan: active hours and reserve -->
+              <!-- 02 Plan: the weekly plan, active hours and reserve -->
               <article class="blk" id="setGoal" aria-labelledby="tGoal">
                 <header class="pl"><h2 class="pn" id="tGoal"><b>02</b><span data-i18n="goal.title">Plan</span></h2></header>
+                <div class="grp">
+                  <h3 class="grp-h"><span data-i18n="plan.title">Weekly plan</span></h3>
+                  <p class="gt" data-i18n="plan.autoText"></p>
+                  <label class="set tgl">
+                    <span class="lb"><span data-i18n="plan.autoOn">Follow my usual week</span><small data-i18n="plan.autoNote"></small></span>
+                    <input type="checkbox" id="autoWeights">
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                  </label>
+                  <p class="gt hidden" id="autoWeightsNow" aria-live="polite"></p>
+                </div>
                 <div class="grp">
                   <h3 class="grp-h"><span data-i18n="active.title">Active hours</span></h3>
                   <p class="gt" data-i18n="active.text"></p>
@@ -682,6 +701,7 @@
 
   <script src="i18n.js"></script>
   <script src="js/core.js"></script>
+  <script src="js/learn.js"></script>
   <script src="js/compute.js"></script>
   <script src="js/hourly.js"></script>
   <script src="js/ui.js"></script>

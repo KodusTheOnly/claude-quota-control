@@ -10,12 +10,14 @@
 .doc-body, .cols { width: 100%; max-width: 110rem; margin-inline: auto; }
 .cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: .8rem; align-items: start; min-width: 0; }
 .cols > .col { display: contents; } /* the sections flow into the board in order: 01, 02, 03 ... */
+/* From 720px the board is newspaper columns, not grid rows: a short section no longer leaves a hole beside a long one */
 @media (min-width: 720px) {
   .doc > .toc { display: none; }
-  .cols { grid-template-columns: repeat(2, minmax(0, 36rem)); justify-content: center; }
+  .cols { display: block; columns: 2; column-gap: .8rem; max-width: 72.8rem; }
+  .cols .blk { break-inside: avoid; margin-bottom: .8rem; }
 }
 @media (min-width: 1280px) {
-  .cols { grid-template-columns: repeat(3, minmax(0, 36rem)); }
+  .cols { columns: 3; max-width: 109.6rem; }
 }
 
 /* Contents keys */
@@ -100,7 +102,7 @@
 .help-tiles { display: grid; grid-template-columns: minmax(0, 1fr); gap: .8rem; }
 @media (min-width: 720px) { .help-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1280px) { .help-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.tile { align-items: stretch; gap: .4rem; min-height: 5.4rem; padding: .6rem .8rem; border-left: 0; border-right: 0; border-bottom: 0; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.tile { align-items: stretch; gap: .4rem; min-height: 5.4rem; padding: .6rem .8rem; background: var(--card); border: 0; border-top: 2px solid var(--ink); font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
 .tile:hover { background-color: color-mix(in srgb, var(--mod) 80%, var(--card)); }
 .tile:focus-visible { outline: 2px solid var(--fc); outline-offset: 2px; }
 .tile-h { display: flex; align-items: center; gap: .6rem; font: 600 var(--fs-lg)/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
@@ -152,6 +154,9 @@
   .toc-about { margin-top: 0; }
   .doc .blk { scroll-margin-top: .6rem; }
   .rules { grid-template-columns: minmax(0, 1fr); }
+  /* The lead: the plate and About on one row, the text under them at full width (it was squeezed between the two) */
+  .lead { flex-wrap: wrap; gap: .5rem 1rem; }
+  .lead p { order: 3; flex-basis: 100%; }
   .calc-table tbody th { width: 6.2rem; }
   .calc-table th, .calc-table td { font-size: var(--fs-sm); }
   .set.sub { margin-left: .6rem; }

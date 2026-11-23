@@ -181,6 +181,7 @@ function renderHistory() {
   renderDays();
   renderWeeks();
   renderSessionMap();
+  renderProducts();
 }
 
 // The chart is drawn at the width it has, so it is drawn again when that changes (window resized, fonts loaded)
@@ -200,19 +201,24 @@ function keyToMs(k) {
   return new Date(y, mo - 1, d).getTime();
 }
 
-// Summary of the week that ended at endReset (whole days; the reset day belongs to the new week)
+// Summary of the week that ended at endReset (whole days; the reset day belongs to the new week).
+// used is what the week really used, give-backs included (pastWeeks in compute.js), and given what Claude gave back.
 function weekSummary(endReset) {
   const from = startOfDay(endReset - WEEK);
   const to = startOfDay(endReset);
-  let used = 0, top = null, active = 0;
-  for (const [k, v] of Object.entries(mergedDays())) {
+  const days = mergedDays();
+  let top = null, active = 0;
+  for (const [k, v] of Object.entries(days)) {
     const ms = keyToMs(k);
     if (ms < from || ms >= to) continue;
     active++;
-    if (typeof v.endUsed === "number") used = Math.max(used, v.endUsed);
     if (!top || v.spent > top.spent) top = { ms, spent: v.spent };
   }
-  return active ? { start: endReset - WEEK, end: endReset, used, top, active } : null;
+  if (!active) return null;
+  const wk = pastWeeks(days, endReset + WEEK, 1)[0];
+  const used = wk ? wk.gross : 0;
+  const given = wk ? Math.max(wk.gross - wk.end, 0) : 0;
+  return { start: endReset - WEEK, end: endReset, used, given, top, active };
 }
 
 function currentReset() {
@@ -220,6 +226,60 @@ function currentReset() {
   if (!src) return null;
   const r = src.data.weekly.resetsAt;
   return r > Date.now() ? r : nextReset(r);
+}
+
+// This week as Claude's usage page splits it: the use per product, and the resets Claude offers for the week.
+// Both come with each reading (parseProducts and parseResets in usage-json.js); the block hides when neither is there.
+// The products belong to the week they were read in, so a new week hides them until the next reading.
+function renderProducts() {
+  const s = state.settings || {};
+  const now = Date.now();
+  const R = currentReset();
+  const p = s.products;
+  const rows = p && Array.isArray(p.rows) && R && Math.abs((p.resetsAt || 0) - R) < HOUR ? p.rows : [];
+  const r = s.resets;
+  const resets = r && Number.isFinite(r.left) && Number.isFinite(r.total) && !(r.endsAt && r.endsAt <= now) ? r : null;
+  $("histProducts").classList.toggle("hidden", !rows.length && !resets);
+
+  const box = $("products");
+  box.textContent = "";
+  box.classList.toggle("hidden", !rows.length);
+  for (const x of rows) {
+    const row = document.createElement("div");
+    row.className = "wrow";
+    const top = document.createElement("div");
+    top.className = "wtop";
+    const name = document.createElement("span");
+    name.className = "plate clamp"; // a long name ends in an ellipsis; the full name is in the title
+    name.textContent = x.name;
+    name.title = x.name;
+    const used = document.createElement("span");
+    used.className = "mid-num";
+    used.textContent = pct(x.pct);
+    top.append(name, used);
+    const bar = document.createElement("span");
+    bar.className = "sbar";
+    bar.setAttribute("aria-hidden", "true");
+    bar.style.setProperty("--fill", `${Math.min(Math.max(x.pct, 0), 100)}%`);
+    const tr = document.createElement("span");
+    tr.className = "tr";
+    const fill = document.createElement("i");
+    fill.className = "fill";
+    tr.appendChild(fill);
+    bar.appendChild(tr);
+    row.append(top, bar);
+    box.appendChild(row);
+  }
+
+  const parts = [];
+  if (rows.length) parts.push(t("products.read", { ago: ago(p.at) }));
+  if (resets) {
+    let text = t("resets.left", { left: resets.left, total: resets.total });
+    if (resets.left > 0 && resets.endsAt) text += ` · ${t("resets.until", { when: fmtWhen(resets.endsAt, now) })}`;
+    if (resets.left > 0 && resets.usableNow) text += ` · ${t("resets.ready")}`;
+    parts.push(text);
+  }
+  $("resetsNote").textContent = parts.join(". ");
 }
 
 // Hour of day when the 5-hour sessions start
@@ -280,7 +340,7 @@ function renderWeeks() {
     const shp = document.createElement("span");
     shp.className = "shp";
     const word = document.createElement("span");
-    word.textContent = t("level.none.name");
+    word.textContent = t("day.noData");
     none.append(shp, word);
     const text = document.createElement("span");
     text.className = "mu";
@@ -311,10 +371,14 @@ function renderWeeks() {
     tr.appendChild(fill);
     bar.appendChild(tr);
     row.append(top, bar);
-    if (s.top) {
+    // A week where Claude gave part of it back used more than its % shows: say how much came back
+    const caps = [];
+    if (s.top) caps.push(t("weeks.busiest", { date: shortWeekday(new Date(s.top.ms)), pct: pct(s.top.spent) }));
+    if (s.given >= 1) caps.push(t("weeks.given", { pct: pct(s.given) }));
+    if (caps.length) {
       const cap = document.createElement("span");
       cap.className = "cap";
-      cap.textContent = t("weeks.busiest", { date: shortWeekday(new Date(s.top.ms)), pct: pct(s.top.spent) });
+      cap.textContent = caps.join(" · ");
       row.appendChild(cap);
     }
     box.appendChild(row);

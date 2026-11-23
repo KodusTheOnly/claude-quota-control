@@ -14,6 +14,9 @@ function openTypeIn() {
   const dlg = $("typeDlg");
   if (!dlg.open) {
     typeInError(null);
+    // The week's number is required, so it comes filled in with the current one (selected: typing replaces it).
+    // Save then saves what the field shows, instead of failing on a hint that looked like a number.
+    if (lastM && !$("qWeekly").value) $("qWeekly").value = String(Math.round(lastM.w.used * 10) / 10);
     dlg.showModal();
   }
   $("qWeekly").focus();
@@ -22,6 +25,10 @@ function openTypeIn() {
 function closeTypeIn() {
   $("typeDlg").close();
 }
+// However it closes (Close, Escape, a click outside, a save), the next opening starts from the current numbers
+$("typeDlg").addEventListener("close", () => {
+  $("qWeekly").value = "";
+});
 
 // Placeholders show the current numbers, so you only retype what changed
 function renderTypeIn(m) {

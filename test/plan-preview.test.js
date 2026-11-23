@@ -18,7 +18,7 @@ function load(nowMs, settings = {}) {
     I18N: { t: (k) => k, getLang: () => "en", locale: () => "en-US" },
   };
   vm.createContext(sandbox);
-  for (const f of ["core.js", "compute.js"]) {
+  for (const f of ["core.js", "learn.js", "compute.js"]) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "renderer", "js", f), "utf8"), sandbox);
   }
   vm.runInContext(`state.settings = ${JSON.stringify(settings)};`, sandbox);

@@ -39,6 +39,17 @@ function base() {
     readings: [],
     sessions: [],
     extra: { limit: 20, spent: 4.2, balance: 15.8, currency: "USD", autoReload: false, at: NOW - 3600000 },
+    // History, This week from Claude: a long product name too, to see it fit
+    products: {
+      rows: [
+        { key: "code", name: "Claude Code", pct: 22 },
+        { key: "chat", name: "Chat", pct: 7 },
+        { key: "long", name: "A product with a rather long name for its row", pct: 2 },
+      ],
+      at: NOW - 2 * 60000,
+      resetsAt: RESETS_AT,
+    },
+    resets: { left: 1, total: 2, endsAt: RESETS_AT + DAY, usableNow: true, at: NOW - 2 * 60000 },
   };
 }
 
@@ -112,10 +123,14 @@ const SCENARIOS = {
   },
   // Three months of readings with gaps, and sessions that mostly start in the morning: every part of History is filled
   history: (s) => {
-    for (let i = 3; i < 100; i++) {
-      if (i % 7 === 3 || i % 11 === 5) continue; // days without a reading
+    // Each week's end of day adds up its days from the reset day (a day without a reading still used its share)
+    let end = 0;
+    for (let i = 99; i >= 3; i--) {
       const spent = [6, 9, 12, 8, 14, 10, 7, 13, 5, 11][i % 10];
-      s.manual.days[key(TODAY - i * DAY)] = { spent, budget: 14, endUsed: 20 + ((i * 7) % 70) };
+      const ms = TODAY - i * DAY;
+      end = new Date(ms).getDay() === new Date(RESETS_AT).getDay() ? spent : Math.min(end + spent, 100);
+      if (i % 7 === 3 || i % 11 === 5) continue; // days without a reading
+      s.manual.days[key(ms)] = { spent, budget: 14, endUsed: end };
     }
     const starts = [8, 8, 9, 9, 10, 14, 15, 8, 9, 19];
     s.sessions = Array.from({ length: 30 }, (_, i) => ({ sr: TODAY - (i + 1) * DAY + (starts[i % 10] + 5) * HOUR, peak: 20 + i }));
@@ -167,6 +182,12 @@ const SCENARIOS = {
     const s2 = s.manual.fiveHour.resetsAt;
     s.readings = [[-8, 19, s1], [-7.75, 21, s1], [-7, 21, s1], [-6.75, 23.5, s1], [-5, 23.5, s1], [-4.75, 26, s1], [-2, 26, s2], [-1.75, 29, s2], [-0.25, 29, s2], [0, 31, s2]]
       .map(([h, w, sr]) => ({ at: NOW + h * HOUR, w, s: 40, sr }));
+    return s;
+  },
+  // The past weeks of "pastweeks" with "Follow my usual week" on (Settings > Plan): the plan takes the suggested weights
+  autoplan: (s) => {
+    s = SCENARIOS.pastweeks(s);
+    s.autoWeights = true;
     return s;
   },
   // Nothing read yet (first run): the Overview asks for a first reading

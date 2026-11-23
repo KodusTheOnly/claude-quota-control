@@ -14,7 +14,7 @@ body { overflow: hidden; user-select: none; }
 .note.is-error { color: var(--danger); }
 
 .screens { display: flex; flex-direction: column; gap: .5rem; }
-.pop.is-stale .crt { opacity: .7; }
+.pop.is-stale .crt { opacity: var(--stale-fade); filter: saturate(var(--stale-sat)); }
 .crt.fit { padding: .55rem .7rem; }
 .crt .row { gap: .5rem; }
 .ans { font-size: var(--fs-md); }
@@ -24,8 +24,8 @@ body { overflow: hidden; user-select: none; }
 .rows { gap: 0; padding-block: .35rem; }
 .prow { display: flex; flex-direction: column; gap: .35rem; padding: .45rem 0; border-top: 1px dotted var(--sline); }
 .prow:first-child { border-top: 0; }
-.prow-top { display: flex; align-items: center; flex-wrap: wrap; gap: .3rem .6rem; }
-.prow .plate { min-width: 5.2rem; text-align: center; }
+.prow-top { display: flex; align-items: center; flex-wrap: wrap; gap: .3rem .5rem; }
+.prow .plate { min-width: 4.4rem; text-align: center; } /* narrow enough for "17% sobrando" and the level on one line */
 .prow .mid-num { font-size: var(--fs-md); }
 .prow .lv { margin-left: auto; }
 .prow .sbar { height: .6rem; }

@@ -17,7 +17,7 @@ function load() {
     I18N: { t: (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k), getLang: () => "en", locale: () => "en-US" },
   };
   vm.createContext(sandbox);
-  for (const f of ["core.js", "compute.js", "ui.js", "blocks/verdict.js", "alerts.js"]) {
+  for (const f of ["core.js", "learn.js", "compute.js", "ui.js", "blocks/verdict.js", "alerts.js"]) {
     vm.runInContext(fs.readFileSync(path.join(ROOT, "renderer", "js", f), "utf8"), sandbox);
   }
   return sandbox;
@@ -79,4 +79,29 @@ test("while warming up the level is not rated, so nothing notifies", () => {
   const res = vm.runInContext("levelAlert", sb)(m, 0, at(7, 9));
   assert.equal(res.level, null);
   assert.equal(res.note, null);
+});
+
+// Claude sends a session's reset time with a different fraction of a second on each reading
+test("the same session gives the same notice key, whatever the fraction of a second", () => {
+  const sb = load();
+  const key = vm.runInContext("resetKey", sb);
+  const sr = at(14, 21) + 30 * 60000;
+  assert.equal(key(sr + 123), key(sr + 987));
+  assert.equal(key(sr - 400), key(sr + 400));
+  assert.notEqual(key(sr), key(sr + 5 * 3600000), "the next session is another key");
+});
+
+test("a week reset that only moved by a fraction of a second is not saved again", () => {
+  const sb = load();
+  const saved = [];
+  const R = at(28, 8); // ahead of now, so no summary of an ended week is due
+  vm.runInContext("(s, q) => { state.settings = s; Object.assign(api, q); }", sb)(
+    { weekSeen: R, notifyAll: true },
+    { setSettings: async (p) => { saved.push(p); return { ...p }; }, notify: () => {} },
+  );
+  const check = vm.runInContext("checkAlerts", sb);
+  check({ w: { resetsAt: R + 731 } }, false, null);
+  assert.equal(saved.length, 0);
+  check({ w: { resetsAt: R + 7 * 864e5 } }, false, null);
+  assert.deepEqual(JSON.parse(JSON.stringify(saved)), [{ weekSeen: R + 7 * 864e5 }]);
 });

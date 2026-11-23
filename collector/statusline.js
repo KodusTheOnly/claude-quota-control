@@ -84,7 +84,8 @@ function weightedDays(from, to, w, a = null) {
     const d = new Date(cur);
     const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
     const end = Math.min(next, to);
-    if (!a) total += ((end - cur) / DAY_MS) * w[d.getDay()];
+    // A whole day is its weight, also when the clock changes and it has 23 or 25 hours
+    if (!a) total += ((end - cur) / (next - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime())) * w[d.getDay()];
     else {
       const spans = activeSpans(cur, a);
       const len = spans.reduce((s, [x, y]) => s + y - x, 0);
@@ -112,6 +113,64 @@ function dayBudget(remaining, resetsAt, now, w, a = null) {
   // The week's last hours fall outside the active hours: today (not an Off day) gets everything left
   if (share <= 0) return left <= 0 && w[d.getDay()] !== 0 ? Math.max(remaining, 0) : 0;
   return (Math.max(remaining, 0) * share) / Math.max(left, share);
+}
+
+// The emergency reserve (Settings > Plan in the app), same as goalSettings / reserveHeld / reserveLeft /
+// reserveReleased / planBudget in renderer/js/core.js: the plan is 100% minus the reserve, and what is left of the
+// reserve joins the plan over its last `release` hours before the reset (0 = never).
+const GOAL = 100;
+function goalOf(config) {
+  const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const reserve = Math.max(Math.min(Math.round(num(config && config.reserve) ?? 0), 20), 0);
+  const rel = num(config && config.reserveRelease);
+  return { goal: GOAL, reserve, release: [24, 48, 72, 0].includes(rel) ? rel : 48 };
+}
+// Same as reserveWindow in renderer/js/core.js: the release follows the plan, and when its hours hold no plan time it
+// moves to the last planned stretch before them (the last day with weight, or its part inside the active hours)
+function reserveWindow(resetsAt, g, w, a = null) {
+  if (!g.reserve || !g.release) return null;
+  const weekStart = resetsAt - 7 * DAY_MS;
+  let from = Math.max(resetsAt - g.release * 3600000, weekStart);
+  let span = weightedDays(from, resetsAt, w, a);
+  if (span <= 0) {
+    let found = null;
+    for (let cur = weekStart; cur < from; ) {
+      const d = new Date(cur);
+      const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+      const end = Math.min(next, from);
+      if (w[d.getDay()] > 0) {
+        const spans = a ? activeSpans(cur, a) : [[cur, end]];
+        for (const [x, y] of spans) if (Math.min(y, end) > Math.max(x, cur)) found = Math.max(x, cur);
+      }
+      cur = end;
+    }
+    if (found === null) return null;
+    from = found;
+    span = weightedDays(from, resetsAt, w, a);
+  }
+  return { from, span };
+}
+function reserveHeld(ms, resetsAt, g, w, a = null) {
+  if (!g.reserve) return 0;
+  const win = reserveWindow(resetsAt, g, w, a);
+  if (!win || ms <= win.from) return g.reserve;
+  if (ms >= resetsAt) return 0;
+  return g.reserve * Math.min(weightedDays(ms, resetsAt, w, a) / win.span, 1);
+}
+function planBudget(usedStart, resetsAt, now, g, w, a = null) {
+  const plan = dayBudget(g.goal - g.reserve - usedStart, resetsAt, now, w, a);
+  if (!resetsAt || !g.reserve) return plan;
+  const d = new Date(now);
+  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+  const from = Math.max(start, resetsAt - 7 * DAY_MS);
+  const to = Math.min(next, resetsAt);
+  // No plan time left before the reset: the whole reserve left joins today too
+  if (weightedDays(from, to, w, a) <= 0) return weightedDays(from, resetsAt, w, a) <= 0 && w[d.getDay()] !== 0 ? Math.max(g.goal - usedStart, 0) : plan;
+  const left = Math.min(Math.max(g.goal - Math.max(usedStart, g.goal - g.reserve), 0), g.reserve);
+  const held = reserveHeld(from, resetsAt, g, w, a);
+  if (!(left > 0) || held <= 0) return plan;
+  return plan + (left * Math.max(held - reserveHeld(to, resetsAt, g, w, a), 0)) / held;
 }
 
 // Short log of the readings (time, weekly %, session %, session reset), so the app can rebuild
@@ -161,9 +220,13 @@ function record(input) {
   const entry = (continuing && days[today]) || {};
   const config = readJson(CONFIG_FILE) || {};
   const w = weightsOf(config);
+  const spent = Math.round(((entry.spent || 0) + delta) * 100) / 100;
+  // The week went down without a reset (Claude gave part of it back): the day's start moves down by as much
+  // (mirrors saveManual in renderer/js/compute.js)
+  if (continuing && dayStart.used > weekly.used - spent + 0.5) dayStart = { ...dayStart, used: Math.max(Math.round((weekly.used - spent) * 100) / 100, 0) };
   days[today] = {
-    spent: Math.round(((entry.spent || 0) + delta) * 100) / 100,
-    budget: Math.round(dayBudget(100 - dayStart.used, weekly.resetsAt, now, w, activeOf(config)) * 100) / 100,
+    spent,
+    budget: Math.round(planBudget(dayStart.used, weekly.resetsAt, now, goalOf(config), w, activeOf(config)) * 100) / 100,
     endUsed: weekly.used,
   };
 
@@ -206,8 +269,9 @@ function ownLine(input, data, lang) {
 
 // On an Off day (plan weight 0) there is no budget to print, so show the use as a share of the week
 function todayText(text, today, now, w) {
-  if (w[new Date(now).getDay()] !== 0) return `${text.today} ${Math.round(today.spent)}/${Math.round(today.budget)}%`;
   const used = Math.round(today.spent);
+  // A day that is not Off but has no budget at all (the hours after a reset past the active hours): only the use
+  if (w[new Date(now).getDay()] !== 0) return today.budget > 0 ? `${text.today} ${used}/${Math.round(today.budget)}%` : `${text.today} ${used}%`;
   return used > 0 ? `${text.today} ${used}% (${text.off})` : `${text.today} ${text.off}`;
 }
 

@@ -70,3 +70,12 @@ test("the collector keeps a short log of readings and extends it when nothing ch
     fs.rmSync(home, { recursive: true, force: true });
   }
 });
+
+test("a reading older than the last one saved is left out", async () => {
+  // The collector's file is read again at start, after newer readings came from the account
+  const { log, store } = load({ readings: [], sessions: [] });
+  await log({ at: T, weekly: 10, session: null, sessionResetsAt: null });
+  await log({ at: T + 30 * MIN, weekly: 12, session: null, sessionResetsAt: null });
+  await log({ at: T + 10 * MIN, weekly: 11, session: null, sessionResetsAt: null });
+  assert.deepEqual(JSON.parse(JSON.stringify(store.readings.map((r) => r.at))), [T, T + 30 * MIN]);
+});

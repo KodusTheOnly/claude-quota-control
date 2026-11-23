@@ -60,13 +60,20 @@ function syncFeedback(text, kind, action) {
 }
 
 let syncBusy = false;
+let syncQuiet = false; // the reading that is running was started by the app itself, so it reports nothing
 
 // A reading of the usage page. "auto" marks the ones the app starts by itself (opening the app,
 // coming back to it, opening the tray card): they never move you to another screen and never show
 // an error or the "updated" notice. The lamp and the message strip still tell the story, and the usual
 // alerts (a change of level, a reset) can still fire from a fresh reading.
 async function runSync({ visible = false, auto = false } = {}) {
-  if (syncBusy || !api) return;
+  if (!api) return;
+  // A reading is already running. If the app started it and this one is the person asking, the one that is
+  // running reports its result as theirs.
+  if (syncBusy) {
+    if (!auto) syncQuiet = false;
+    return;
+  }
   if (!state.settings.claudeConnected) {
     if (auto) return;
     go("panel");
@@ -74,6 +81,7 @@ async function runSync({ visible = false, auto = false } = {}) {
     return;
   }
   syncBusy = true;
+  syncQuiet = auto;
   state.syncMsg = null;
   render(); // tells the tray card a refresh is running
   const btn = $("syncBtn");
@@ -85,6 +93,8 @@ async function runSync({ visible = false, auto = false } = {}) {
   let res;
   try {
     res = await api.claudeSync({ visible });
+  } catch {
+    res = { ok: false, error: "fail" }; // the main process did not answer: a plain failure, with its message
   } finally {
     syncBusy = false;
     btn.disabled = false;
@@ -92,6 +102,7 @@ async function runSync({ visible = false, auto = false } = {}) {
     btn.removeAttribute("aria-busy");
     $("syncLabel").textContent = t("hd.refresh");
   }
+  auto = syncQuiet; // someone may have asked while it ran
 
   // The verdict's face shows a failed reading (state.syncFail, the error code) until one works
   if (res.ok) state.syncFail = null;
@@ -109,6 +120,14 @@ async function runSync({ visible = false, auto = false } = {}) {
     // reading that could not read the text at all (undefined) keeps what the app already had.
     if (res.extra !== undefined) {
       state.settings = await api.setSettings({ extra: res.extra ? { ...res.extra, at: res.at || Date.now() } : null });
+    }
+    // Use per product and Claude's resets (History): each reading replaces them, null when it did not show them
+    if ("products" in res || "resets" in res) {
+      const at = res.at || Date.now();
+      state.settings = await api.setSettings({
+        products: res.products ? { rows: res.products, at, resetsAt: res.weekly.resetsAt } : null,
+        resets: res.resets ? { ...res.resets, at } : null,
+      });
     }
     await saveManual({
       weekly: res.weekly.used,

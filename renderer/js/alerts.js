@@ -9,7 +9,7 @@ function checkAlerts(m, fresh, src) {
   // Session reset: the time is already known, so this needs no reading
   const raw = src && src.data.fiveHour;
   if (resets && raw && raw.resetsAt && raw.resetsAt <= now && now - raw.resetsAt < 2 * HOUR && raw.used >= warnAt()) {
-    api.notify({ key: `sess-reset-${raw.resetsAt}`, title: t("alert.sessionReset"), body: t("alert.sessionResetBody"), syncOnClick: Boolean(s.claudeConnected) });
+    api.notify({ key: `sess-reset-${resetKey(raw.resetsAt)}`, title: t("alert.sessionReset"), body: t("alert.sessionResetBody"), syncOnClick: Boolean(s.claudeConnected) });
   }
 
   // Session far above normal
@@ -25,8 +25,9 @@ function checkAlerts(m, fresh, src) {
   }
 
   // Week rolled over: notify with a summary of the week that ended
+  // Claude sends the same reset with a slightly different time on each reading: only a move of an hour or more is a new week
   const R = m.w.resetsAt;
-  if (s.weekSeen !== R) {
+  if (!s.weekSeen || Math.abs(s.weekSeen - R) >= HOUR) {
     const ended = s.weekSeen;
     api.setSettings({ weekSeen: R }).then((next) => {
       state.settings = next;
@@ -86,6 +87,12 @@ function levelAlert(m, prev, now) {
   return { level, note };
 }
 
+// Claude sends a session's reset time with a different fraction of a second on each reading. A key built from it
+// rounds it to 10 minutes, so the same session gives the same key and its notice is shown once.
+function resetKey(ms) {
+  return Math.round(ms / (10 * MIN));
+}
+
 // Typical session peak: the median of the last sessions
 function typicalPeak(excludeSr) {
   const peaks = ((state.settings && state.settings.sessions) || [])
@@ -101,7 +108,7 @@ function spikeAlert(raw) {
   const typical = typicalPeak(raw.resetsAt);
   if (!typical || raw.used < 20 || raw.used < typical * SPIKE_FACTOR) return;
   api.notify({
-    key: `spike-${raw.resetsAt}`,
+    key: `spike-${resetKey(raw.resetsAt)}`,
     title: t("alert.spikeTitle"),
     body: t("alert.spikeBody", { used: pct(raw.used), typical: pct(typical), times: fmtNum(raw.used / typical, 1, 1) }),
   });

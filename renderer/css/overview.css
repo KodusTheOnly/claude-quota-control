@@ -148,8 +148,9 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 .gauge .z1 { --zc: var(--moderate); }
 .gauge .z2 { --zc: var(--tight); }
 .gauge .z.on { background: var(--zc); color: var(--scr); }
-/* The needle: two notches, one at the top edge and one at the bottom, so the zone's name stays clear between them */
-.gauge .ndl { position: absolute; z-index: 2; top: 0; bottom: 0; left: var(--nx, 50%); width: 6px; margin-left: -3px; pointer-events: none; }
+/* The needle: two notches that straddle the top and the bottom edge, so the zone's name stays clear between them
+   (inside the edges they ran into the letters) */
+.gauge .ndl { position: absolute; z-index: 2; top: -1px; bottom: -2px; left: var(--nx, 50%); width: 6px; margin-left: -3px; pointer-events: none; }
 .gauge .ndl::before, .gauge .ndl::after { content: ""; position: absolute; left: 0; right: 0; height: 3px; background: var(--st); box-shadow: 0 0 0 1px var(--scr); }
 .gauge .ndl::before { top: 0; }
 .gauge .ndl::after { bottom: 0; }
@@ -202,6 +203,11 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
    columns) and leave the last stretch empty, under the chart's. The line above them is the hours' bottom edge, so it runs on. */
 .days { grid-column: 2; grid-row: 3; position: relative; z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: calc(100% * var(--dw, 7) / var(--ax, 7)); }
 .day:last-child { border-right: 1px solid var(--crt-grid-day); }
+/* What is left of the row after the seventh day: the hours up to the reset. It says so when it has the room. */
+.dend { grid-column: 2; grid-row: 3; justify-self: end; position: relative; z-index: 1; display: flex; flex-direction: column; gap: .1rem; min-width: 0; overflow: hidden; width: calc(100% * (var(--ax, 7) - var(--dw, 7)) / var(--ax, 7)); container: dend / inline-size; font: 400 var(--fs-xs)/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; color: var(--sm); }
+.dend > * { margin: 0 .5rem; }
+.dend b { margin-top: .3rem; font-weight: 600; }
+@container dend (max-width: 5.5rem) { .dend > * { display: none; } }
 .day {
   position: relative; display: flex; flex-direction: column; align-items: stretch; gap: .1rem; min-width: 0; padding: .3rem .5rem .35rem; overflow: hidden;
   text-align: left; font: inherit; color: var(--st); background: transparent; border: 0; border-left: 1px solid var(--crt-grid-day); border-radius: 0; cursor: pointer;
@@ -230,6 +236,7 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 .day .bg .sbar { flex: 1 1 auto; min-width: 1.5rem; height: .5rem; }
 .day .bd { font: 400 var(--fs-xs)/1.3 var(--mono); color: var(--sm); white-space: nowrap; }
 .day .bd .bdw { font-style: normal; }
+.day .bd .bdl { font-style: normal; color: var(--pause); }
 /* A day ahead: no % and no empty bar, only its budget and where the week should stand at its end */
 .day.ahead .pr, .day.ahead .bg .sbar { display: none; }
 .day.ahead .bg { margin-top: .1rem; }
@@ -310,7 +317,7 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
   .band .wk:has(.gauge.hidden) { padding-bottom: 1.6rem; } /* no pace row: room for the bar's label ("▲ 23% expected") under it */
   .ghead { flex-wrap: wrap; gap: .1rem .6rem; padding-left: .6rem; padding-right: .6rem; }
   /* The days as rows. The column tiers further down (@container days) are for the columns: the rows undo them. */
-  .dg, .todaybox { display: none; }
+  .dg, .todaybox, .dend { display: none; }
   .days { grid-column: 1 / -1; display: flex; flex-direction: column; width: auto; }
   .days .day { flex-direction: row; align-items: center; gap: .6rem; min-height: 2rem; padding: .3rem .6rem; border-left: 0; border-top: 1px solid var(--crt-grid-day); }
   .days .day:first-child { border-top: 0; }

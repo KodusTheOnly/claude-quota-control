@@ -20,7 +20,7 @@ function levelOf(name) {
     I18N: { t: (k) => k, getLang: () => "en", locale: () => "en-US" },
   };
   vm.createContext(sandbox);
-  for (const f of ["core.js", "compute.js"]) vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "renderer", "js", f), "utf8"), sandbox);
+  for (const f of ["core.js", "learn.js", "compute.js"]) vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "renderer", "js", f), "utf8"), sandbox);
   vm.runInContext(`state.settings = ${JSON.stringify(settingsFor(name))};`, sandbox);
   return vm.runInContext("(() => { const m = compute(pickSource()); return { head: m.head.level, room: Boolean(m.head.room), endRoom: m.endRoom, week: m.lv.week, hours: m.lv.lock && m.lv.lock.hours }; })()", sandbox);
 }

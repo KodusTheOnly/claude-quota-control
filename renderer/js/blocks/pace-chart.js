@@ -125,6 +125,9 @@ function drawPaceChart() {
   const past = pastInChart() ? pastData : [];
   for (const w of past) add("polyline", { points: fmt(w.pts), fill: "none", stroke: w.fullDay ? PAL.red : PAL.muted, opacity: w.fullDay ? ".8" : ".75", "stroke-width": 1.5, "stroke-dasharray": "5 3" });
 
+  // The likely range at the reset: a faint fan from now, under every line of this week
+  if (s.band) add("polygon", { points: fmt([{ x: s.band.x0, y: s.band.y0 }, { x: s.band.x1, y: s.band.high }, { x: s.band.x1, y: s.band.low }]), fill: color, opacity: ".16" });
+
   // The plan's pace, then what was used (with a faint area under it)
   const px = (pts) => pts.map((p) => ({ x: X(p.x), y: Y(p.y) }));
   const projPx = s.proj && s.proj.length > 1 ? px(s.proj) : null;

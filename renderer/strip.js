@@ -52,8 +52,7 @@ function render(s) {
     flag = t("level.none.name");
   } else if (today.off) {
     value = today.short; // what was used today, a share of the week
-
-    flag = t("day.off");
+    flag = t(today.reserve ? "day.reserve" : "day.off");
   } else {
     value = today.short;
     if (today.isOver) flag = t("strip.over");

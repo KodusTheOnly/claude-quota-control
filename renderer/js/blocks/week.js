@@ -15,6 +15,7 @@ function dayLabel(ms) {
 // A column has three rows: name and date, the day's % with its level shape and its tag, the budget bar.
 // A day with no reading says why (no data, off, a plan other than Normal) between the % and the bar.
 // A day ahead has nothing to measure yet: no %, no bar. It shows its budget and where the week should stand at its end.
+// When today went past its own budget, the days ahead show the smaller budget that leaves them, and how much they lost.
 // The week starts mid-day (at the reset) and ends a little after the seventh day: the chart and the hours run on to the
 // reset, and the days leave that last stretch empty.
 function buildDays() {
@@ -123,6 +124,7 @@ function renderWeek(m) {
   const legend = [
     ...(s.over.length ? [["chart.legOver", legRed, ""]] : []),
     ...(s.used.some((p) => p.est) ? [["chart.legEst", weekColor, "dotted"]] : []),
+    ...(s.band ? [["chart.legRange", weekColor, "range"]] : []),
     ...(s.reserve ? [["chart.legReserve", cssVar("--crt-accent"), ""]] : []),
     ...(s.starts.length ? [["chart.legStart", legMuted, "tick"]] : []),
     ...(activeHours() ? [["chart.legActive", cssVar("--crt-accent"), "active"]] : []),
@@ -133,6 +135,7 @@ function renderWeek(m) {
       const line = node("i");
       line.style.borderTopColor = color;
       if (style === "tick") Object.assign(line.style, { width: "0", height: "1em", borderTop: "0", borderLeft: `2px solid ${legMuted}`, marginRight: ".7em" }); // a short vertical tick, as on the chart
+      else if (style === "range") Object.assign(line.style, { borderTopWidth: "7px", opacity: ".35" }); // the fan's fill
       else if (style === "active") Object.assign(line.style, { borderTopWidth: "3px", opacity: ".75" }); // the bar under the HRS strip
       else if (style) line.style.borderTopStyle = style;
       item.append(line, t(key));
@@ -141,6 +144,7 @@ function renderWeek(m) {
   );
   $("planSum").textContent = planSummary(m).join(" · ");
   $("planSum").title = t("plan.label");
+  $("daysEndText").textContent = `${shortWeekday(new Date(m.w.resetsAt))} ${fmtTime(m.w.resetsAt)}`;
   $("wResets").textContent = t("chart.resets", { when: `${shortWeekday(new Date(m.w.resetsAt))} ${fmtTime(m.w.resetsAt)}` });
 
   // Where the week should stand at the end of each day ahead: today ending on its budget (or where it already is, when
@@ -166,7 +170,7 @@ function renderWeek(m) {
     const shownNum = known ? `${r0(d.ratio * 100)}%` : (d.kind === "off" || onReserve) && d.isToday ? offDayNumber(d.spent) : "–";
     r.num.textContent = shownNum;
     // The level shape next to the %, or why there is none
-    const stateKey = onReserve ? "day.reserve" : d.kind === "off" ? "day.off" : d.kind === "future" ? `plan.${d.name}` : "day.noData";
+    const stateKey = onReserve ? "day.reserve" : d.idle ? "day.idle" : d.kind === "off" ? "day.off" : d.kind === "future" ? `plan.${d.name}` : "day.noData";
     r.lv.classList.toggle("hidden", !known);
     if (known) paintLevel(r.lv, d.level);
     // A plain Normal day ahead keeps its word: the columns hide it (the footer says "Normal ×N"), the vertical rows show it
@@ -188,6 +192,10 @@ function renderWeek(m) {
       r.bud.replaceChildren();
       if (d.budget) r.bud.append("▲", node("i", "bdw", ` ${t("day.budgetWord")} `), `${r0(d.budget)}%`);
     }
+    // A day ahead that today's use made smaller says by how much: "▲12% ▼2" (whole points, as shown)
+    const lost = ahead && d.planned !== null ? r0(d.planned) - r0(d.budget) : 0;
+    if (lost >= 1) r.bud.append(node("i", "bdl", ` ▼${lost}`));
+    const lostPhrase = lost >= 1 ? `, ${t("day.lostAria", { pct: lost })}` : "";
     let weekPhrase = "";
     if (ahead && d.budget > 0) {
       weekTo = Math.min(weekTo + d.budget, 100);
@@ -202,9 +210,9 @@ function renderWeek(m) {
       r.b.removeAttribute("aria-disabled");
       r.b.setAttribute("aria-haspopup", "dialog");
     }
-    const status = known ? `${lvName(d.level)}, ${t(isOverBudget(d.ratio) ? "day.over" : "day.within")}` : d.kind === "off" ? t("day.off") : d.kind === "future" ? t(`plan.${d.name}`) : t("day.noData");
+    const status = known ? `${lvName(d.level)}, ${t(isOverBudget(d.ratio) ? "day.over" : "day.within")}` : d.idle ? t("day.idle") : d.kind === "off" ? t("day.off") : d.kind === "future" ? t(`plan.${d.name}`) : t("day.noData");
     r.b.title = i === 0 ? `${t("day.reset")} ${fmtTime(m.w.resetsAt)}` : "";
-    r.b.setAttribute("aria-label", `${nm} ${date}, ${t(`plan.${d.name}`)}, ${shownNum}, ${status}${i === 0 ? `, ${t("day.reset")} ${fmtTime(m.w.resetsAt)}` : ""}${fig ? `, ${figPhrase}` : d.budget ? `, ${t("day.budgetAria", { pct: r0(d.budget) })}` : ""}${weekPhrase}${d.isToday ? `, ${t("day.today")}` : ""}`);
+    r.b.setAttribute("aria-label", `${nm} ${date}, ${t(`plan.${d.name}`)}, ${shownNum}, ${status}${i === 0 ? `, ${t("day.reset")} ${fmtTime(m.w.resetsAt)}` : ""}${fig ? `, ${figPhrase}` : d.budget ? `, ${t("day.budgetAria", { pct: r0(d.budget) })}` : ""}${lostPhrase}${weekPhrase}${d.isToday ? `, ${t("day.today")}` : ""}`);
     r.b.title = r.b.getAttribute("aria-label"); // the narrow columns hide the date and the level word; hover shows them
   });
 

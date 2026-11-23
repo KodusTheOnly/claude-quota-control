@@ -42,6 +42,51 @@ function parseUsageJson(data) {
   return { ok: true, weekly, session };
 }
 
+// Two optional parts of the same answer, read only when they have the expected shape. Neither can fail a reading:
+// a part that is missing or looks different is null, and the app shows nothing for it.
+//   products: this week's use per product, from seven_day_breakdown.rows:
+//             [{ key, name, pct }], pct being the share of the weekly limit (percent_of_limit), biggest first
+//   resets:   the resets Claude offers for the weekly limit, from cedar_ember.grants (those that give the week back):
+//             { left, total, endsAt (the soonest end among those with resets left, or null), usableNow }
+const MAX_PRODUCTS = 12;
+const isCount = (v) => Number.isInteger(v) && v >= 0 && v < 1000;
+const isName = (v) => typeof v === "string" && v.trim().length > 0 && v.length <= 60;
+
+function parseProducts(data) {
+  const b = data && data.seven_day_breakdown;
+  if (!isObject(b) || !Array.isArray(b.rows)) return null;
+  const rows = [];
+  for (const r of b.rows) {
+    if (!isObject(r) || !isName(r.display_name) || !isPercent(r.percent_of_limit)) return null;
+    rows.push({ key: typeof r.key === "string" ? r.key.slice(0, 60) : "", name: r.display_name.trim(), pct: r.percent_of_limit });
+  }
+  if (!rows.length || rows.length > MAX_PRODUCTS) return null;
+  return rows.sort((x, y) => y.pct - x.pct);
+}
+
+function parseResets(data, now = Date.now()) {
+  const c = data && data.cedar_ember;
+  if (!isObject(c) || !Array.isArray(c.grants)) return null;
+  let left = 0;
+  let total = 0;
+  let endsAt = null;
+  let usableNow = false;
+  let any = false;
+  for (const g of c.grants) {
+    if (!isObject(g) || !isCount(g.resets_left) || !isCount(g.resets_total) || g.resets_left > g.resets_total) return null;
+    if (g.gives_back_weekly !== true) continue;
+    const ends = g.ends_at === null || g.ends_at === undefined ? null : toTime(g.ends_at);
+    if (g.ends_at !== null && g.ends_at !== undefined && ends === null) return null;
+    if (ends !== null && ends <= now) continue; // an offer that ended
+    any = true;
+    left += g.resets_left;
+    total += g.resets_total;
+    if (g.resets_left > 0 && ends !== null && (endsAt === null || ends < endsAt)) endsAt = ends;
+    if (g.resets_left > 0 && g.usable_now === true) usableNow = true;
+  }
+  return any ? { left, total, endsAt, usableNow } : null;
+}
+
 // Field names and types of a response, without any value. Saved when a reading fails, so the
 // reader can be adjusted without keeping anyone's numbers.
 function describeShape(v, depth = 0) {
@@ -54,4 +99,4 @@ function describeShape(v, depth = 0) {
   return typeof v;
 }
 
-module.exports = { parseUsageJson, describeShape };
+module.exports = { parseUsageJson, parseProducts, parseResets, describeShape };

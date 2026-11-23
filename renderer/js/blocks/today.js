@@ -10,15 +10,18 @@ function renderToday(m) {
 
   // An Off day (and a day on the reserve) shows what was used today as a share of the week (a dash when nothing was)
   setNum($("tUsed"), off ? offDayNumber(m.spent) : `${r0(ratio * 100)}%`);
-  $("tUsedWord").textContent = t(res ? "today.fromReserveWord" : off ? "today.ofWeekWord" : "today.usedWord");
+  // A dash is not a share of anything: an Off day with nothing used says so in words
+  const nothing = off && !(Math.round(m.spent) > 0);
+  $("tUsedWord").textContent = t(res ? "today.fromReserveWord" : nothing ? "today.nothingWord" : off ? "today.ofWeekWord" : "today.usedWord");
   // The note under the title, longest first; fitTodayHead() takes the first one that fits
   // On the reserve it says when the budget comes back, or how much of the reserve is left
   const bud = t("today.budgetAt", { pct: pct(m.budget) });
-  const relStart = m.g.release ? m.w.resetsAt - m.g.release * HOUR : null;
+  const rw = reserveWindow(m.w.resetsAt, m.g);
+  const relStart = rw ? rw.from : null;
   const resNote = relStart !== null && relStart > m.now
     ? t("today.budgetReturns", { when: fmtWhen(relStart, m.now) })
     : t("today.reserveLeft", { pct: asShownPct(reserveLeft(m.w.used, m.g)) });
-  todayLeftTexts = res ? [resNote, t("today.onReserve"), ""] : off ? [t("today.dayOff"), t("day.off"), ""] : [`${bud}${t("today.budgetWord")}`, bud, ""];
+  todayLeftTexts = res ? [resNote, t("today.onReserve"), ""] : m.idle ? [t("today.idle"), t("day.idle"), ""] : off ? [t("today.dayOff"), t("day.off"), ""] : [`${bud}${t("today.budgetWord")}`, bud, ""];
   // Today is a target, not a risk: the level only shows when the day runs past its budget (Tight or Pause)
   const showLevel = !off && lv !== null && lv >= 2;
   paintLevel($("tLevel"), showLevel ? lv : null);

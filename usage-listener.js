@@ -21,14 +21,23 @@ function maskedPath(url) {
 }
 
 // `webContents` is an Electron WebContents (or anything with the same `debugger`).
-// Resolves with an object that fills in by itself: { requested, status, body }. requested: the page sent its
-// usage request (an answer may still be on its way).
+// Resolves with an object that fills in by itself: { requested, status, body, bodyFailed, detached }.
+//   requested   the page sent its usage request (an answer may still be on its way)
+//   status      the status of the usage answer. The page can ask more than once: a good answer (200 with its body
+//               read) is kept, and a later one that fails does not replace it
+//   body        the text of the 200 answer, null until it is read
+//   bodyFailed  a 200 answer arrived but its body could not be read (and no other one was)
+//   detached    the debugger let go of the page (it crashed, or something else took the debugger): nothing more comes
 function listenForUsage(webContents, origin, trace = () => {}) {
   const pattern = usageUrlPattern(origin);
   const dbg = webContents.debugger;
-  const got = { requested: false, status: null, body: null };
-  const mine = new Set();
+  const got = { requested: false, status: null, body: null, bodyFailed: false, detached: false };
+  const mine = new Map(); // request id -> status of its answer
   dbg.attach("1.3");
+  dbg.on("detach", (_e, reason) => {
+    got.detached = true;
+    trace(`debugger detached: ${reason}`);
+  });
   dbg.on("message", (_e, method, params) => {
     if (method === "Network.requestWillBeSent") {
       if (params.request && pattern.test(params.request.url)) got.requested = true;
@@ -38,17 +47,22 @@ function listenForUsage(webContents, origin, trace = () => {}) {
       if (url.startsWith(`${origin}/api/`)) trace(`page request ${params.response.status} ${maskedPath(url)}`);
       if (pattern.test(url)) {
         got.requested = true;
-        mine.add(params.requestId);
-        got.status = params.response.status;
+        mine.set(params.requestId, params.response.status);
+        if (got.body === null) got.status = params.response.status;
       }
-    } else if (method === "Network.loadingFinished" && mine.has(params.requestId)) {
+    } else if (method === "Network.loadingFinished" && mine.get(params.requestId) === 200) {
       dbg
         .sendCommand("Network.getResponseBody", { requestId: params.requestId })
         .then((r) => {
           got.body = r.base64Encoded ? Buffer.from(r.body, "base64").toString("utf8") : r.body;
+          got.status = 200;
+          got.bodyFailed = false;
           trace(`usage answer read (${got.body.length} characters)`);
         })
-        .catch((e) => trace(`usage answer could not be read: ${e && e.message}`));
+        .catch((e) => {
+          if (got.body === null) got.bodyFailed = true;
+          trace(`usage answer could not be read: ${e && e.message}`);
+        });
     } else if (method === "Network.loadingFailed" && mine.has(params.requestId)) {
       trace(`usage request failed: ${params.errorText}`);
     }

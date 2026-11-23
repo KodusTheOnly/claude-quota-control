@@ -60,7 +60,7 @@ function updateTray(m) {
     fraction = Math.max(0, shown) / 100;
     tooltip = t("tray.head", { name: t("app.name"), level: m.head.name })
       + (m.five ? `\n${t("tray.session", { pct: pct(m.five.used) })}` : "")
-      + `\n${t("tray.week", { pct: pct(m.w.used) })}\n${m.dayOff ? t("tray.todayOff", { pct: pct(m.spent) }) : t("tray.today", { pct: pct(m.todayRatio * 100) })}\n${t("tray.updated", { ago: ago(lastUpdate()) })}`;
+      + `\n${t("tray.week", { pct: pct(m.w.used) })}\n${m.reserveMode ? t("tray.todayReserve", { pct: pct(m.spent) }) : m.dayOff ? t("tray.todayOff", { pct: pct(m.spent) }) : t("tray.today", { pct: pct(m.todayRatio * 100) })}\n${t("tray.updated", { ago: ago(lastUpdate()) })}`;
   }
   const images = TRAY_SIZES.map((size) => ({ scale: size / 16, dataUrl: drawTrayIcon(size, color, label, fraction) }));
   api.setTray({ images, tooltip });
@@ -99,13 +99,15 @@ function publishSummary(m, src) {
     s.rows = [];
 
     // Today: a share of today's budget; "left" until it is spent, then "over"
-    // An Off day is not rated: it says Off and what was used (a share of the week), with no level or bar
-    const off = m.dayOff;
+    // An Off day is not rated: it says Off and what was used (a share of the week), with no level or bar.
+    // A day on the reserve is shown the same way, as the Overview does: the plan is spent, so there is no budget to rate.
+    const reserve = m.reserveMode;
+    const off = m.dayOff || reserve;
     const ratio = off ? 0 : m.todayRatio;
     const left = pct(Math.max(1 - ratio, 0) * 100);
     const usedToday = pct(m.spent);
     const todayLevel = off ? null : m.lv.today;
-    s.rows.push({ kind: "today", label: t("pop.today"), text: off ? t("pop.offUsed", { pct: usedToday }) : t("pop.left", { pct: left }), short: off ? usedToday : left, isOver: !off && isOverBudget(ratio), off, level: todayLevel, ...budgetBarValues(ratio) });
+    s.rows.push({ kind: "today", label: t("pop.today"), text: reserve ? t("pop.reserveUsed", { pct: usedToday }) : off ? t("pop.offUsed", { pct: usedToday }) : t("pop.left", { pct: left }), short: off ? usedToday : left, isOver: !off && isOverBudget(ratio), off, reserve, level: todayLevel, ...budgetBarValues(ratio) });
 
     if (m.five) {
       const f = m.five;

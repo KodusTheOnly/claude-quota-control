@@ -11,7 +11,11 @@ const EventEmitter = require("node:events");
 const i18n = require("../renderer/i18n.js");
 
 const MAIN = require.resolve("../main.js");
-const DATA_FILE = path.join(os.homedir(), ".claude", "claude-quota-control.json");
+// main.js reads and writes the Claude Code folder: give it a temporary one, never the real one
+const CLAUDE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "cqc-claude-"));
+process.env.CQC_CLAUDE_DIR = CLAUDE_DIR;
+test.after(() => fs.rmSync(CLAUDE_DIR, { recursive: true, force: true }));
+const DATA_FILE = path.join(CLAUDE_DIR, "claude-quota-control.json");
 const T0 = 1_800_000_000_000;
 const MIN = 60 * 1000;
 
@@ -86,7 +90,11 @@ async function loadMain(t, { settings = {}, files = null, shortcutAvailable = tr
     Menu: { buildFromTemplate: (tpl) => { lastMenu = tpl; return { popup() {} }; } },
     nativeImage: { createFromPath: () => ({}), createEmpty: () => ({ addRepresentation() {}, isEmpty: () => true }), createFromDataURL: () => ({ isEmpty: () => true }) },
     nativeTheme: Object.assign(new EventEmitter(), { themeSource: "system", shouldUseDarkColors: false }),
-    ipcMain: { handle: (ch, fn) => { ipc.handle[ch] = fn; }, on: (ch, fn) => { ipc.on[ch] = fn; } },
+    // The tests call the handlers directly: a call that names no sender comes from the main window, as in the app
+    ipcMain: {
+      handle: (ch, fn) => { ipc.handle[ch] = (e, ...args) => fn(fromMainWindow(e), ...args); },
+      on: (ch, fn) => { ipc.on[ch] = (e, ...args) => fn(fromMainWindow(e), ...args); },
+    },
     Notification: notifications
       ? class extends EventEmitter {
           static isSupported() { return true; }
@@ -109,6 +117,7 @@ async function loadMain(t, { settings = {}, files = null, shortcutAvailable = tr
       unregisterAll: () => { shortcuts.clear(); },
     },
   };
+  const fromMainWindow = (e) => (e && e.sender ? e : { ...(e || {}), sender: windows[0] && windows[0].webContents });
   const fakeSync = { sync: async () => ({ ok: false, error: "closed" }), login: async () => ({ ok: false }), logout: async () => ({}), USAGE_URL: "" };
 
   const fakeChildProcess = {
@@ -392,9 +401,9 @@ const FULL = {
   language: "pt-BR", theme: "light", screens: "crt", showExtra: false, miniWindow: false, codeLogs: false,
   shortcutOn: true, shortcutKeys: "Ctrl+Alt+Y", fiveHourThreshold: 80, remindEvery: 4,
   notifyAll: true, notifyLevel: false, notifyResets: true, notifySpikes: false, notifyExtra: true,
-  reserve: 10, reserveRelease: 24,
+  reserve: 10, reserveRelease: 24, autoWeights: true,
 };
-const EXPORTED_KEYS = ["manual", "readings", "sessions", "weights", "activeHours", "extra", "language", "theme", "screens", "showExtra", "miniWindow", "codeLogs", "shortcutOn", "shortcutKeys", "fiveHourThreshold", "remindEvery", "notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "reserve", "reserveRelease"];
+const EXPORTED_KEYS = ["manual", "readings", "sessions", "weights", "activeHours", "extra", "language", "theme", "screens", "showExtra", "miniWindow", "codeLogs", "shortcutOn", "shortcutKeys", "fiveHourThreshold", "remindEvery", "notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "reserve", "reserveRelease", "autoWeights"];
 const backups = (dir) => (fs.existsSync(path.join(dir, "backups")) ? fs.readdirSync(path.join(dir, "backups")).sort() : []);
 const readBackup = (dir, name) => JSON.parse(fs.readFileSync(path.join(dir, "backups", name), "utf8"));
 const tmpFile = (t, name) => {
@@ -561,4 +570,75 @@ test("the collector status answers without blocking, with the node version", asy
   assert.equal(typeof pending.then, "function", "a promise, not a value computed on the spot");
   const st = await pending;
   assert.match(st.node, /^v[0-9]+[.]/);
+});
+
+// Who may talk to the main process, and what an import or an export lets through
+
+test("only the app's own windows are answered", async (t) => {
+  const app = await loadMain(t);
+  const stranger = { sender: { send() {} } }; // some other page, not one of the app's three windows
+  assert.throws(() => app.ipc.handle["get-settings"](stranger), /refused/);
+  assert.throws(() => app.ipc.handle["set-settings"](stranger, { notifyAll: false }), /refused/);
+  assert.throws(() => app.ipc.handle["clear-data"](stranger), /refused/);
+  app.ipc.on["open-usage"](stranger);
+  assert.deepEqual(app.opened, [], "a message from elsewhere does nothing");
+  // The tray card is one of the app's windows; a frame inside a window is not its top page
+  assert.equal(typeof (await app.ipc.handle["get-settings"]({ sender: app.popup.webContents })).language, "string");
+  const top = {};
+  assert.throws(() => app.ipc.handle["get-settings"]({ sender: Object.assign(app.win.webContents, { mainFrame: top }), senderFrame: {} }), /refused/);
+  assert.equal(typeof (await app.ipc.handle["get-settings"]({ sender: app.win.webContents, senderFrame: top })).language, "string");
+});
+
+test("settings sent in a shape that is not an object change nothing", async (t) => {
+  const app = await loadMain(t, { settings: GOOD });
+  for (const bad of [null, "x", 5, [1, 2]]) await app.ipc.handle["set-settings"]({}, bad);
+  assert.deepEqual((await app.ipc.handle["get-settings"]()).readings, GOOD.readings);
+});
+
+test("an import drops times that cannot be real, so the week's math never walks toward them", async (t) => {
+  const file = backupFile(t, "times", {
+    manual: { ...MANUAL, weekly: { used: 40, resetsAt: 1e300 }, anchor: T0 + 5 * MIN },
+    readings: [{ at: T0, w: 10, s: null, sr: null }, { at: 1e300, w: 10 }, { at: -5, w: 10 }, { at: T0 + MIN, w: 400 }, { at: T0 + 2 * MIN, w: 11, s: 20, sr: 8.64e15 }],
+    sessions: [{ sr: T0, peak: 50 }, { sr: 1e300, peak: 50 }, { sr: T0, peak: 5000 }],
+  });
+  const app = await loadMain(t, { dialog: importer(file) });
+  assert.equal((await app.ipc.handle["import-data"]({})).ok, true);
+  const s = await app.ipc.handle["get-settings"]();
+  assert.deepEqual(s.manual, { anchor: T0 + 5 * MIN }, "a week with an impossible reset keeps only a real reset time");
+  assert.deepEqual(s.readings, [{ at: T0, w: 10, s: null, sr: null }, { at: T0 + 2 * MIN, w: 11, s: 20, sr: null }]);
+  assert.deepEqual(s.sessions, [{ sr: T0, peak: 50 }]);
+});
+
+test("a file far too large to be a backup is refused without being read", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cqc-big-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const file = path.join(dir, "big.json");
+  const fd = fs.openSync(file, "w");
+  fs.ftruncateSync(fd, 21 * 1024 * 1024); // 21 MB of nothing
+  fs.closeSync(fd);
+  const app = await loadMain(t, { settings: GOOD, dialog: importer(file) });
+  assert.deepEqual(await app.ipc.handle["import-data"]({}), { ok: false });
+  assert.deepEqual((await app.ipc.handle["get-settings"]()).readings, GOOD.readings);
+});
+
+test("the CSV export writes only dates and numbers", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cqc-csv-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const out = path.join(dir, "out.csv");
+  const days = { "2026-01-05": { spent: 5, budget: 12.5 }, "=cmd|' /C calc'!A0": { spent: 1, budget: 1 }, "2026-01-06": { spent: "=1+1", budget: null }, "2026-01-07": null };
+  const app = await loadMain(t, { settings: { manual: { ...MANUAL, days } }, dialog: saver(out) });
+  assert.deepEqual(await app.ipc.handle["export-data"]({}, "csv"), { ok: true });
+  const lines = fs.readFileSync(out, "utf8").trim().split("\n");
+  assert.equal(lines[0], "date,spent_pct_of_week,budget_pct_of_week");
+  assert.ok(lines.includes("2026-01-05,5,12.5"));
+  assert.ok(lines.includes("2026-01-06,,"), "a value that is not a number is left empty");
+  assert.ok(!lines.some((l) => l.includes("=")), "nothing a spreadsheet would run");
+});
+
+test("only a plain x.y.z counts as a version to offer", () => {
+  const { isVersion, newerThan } = require("../updater.js");
+  for (const v of ["2.2.1", "10.0.0", "0.0.1"]) assert.equal(isVersion(v), true, v);
+  for (const v of ["", "2.2", "2.2.1-beta", "v2.2.1", "2.2.1 <b>", "99999.1.1", "2.2.1\n", null, 221]) assert.equal(isVersion(v), false, String(v));
+  assert.equal(newerThan("2.3.0", "2.2.9"), true);
+  assert.equal(newerThan("2.2.0", "2.2.0"), false);
 });

@@ -115,3 +115,53 @@ test("gives up when the debugger never answers Network.enable", async () => {
   await assert.rejects(listenForUsage({ debugger: dbg }, ORIGIN), /did not answer/);
   assert.ok(Date.now() - started < 8000);
 });
+
+test("a body that cannot be read is told apart from an answer that has not come", async () => {
+  const { wc, emit } = fakeWebContents({});
+  const got = await listenForUsage(wc, ORIGIN);
+  assert.equal(got.bodyFailed, false);
+  emit("Network.responseReceived", { requestId: "r3", response: { url: API, status: 200 } });
+  emit("Network.loadingFinished", { requestId: "r3" });
+  await tick();
+  assert.equal(got.bodyFailed, true);
+});
+
+test("when the page asks twice, a later answer that fails does not replace the good one", async () => {
+  const { wc, emit } = fakeWebContents({ r1: { body: '{"a":1}', base64Encoded: false } });
+  const got = await listenForUsage(wc, ORIGIN);
+  emit("Network.responseReceived", { requestId: "r1", response: { url: API, status: 200 } });
+  emit("Network.loadingFinished", { requestId: "r1" });
+  await tick();
+  emit("Network.responseReceived", { requestId: "r2", response: { url: API, status: 500 } });
+  emit("Network.loadingFinished", { requestId: "r2" });
+  await tick();
+  assert.equal(got.status, 200);
+  assert.equal(got.body, '{"a":1}');
+  assert.equal(got.bodyFailed, false);
+});
+
+test("and a good answer after a failed one is the one kept", async () => {
+  const { wc, dbg, emit } = fakeWebContents({ r2: { body: '{"a":2}', base64Encoded: false } });
+  const got = await listenForUsage(wc, ORIGIN);
+  emit("Network.responseReceived", { requestId: "r1", response: { url: API, status: 401 } });
+  emit("Network.loadingFinished", { requestId: "r1" });
+  await tick();
+  assert.equal(got.status, 401);
+  assert.equal(got.body, null);
+  assert.ok(!dbg.calls.includes("Network.getResponseBody"), "only a 200 answer has a body worth reading");
+  emit("Network.responseReceived", { requestId: "r2", response: { url: API, status: 200 } });
+  emit("Network.loadingFinished", { requestId: "r2" });
+  await tick();
+  assert.equal(got.status, 200);
+  assert.equal(got.body, '{"a":2}');
+});
+
+test("notes when the debugger lets go of the page", async () => {
+  const lines = [];
+  const { wc, dbg } = fakeWebContents({});
+  const got = await listenForUsage(wc, ORIGIN, (l) => lines.push(l));
+  assert.equal(got.detached, false);
+  dbg.emit("detach", {}, "target closed");
+  assert.equal(got.detached, true);
+  assert.ok(lines.includes("debugger detached: target closed"));
+});

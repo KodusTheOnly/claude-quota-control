@@ -18,7 +18,8 @@ const { createRefreshPolicy, normalizeAccelerator, TIMER_EVERY, timerVerdict } =
 const SLUG = "claude-quota-control";
 const BACKUP_SUFFIX = ".quota-control-backup";
 
-const CLAUDE_DIR = path.join(os.homedir(), ".claude");
+// CQC_CLAUDE_DIR lets the tests point it at a temporary folder, away from the real one
+const CLAUDE_DIR = process.env.CQC_CLAUDE_DIR || path.join(os.homedir(), ".claude");
 const DATA_FILE = path.join(CLAUDE_DIR, `${SLUG}.json`);
 const CLAUDE_SETTINGS = path.join(CLAUDE_DIR, "settings.json");
 const COLLECTOR_CONFIG = path.join(CLAUDE_DIR, `${SLUG}-config.json`);
@@ -47,6 +48,7 @@ const DEFAULT_SETTINGS = {
   reserve: 0, // emergency reserve, % of the week kept out of the daily plan (off by default)
   reserveRelease: 48, // hours before the reset over which what is left of the reserve joins the plan (0 = never)
   pastWeeks: false, // the "4 wk" key on the week chart: the last 4 weeks drawn with this one
+  autoWeights: false, // Settings > Plan, "Follow my usual week": the plan takes the weights the past weeks suggest
   lastUpdateCheck: 0, // when "Check for updates" last worked (updater.js)
   updateTo: null, // the version "Update now" is installing, read at the next start (updater.js)
 };
@@ -77,6 +79,34 @@ let popupHiddenAt = 0;
 let lastSummary = null;
 let quitting = false;
 const startHidden = process.argv.includes("--hidden");
+
+// Only the app's own three windows (the main one, the tray card and the strip) may talk to the main process, and only
+// from their top page. Claude's pages run in windows of their own with no bridge at all; this is the second lock,
+// should a page ever end up somewhere it should not be.
+function fromApp(event) {
+  const sender = event && event.sender;
+  if (!sender) return false;
+  const mine = [win, popup, strip].some((w) => w && !w.isDestroyed() && w.webContents === sender);
+  if (!mine) return false;
+  return !(event.senderFrame && sender.mainFrame && event.senderFrame !== sender.mainFrame);
+}
+function handle(channel, fn) {
+  ipcMain.handle(channel, (event, ...args) => {
+    if (!fromApp(event)) throw new Error("refused");
+    return fn(event, ...args);
+  });
+}
+function on(channel, fn) {
+  ipcMain.on(channel, (event, ...args) => {
+    if (fromApp(event)) fn(event, ...args);
+  });
+}
+
+// Windows programs the app starts are named by their full path: a bare name would be looked up in the current
+// folder first.
+const SYSTEM32 = path.join(process.env.SystemRoot || process.env.windir || "C:\\Windows", "System32");
+const REG_EXE = path.join(SYSTEM32, "reg.exe");
+const POWERSHELL_EXE = path.join(SYSTEM32, "WindowsPowerShell", "v1.0", "powershell.exe");
 
 // Helpers
 
@@ -168,7 +198,7 @@ function refreshLoginItem() {
   const opts = { encoding: "utf8", windowsHide: true, stdio: ["ignore", "pipe", "ignore"], timeout: 5000 };
   let out;
   try {
-    out = execSync(`reg query "${key}" /v "com.kodus.claudequotacontrol"`, opts);
+    out = execSync(`"${REG_EXE}" query "${key}" /v "com.kodus.claudequotacontrol"`, opts);
   } catch {
     return; // does not start with Windows
   }
@@ -447,7 +477,7 @@ function startProbe() {
     "Add-Type -TypeDefinition 'using System.Runtime.InteropServices; public static class Q { [DllImport(\"shell32.dll\")] public static extern int SHQueryUserNotificationState(out int s); }'; " +
     "while ($true) { $s = 0; [void][Q]::SHQueryUserNotificationState([ref]$s); Write-Output $s; Start-Sleep -Milliseconds 2500 }";
   try {
-    probe = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script], { windowsHide: true });
+    probe = spawn(POWERSHELL_EXE, ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script], { windowsHide: true });
   } catch {
     probe = null;
     return;
@@ -527,7 +557,7 @@ function repaintMain() {
   }, 150);
 }
 
-ipcMain.on("strip-resize", (_e, width) => {
+on("strip-resize", (_e, width) => {
   const w = Math.min(Math.max(Math.round(Number(width) || 0), 60), 320);
   if (w === stripW) return;
   stripW = w;
@@ -536,7 +566,7 @@ ipcMain.on("strip-resize", (_e, width) => {
 
 // Dragging: the strip sends the cursor position, we move the window by the same distance
 let drag = null;
-ipcMain.on("strip-drag", (_e, phase, x, y) => {
+on("strip-drag", (_e, phase, x, y) => {
   if (!strip || strip.isDestroyed()) return;
   if (phase === "start") {
     const b = strip.getBounds();
@@ -554,7 +584,7 @@ ipcMain.on("strip-drag", (_e, phase, x, y) => {
   }
 });
 
-ipcMain.on("strip-action", (_e, action) => {
+on("strip-action", (_e, action) => {
   if (action === "toggle") {
     const b = strip && !strip.isDestroyed() ? strip.getBounds() : null;
     togglePopup(b ? { x: b.x + b.width / 2, y: b.y + b.height / 2, rect: b } : undefined);
@@ -638,11 +668,11 @@ function applyShortcut(s = loadSettings()) {
   shortcutState = ok ? "ok" : "taken";
 }
 
-ipcMain.handle("shortcut-status", () => ({ state: shortcutState, keys: registeredKeys }));
+handle("shortcut-status", () => ({ state: shortcutState, keys: registeredKeys }));
 
 // The window says when it can take requests. The first one is "open", unless the app started
 // hidden in the tray: then the first time the window is shown, gaining focus does the same job.
-ipcMain.on("renderer-ready", () => {
+on("renderer-ready", () => {
   if (rendererIsReady) return;
   rendererIsReady = true;
   if (!startHidden) requestSync("open");
@@ -708,6 +738,8 @@ async function installCollector() {
   config.lang = i18n.getLang();
   config.weights = loadSettings().weights || null;
   config.activeHours = cleanActiveHours(loadSettings().activeHours);
+  config.reserve = loadSettings().reserve || 0;
+  config.reserveRelease = loadSettings().reserveRelease ?? null;
   writeJson(COLLECTOR_CONFIG, config);
 
   settings.statusLine = { type: "command", command: `node "${COLLECTOR_TARGET}"` };
@@ -734,7 +766,8 @@ async function uninstallCollector() {
   return { ok: true, status: await collectorStatus() };
 }
 
-// The collector runs outside the app: it needs the language (status line text), the day weights and the active hours
+// The collector runs outside the app: it needs the language (status line text), the day weights, the active hours
+// and the reserve
 function writeCollectorLanguage() {
   try {
     const config = readJson(COLLECTOR_CONFIG);
@@ -743,8 +776,10 @@ function writeCollectorLanguage() {
     const weights = s.weights || null;
     const activeHours = cleanActiveHours(s.activeHours);
     const same = (a, b) => JSON.stringify(a || null) === JSON.stringify(b || null);
-    if (config.lang !== i18n.getLang() || !same(config.weights, weights) || !same(config.activeHours, activeHours)) {
-      writeJson(COLLECTOR_CONFIG, { ...config, lang: i18n.getLang(), weights, activeHours });
+    const reserve = s.reserve || 0;
+    const reserveRelease = s.reserveRelease ?? null;
+    if (config.lang !== i18n.getLang() || !same(config.weights, weights) || !same(config.activeHours, activeHours) || !same(config.reserve, reserve) || !same(config.reserveRelease, reserveRelease)) {
+      writeJson(COLLECTOR_CONFIG, { ...config, lang: i18n.getLang(), weights, activeHours, reserve, reserveRelease });
     }
   } catch {
     // not essential
@@ -753,14 +788,14 @@ function writeCollectorLanguage() {
 
 // IPC
 
-ipcMain.handle("get-data", () => readJson(DATA_FILE));
+handle("get-data", () => readJson(DATA_FILE));
 
 // Asked once by the window at start, so it can say the settings file was damaged
-ipcMain.handle("settings-recovery", () => settingsRecovery);
+handle("settings-recovery", () => settingsRecovery);
 
 // Hours with Claude Code activity since a given time, from the local logs. Off with the setting.
 const activityCache = new Map();
-ipcMain.handle("activity-hours", async (_e, sinceMs) => {
+handle("activity-hours", async (_e, sinceMs) => {
   if (loadSettings().codeLogs === false || !isNum(sinceMs)) return { enabled: false, hours: [] };
   try {
     const hours = await readActivity({ dir: path.join(CLAUDE_DIR, "projects"), sinceMs, cache: activityCache });
@@ -769,14 +804,14 @@ ipcMain.handle("activity-hours", async (_e, sinceMs) => {
     return { enabled: true, hours: [] };
   }
 });
-ipcMain.handle("app-info", () => ({ version: app.getVersion(), electron: process.versions.electron }));
+handle("app-info", () => ({ version: app.getVersion(), electron: process.versions.electron }));
 
 // Export and import
 
 const BACKUP_KEYS = [
   "manual", "readings", "sessions", "weights", "activeHours", "extra",
   "language", "theme", "screens", "notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "fiveHourThreshold", "remindEvery",
-  "showExtra", "miniWindow", "codeLogs", "shortcutOn", "shortcutKeys", "reserve", "reserveRelease", "pastWeeks",
+  "showExtra", "miniWindow", "codeLogs", "shortcutOn", "shortcutKeys", "reserve", "reserveRelease", "pastWeeks", "autoWeights",
 ];
 // Active hours (Settings > Plan): whole hours 0-23, start and end different, or null for the whole day.
 // Same rule as activeHours() in renderer/js/core.js.
@@ -784,13 +819,17 @@ function cleanActiveHours(a) {
   const isHour = (h) => Number.isInteger(h) && h >= 0 && h <= 23;
   return a && isHour(a.start) && isHour(a.end) && a.start !== a.end ? { start: a.start, end: a.end } : null;
 }
-const BOOLEAN_KEYS = ["notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "showExtra", "miniWindow", "codeLogs", "shortcutOn", "pastWeeks"];
+const BOOLEAN_KEYS = ["notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "showExtra", "miniWindow", "codeLogs", "shortcutOn", "pastWeeks", "autoWeights"];
 const THRESHOLDS = [60, 70, 75, 80, 85]; // the choices in Settings
 const REMIND_HOURS = [0, 2, 4, 8];
 const RESERVE_CHOICES = [0, 5, 10, 15, 20]; // the choices in Settings, Reserve
 const RELEASE_HOURS = [0, 24, 48, 72];
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 const isPct = (v) => isNum(v) && v >= 0 && v <= 100;
+// A moment in time that can be real: after 2020 and before 2100. A reset time far from any real date (from a file
+// edited by hand, or a damaged one) would have the week's math walk day by day toward it.
+const isTime = (v) => isNum(v) && v > 1577836800000 && v < 4102444800000;
+const IMPORT_MAX_BYTES = 20 * 1024 * 1024; // a backup is well under 1 MB
 const numOrNull = (v) => (isNum(v) ? v : null);
 
 // The data typed in or read from Claude, rebuilt field by field from a backup. A broken day is
@@ -799,11 +838,11 @@ function cleanManual(m) {
   if (!isPlainObject(m)) return null;
   // Where the reset time came from (Settings hides its own form when the account gave it)
   const via = ["sync", "manual"].includes(m.anchorVia) ? { anchorVia: m.anchorVia } : {};
-  if (!isPlainObject(m.weekly) || !isPct(m.weekly.used) || !isNum(m.weekly.resetsAt)) return isNum(m.anchor) ? { anchor: m.anchor, ...via } : null;
+  if (!isPlainObject(m.weekly) || !isPct(m.weekly.used) || !isTime(m.weekly.resetsAt)) return isTime(m.anchor) ? { anchor: m.anchor, ...via } : null;
   const out = {
-    anchor: isNum(m.anchor) ? m.anchor : m.weekly.resetsAt,
+    anchor: isTime(m.anchor) ? m.anchor : m.weekly.resetsAt,
     ...via,
-    updatedAt: isNum(m.updatedAt) ? m.updatedAt : 0,
+    updatedAt: isTime(m.updatedAt) ? m.updatedAt : 0,
     via: m.via === "sync" ? "sync" : "manual",
     weekly: { used: m.weekly.used, resetsAt: m.weekly.resetsAt },
     fiveHour: null,
@@ -811,9 +850,9 @@ function cleanManual(m) {
     days: {},
   };
   const f = m.fiveHour;
-  if (isPlainObject(f) && isPct(f.used)) out.fiveHour = { used: f.used, resetsAt: numOrNull(f.resetsAt), at: isNum(f.at) ? f.at : out.updatedAt };
+  if (isPlainObject(f) && isPct(f.used)) out.fiveHour = { used: f.used, resetsAt: isTime(f.resetsAt) ? f.resetsAt : null, at: isTime(f.at) ? f.at : out.updatedAt };
   const ds = m.dayStart;
-  if (isPlainObject(ds) && /^\d{4}-\d{2}-\d{2}$/.test(ds.day) && isNum(ds.at) && isPct(ds.used)) out.dayStart = { day: ds.day, at: ds.at, used: ds.used };
+  if (isPlainObject(ds) && /^\d{4}-\d{2}-\d{2}$/.test(ds.day) && isTime(ds.at) && isPct(ds.used)) out.dayStart = { day: ds.day, at: ds.at, used: ds.used };
   if (isPlainObject(m.days)) {
     for (const [k, v] of Object.entries(m.days)) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(k) || !isPlainObject(v) || !isNum(v.spent)) continue;
@@ -844,12 +883,12 @@ function cleanBackupSettings(st) {
   if (!isPlainObject(st)) return next;
   if (Array.isArray(st.readings)) {
     next.readings = st.readings
-      .filter((r) => r && isNum(r.at) && isNum(r.w))
-      .map((r) => ({ at: r.at, w: r.w, s: isNum(r.s) ? r.s : null, sr: isNum(r.sr) ? r.sr : null, ...(isNum(r.to) && r.to > r.at ? { to: r.to } : {}) }))
+      .filter((r) => r && isTime(r.at) && isPct(r.w))
+      .map((r) => ({ at: r.at, w: r.w, s: isPct(r.s) ? r.s : null, sr: isTime(r.sr) ? r.sr : null, ...(isTime(r.to) && r.to > r.at ? { to: r.to } : {}) }))
       .slice(-1500);
   }
   if (Array.isArray(st.sessions)) {
-    next.sessions = st.sessions.filter((x) => x && isNum(x.sr) && isNum(x.peak)).map((x) => ({ sr: x.sr, peak: x.peak })).slice(-400);
+    next.sessions = st.sessions.filter((x) => x && isTime(x.sr) && isPct(x.peak)).map((x) => ({ sr: x.sr, peak: x.peak })).slice(-400);
   }
   if (st.manual === null) next.manual = null;
   else if (st.manual !== undefined) {
@@ -913,12 +952,12 @@ function allDays(s) {
   const out = {};
   const claudeCode = readJson(DATA_FILE);
   for (const src of [(s.manual && s.manual.days) || {}, (claudeCode && claudeCode.days) || {}]) {
-    for (const [k, v] of Object.entries(src)) if (!out[k] || v.spent > out[k].spent) out[k] = v;
+    for (const [k, v] of Object.entries(src)) if (isPlainObject(v) && (!out[k] || v.spent > out[k].spent)) out[k] = v;
   }
   return out;
 }
 
-ipcMain.handle("export-data", async (_e, format) => {
+handle("export-data", async (_e, format) => {
   const s = loadSettings();
   const stamp = new Date().toISOString().slice(0, 10);
   const asCsv = format === "csv";
@@ -931,7 +970,9 @@ ipcMain.handle("export-data", async (_e, format) => {
   try {
     if (asCsv) {
       const days = allDays(s);
-      const rows = Object.keys(days).sort().map((k) => `${k},${days[k].spent},${days[k].budget ?? ""}`);
+      // Only dates and numbers are written: a spreadsheet would run anything else that looks like a formula
+      const cell = (v) => (isNum(v) ? v : "");
+      const rows = Object.keys(days).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort().map((k) => `${k},${cell(days[k] && days[k].spent)},${cell(days[k] && days[k].budget)}`);
       fs.writeFileSync(pick.filePath, ["date,spent_pct_of_week,budget_pct_of_week", ...rows].join("\n") + "\n");
     } else {
       const settings = {};
@@ -945,13 +986,21 @@ ipcMain.handle("export-data", async (_e, format) => {
   }
 });
 
-ipcMain.handle("import-data", async () => {
+handle("import-data", async () => {
   const pick = await dialog.showOpenDialog(win, {
     title: i18n.t("data.dialogOpen"),
     properties: ["openFile"],
     filters: [{ name: "JSON", extensions: ["json"] }],
   });
   if (pick.canceled || !pick.filePaths[0]) return { canceled: true };
+  // A file far too large to be a backup is not read at all (reading it would freeze the app)
+  let size = Infinity;
+  try {
+    size = fs.statSync(pick.filePaths[0]).size;
+  } catch {
+    // unreadable: refused below
+  }
+  if (size > IMPORT_MAX_BYTES) return { ok: false };
   const body = readJson(pick.filePaths[0]);
   const st = body && body.app === "claude-quota-control" && body.format === 1 ? body.settings : null;
   const next = cleanBackupSettings(st);
@@ -972,17 +1021,17 @@ ipcMain.handle("import-data", async () => {
 });
 
 // "Delete my data" in Settings: a copy is kept first
-ipcMain.handle("clear-data", () => {
+handle("clear-data", () => {
   snapshotSettings("clear");
   return applySettings({ manual: null, readings: [], sessions: [], lastLevel: null });
 });
 
-ipcMain.handle("get-settings", () => {
+handle("get-settings", () => {
   const s = loadSettings();
   return { ...s, openAtLogin: app.getLoginItemSettings().openAtLogin };
 });
 
-ipcMain.handle("set-settings", (_e, patch) => applySettings(patch));
+handle("set-settings", (_e, patch) => applySettings(isPlainObject(patch) ? patch : {}));
 
 // Saves a change to the settings and applies what the main process controls (login item, strip,
 // language, theme, shortcut, timer, collector config). Used by the window and by an import.
@@ -1017,19 +1066,19 @@ function applySettings(patch) {
   }
   saveSettings(next);
   if ("autoRead" in patch) applyAutoRead();
-  if ("weights" in patch || "activeHours" in patch) writeCollectorLanguage();
+  if ("weights" in patch || "activeHours" in patch || "reserve" in patch || "reserveRelease" in patch) writeCollectorLanguage();
   return next;
 }
 
-ipcMain.handle("collector-status", () => collectorStatus());
-ipcMain.handle("install-collector", async () => {
+handle("collector-status", () => collectorStatus());
+handle("install-collector", async () => {
   try {
     return await installCollector();
   } catch (err) {
     return { ok: false, error: String(err.message || err) };
   }
 });
-ipcMain.handle("uninstall-collector", async () => {
+handle("uninstall-collector", async () => {
   try {
     return await uninstallCollector();
   } catch (err) {
@@ -1038,28 +1087,28 @@ ipcMain.handle("uninstall-collector", async () => {
 });
 
 // The renderer sends the icon in several sizes; Windows picks the right one for the display scale
-ipcMain.on("set-tray", (_e, { images, dataUrl, tooltip }) => {
+on("set-tray", (_e, { images, dataUrl, tooltip } = {}) => {
   if (!tray) return;
   let img = null;
   if (Array.isArray(images) && images.length) {
     img = nativeImage.createEmpty();
-    for (const { scale, dataUrl: url } of images) img.addRepresentation({ scaleFactor: scale, dataURL: url });
-  } else if (dataUrl) {
+    for (const rep of images) if (rep && isNum(rep.scale) && typeof rep.dataUrl === "string" && rep.dataUrl.startsWith("data:image/")) img.addRepresentation({ scaleFactor: rep.scale, dataURL: rep.dataUrl });
+  } else if (typeof dataUrl === "string" && dataUrl.startsWith("data:image/")) {
     img = nativeImage.createFromDataURL(dataUrl);
   }
   if (img && !img.isEmpty()) tray.setImage(img);
-  if (tooltip) tray.setToolTip(tooltip);
+  if (typeof tooltip === "string" && tooltip) tray.setToolTip(tooltip.slice(0, 127)); // Windows shows at most 127 characters
 });
 
 // Summary computed by the main window, passed on to the tray card and the strip
-ipcMain.on("summary", (_e, summary) => {
+on("summary", (_e, summary) => {
   lastSummary = summary;
   if (popup && !popup.isDestroyed()) popup.webContents.send("summary", summary);
   if (strip && !strip.isDestroyed()) strip.webContents.send("summary", summary);
 });
-ipcMain.handle("get-summary", () => lastSummary);
+handle("get-summary", () => lastSummary);
 
-ipcMain.on("popup-resize", (_e, height) => {
+on("popup-resize", (_e, height) => {
   const h = Math.min(Math.max(Math.round(Number(height) || 0), 160), 680); // the tallest card (a stale reading and a failed refresh at once, in Portuguese) is about 640
   if (!popup || popup.isDestroyed() || h === POPUP_H) return;
   POPUP_H = h;
@@ -1067,7 +1116,7 @@ ipcMain.on("popup-resize", (_e, height) => {
   if (popup.isVisible()) placePopup(popupAnchor);
 });
 
-ipcMain.on("popup-action", (_e, action) => {
+on("popup-action", (_e, action) => {
   if (action === "sync") requestSync("popup-button");
   else if (action === "type") showUpdate();
   else if (action === "open") showWindow();
@@ -1075,26 +1124,31 @@ ipcMain.on("popup-action", (_e, action) => {
 });
 
 // Every notice has a key; the same notice never repeats
-ipcMain.on("open-usage", openUsage);
+on("open-usage", openUsage);
 
 // Claude account
 
-ipcMain.handle("claude-login", async () => {
+handle("claude-login", async () => {
   const res = await claude.login(win);
   if (res.ok) saveSettings({ ...loadSettings(), claudeConnected: true });
   noteAutoReadResult(res);
   return res;
 });
 
-ipcMain.handle("claude-logout", async () => {
+handle("claude-logout", async () => {
   await claude.logout();
   saveSettings({ ...loadSettings(), claudeConnected: false });
   return { ok: true };
 });
 
-ipcMain.handle("claude-sync", async (_e, opts = {}) => {
+handle("claude-sync", async (_e, opts = {}) => {
   refreshPolicy.markAttempt(); // the button in the window comes here directly, so it counts too
-  const res = await claude.sync({ visible: Boolean(opts.visible), parent: win });
+  let res;
+  try {
+    res = await claude.sync({ visible: Boolean(opts && opts.visible), parent: win });
+  } catch {
+    res = { ok: false, error: "fail" }; // the window always gets an answer
+  }
   if (res.error === "need-login") saveSettings({ ...loadSettings(), claudeConnected: false });
   if (res.ok) saveSettings({ ...loadSettings(), claudeConnected: true });
   noteAutoReadResult(res);
@@ -1115,13 +1169,14 @@ function showNotification(title, body, onClick) {
 }
 
 // Plain notice with no repeat control (the result of a user action)
-ipcMain.on("toast", (_e, { title, body }) => {
+on("toast", (_e, { title, body } = {}) => {
   if (!Notification.isSupported() || loadSettings().notifyAll === false) return;
   if (win && win.isVisible() && win.isFocused()) return; // the window itself already shows the result
-  showNotification(title, body, showWindow);
+  showNotification(String(title || ""), String(body || ""), showWindow);
 });
 
-ipcMain.on("notify", (_e, { key, title, body, focusUpdate, syncOnClick }) => {
+on("notify", (_e, { key, title, body, focusUpdate, syncOnClick } = {}) => {
+  if (typeof key !== "string" || !key || key.length > 120) return;
   const s = loadSettings();
   const notified = { ...(s.notified || {}) }; // a copy: the defaults object must never be changed
   if (notified[key]) return;
@@ -1132,7 +1187,7 @@ ipcMain.on("notify", (_e, { key, title, body, focusUpdate, syncOnClick }) => {
   saveSettings({ ...s, notified });
   // The master switch is off: remember the alert as seen so it does not pop up later
   if (!Notification.isSupported() || s.notifyAll === false) return;
-  showNotification(title, body, () => {
+  showNotification(String(title || ""), String(body || ""), () => {
     if (syncOnClick) {
       showWindow();
       requestSync("notification");
@@ -1149,6 +1204,11 @@ if (!app.requestSingleInstanceLock()) {
   app.on("second-instance", showWindow);
   app.setAppUserModelId("com.kodus.claudequotacontrol");
 
+  // No page the app shows may embed another one in a <webview>, whatever window it is in
+  app.on("web-contents-created", (_e, contents) => {
+    contents.on("will-attach-webview", (e) => e.preventDefault());
+  });
+
   app.whenReady().then(() => {
     i18n.setLang(loadSettings().language);
     refreshLoginItem();
@@ -1160,6 +1220,7 @@ if (!app.requestSingleInstanceLock()) {
     applyAutoRead();
     if (loadSettings().miniWindow) startStrip();
     setupUpdates({
+      handle,
       loadSettings,
       saveSettings,
       send: (channel, value) => win && !win.isDestroyed() && win.webContents.send(channel, value),

@@ -181,9 +181,9 @@ function checkPage({ format, scrolls: formatScrolls, view = "panel" }) {
     }
   }
 
-  // History: the three blocks, the stats and a column for every day, or the empty message
+  // History: the four blocks, the stats and a column for every day, or the empty message
   if (view === "history") {
-    for (const id of ["histDays", "histWeeks", "histMap"]) {
+    for (const id of ["histDays", "histWeeks", "histMap", "histProducts"]) {
       const e = document.getElementById(id);
       if (!e || !visible(e)) problems.push(`#${id} is not visible`);
     }

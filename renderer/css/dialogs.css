@@ -45,8 +45,10 @@ dialog::backdrop { background: rgba(10, 15, 12, .55); }
 .modal .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
 .modal label { display: grid; gap: .3rem; color: var(--sm); font-size: var(--fs-sm); }
 .modal label em { font-style: normal; opacity: .75; }
+.modal label em::before { content: "("; }
+.modal label em::after { content: ")"; }
 .modal input { min-height: 2.2rem; padding: var(--sp-2) .6rem; background: var(--crt-field); border: 1px solid var(--sm); color: var(--st); border-radius: var(--r-sm); font: 500 var(--fs-md) var(--mono); color-scheme: dark; }
-.modal input::placeholder { color: var(--sm); opacity: 1; }
+.modal input::placeholder { color: var(--sm); opacity: .65; } /* a hint, never mistaken for a typed number */
 .modal .fields > label:last-child { grid-column: 1 / -1; }
 .modal .input-suffix input { width: 100%; font: 600 var(--fs-lg) var(--mono); }
 .modal .input-suffix i { color: var(--sm); }

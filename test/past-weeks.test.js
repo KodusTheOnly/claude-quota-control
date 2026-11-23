@@ -7,7 +7,7 @@ const vm = require("node:vm");
 function load() {
   const sandbox = { document: { getElementById: () => ({}) }, window: { quota: {} }, I18N: { t: (k) => k, getLang: () => "en", locale: () => "en-US" } };
   vm.createContext(sandbox);
-  for (const f of ["core.js", "compute.js"]) vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "renderer", "js", f), "utf8"), sandbox);
+  for (const f of ["core.js", "learn.js", "compute.js"]) vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "renderer", "js", f), "utf8"), sandbox);
   return sandbox;
 }
 const at = (y, m, d, h = 0) => new Date(y, m - 1, d, h).getTime();
@@ -58,4 +58,38 @@ test("pastWeekAt follows the line and holds its last point", () => {
   assert.equal(vm.runInContext("pastWeekAt(__w, 0.2)", sb), 0);
   assert.equal(vm.runInContext("pastWeekAt(__w, 1.5)", sb), 30);
   assert.equal(vm.runInContext("pastWeekAt(__w, 5)", sb), 40);
+});
+
+test("a week where Claude gave part of it back keeps what it really used as its gross line", () => {
+  // 50, 99, then a give-back down to 30 on a day that used 40, then 15 more
+  const days = {
+    "2026-11-03": { spent: 50, endUsed: 50 },
+    "2026-11-04": { spent: 49, endUsed: 99 },
+    "2026-11-05": { spent: 40, endUsed: 30 },
+    "2026-11-06": { spent: 15, endUsed: 45 },
+  };
+  const w = run(days)[0];
+  assert.equal(w.end, 99, "the % line stays where it was");
+  assert.equal(w.gross, 154);
+  assert.deepEqual(w.gpts.slice(1).map((p) => p.y), [50, 99, 139, 154]);
+});
+
+test("without a give-back the gross line is the % line", () => {
+  const w = run({ "2026-11-03": { spent: 20, endUsed: 20 }, "2026-11-04": { spent: 15, endUsed: 35 }, "2026-11-09": { spent: 30, endUsed: 90 } })[0];
+  assert.equal(w.gross, w.end);
+  assert.deepEqual(w.gpts, w.pts);
+});
+
+test("the learning reads a give-back week from what it really used", () => {
+  const sb = load();
+  sb.__days = {
+    "2026-11-03": { spent: 50, endUsed: 50 },
+    "2026-11-04": { spent: 49, endUsed: 99 },
+    "2026-11-05": { spent: 40, endUsed: 30 },
+    "2026-11-06": { spent: 15, endUsed: 45 },
+  };
+  const L = plain(vm.runInContext(`learnProfile(__days, ${RESET})`, sb));
+  assert.equal(L.weeks[0].end, 154);
+  assert.equal(L.weeks[0].full, false);
+  assert.equal(L.avg[4], 40, "Thursday used 40, not the 69 points the % fell");
 });

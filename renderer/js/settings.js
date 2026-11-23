@@ -274,11 +274,32 @@ $("uninstallBtn").addEventListener("click", async () => {
 // With notifications off, the individual switches have nothing to control
 function syncNotifyGroup() {
   const on = $("notifyAll").checked;
-  for (const id of ["notifyLevel", "notifyResets", "notifySpikes", "notifyExtra"]) {
+  // The two selects only matter for notifications too: with them off, nothing they set is ever shown
+  for (const id of ["notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "fiveHourThreshold", "remindEvery"]) {
     $(id).disabled = !on;
-    $(id).closest("label").classList.toggle("is-disabled", !on);
+    $(id).closest(".set").classList.toggle("is-disabled", !on);
   }
 }
+
+// The weekly plan: a switch to follow the usual week (applyAutoWeights in plan-menu.js), and what it does now
+function renderAutoWeightsSettings() {
+  const on = Boolean(state.settings && state.settings.autoWeights);
+  $("autoWeights").checked = on;
+  const note = $("autoWeightsNow");
+  const m = lastM;
+  let text = "";
+  if (on && m) {
+    const sug = suggestWeights(m.learn);
+    const n = m.learn ? m.learn.n : 0;
+    text = sug ? t("plan.autoNow", { list: planText(sug, m.week), n }) : t("plan.autoWait", { n, need: SUGGEST_MIN_WEEKS });
+  }
+  note.textContent = text;
+  note.classList.toggle("hidden", !text);
+}
+$("autoWeights").addEventListener("change", async (e) => {
+  await saveSetting({ autoWeights: e.target.checked });
+  renderAutoWeightsSettings();
+});
 
 // Active hours: a switch and two hour lists. Turned on, the window starts at ACTIVE_DEFAULT (see core.js).
 // The two lists never show the same hour on both sides: a window needs some length.
@@ -339,6 +360,7 @@ function bindSettings() {
   syncNotifyGroup();
   $("notifyLevel").checked = s.notifyLevel !== false;
   renderGoalSettings();
+  renderAutoWeightsSettings();
   renderActiveSettings();
   $("fiveHourThreshold").value = String(warnAt());
   $("remindEvery").value = String(s.remindEvery ?? "smart");

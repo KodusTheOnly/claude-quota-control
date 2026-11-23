@@ -11,7 +11,8 @@
     "start": "electron .",
     "test": "node --test test/*.test.js",
     "dist": "electron-builder --win --publish never",
-    "test:layout": "node test/layout/run.js"
+    "test:layout": "node test/layout/run.js",
+    "test:reading": "node test/reading/run.js"
   },
   "repository": {
     "type": "git",

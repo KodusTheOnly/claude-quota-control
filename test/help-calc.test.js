@@ -46,7 +46,7 @@ function render(lang) {
   };
   vm.createContext(sandbox);
   i18n.setLang(lang);
-  for (const f of ["core.js", "compute.js", "ui.js", "help-calc.js"]) {
+  for (const f of ["core.js", "learn.js", "compute.js", "ui.js", "help-calc.js"]) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "renderer", "js", f), "utf8"), sandbox);
   }
   vm.runInContext("let lastM = null;", sandbox); // declared in overview.js in the app

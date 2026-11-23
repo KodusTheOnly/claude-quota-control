@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+- The projection learns from your past weeks (up to 8, as the history keeps them). Your usual pace stands in for the days this week has not shown yet, so there is a projection from the first day instead of after a day and a half, and each day of the week counts as heavy as you usually make it: a day you always use a lot no longer reads as a spike, and heavy days still to come are counted before they arrive. A day you plan as Off stays out. With no past week on record everything works as before.
+- A likely range instead of one number: "at reset 84-97%" in the verdict, a faint fan on the chart and a row in the Math drawer. About 8 weeks in 10 end inside it. It starts wide, narrows as the week goes on, and narrows more when your weeks are alike. When the pace reaches the limit but the range still starts under it, a chip says the week may still fit.
+- The plan menu suggests a plan from how you really used your last weeks (after three on record): for example "Mon Heavy, Sat Light, Sun Off", with one key to accept it. Nothing changes until you do, and every day can still be set by hand.
+- Follow my usual week (Settings > Plan, off by default): the plan takes the suggested weights by itself and updates when a week ends. Setting a day by hand turns it off.
+- The Math drawer shows this week's pace, your usual pace and the mix the projection uses.
+- When today goes past its budget, the days ahead show the smaller budget that leaves them, with how much each one lost ("▲12% ▼2"), and "week at" follows. The Math drawer says how much today took from them.
+- Fixed: when Claude gives part of the week back without a reset (as with the reset that came with a new model), the week's % went down but today kept counting from the higher number: a budget of 2% and today at 550%, and the chart slid from 100% down to the new number. Today now counts from the lower number, and the chart falls straight down where it happened. The collector follows.
+- Fixed: after a reset that falls past the end of the active hours (a window of 09:00 to 18:00 and a reset at 20:00), the rest of that day had a budget of 0 and any use read as 200% and Pause. Those hours are now not rated, like a day off.
+- Fixed: the reserve's release ran on the clock, so the part of it that fell on a day off was lost (a reset on Monday morning with the weekend Off lost most of it). It now follows the plan: heavier days in the release get more, days off and the hours outside the active hours none, and when the release hours are all off it joins the last planned day. The collector follows.
+- Fixed: on the two days a year the clock changes, the day weighed 23/24 or 25/24 of its weight. A day now always weighs its whole weight. The collector follows.
+- Fixed: the Claude Code collector ignored the emergency reserve, so its budget for the day (and the status line) was higher than the app's. It now uses the same rule.
+- Fixed: a reset time that cannot be real (from a damaged or hand-edited file) could freeze the window. Such a reading is ignored, an import drops it, and a reset more than a week ahead is read as the same weekly cycle.
+- Readings: the app no longer waits for the usage page to finish loading before looking at its data, so a slow page does not end in a failed reading. A page that is stuck cannot hold a reading that already has its numbers. When the page asks for its data twice, a later failed answer no longer hides the good one. An answer the browser could not hand over reads as a failed reading, not as "Claude changed its format". The reading and login windows are always closed, even when the page refuses to close.
+- Asking for a visible reading (to pass a check) while a hidden one is running now waits for it and opens the window, instead of returning the hidden one's failure. A Refresh asked while the app was reading on its own shows its result.
+- Security: the main process only answers the app's own three windows. Claude's pages get a short list of permissions instead of everything but a list, and cannot start downloads. An import refuses files over 20 MB and times that cannot be real. The CSV export writes only dates and numbers. The update check only accepts a plain x.y.z version and builds the release link itself. Windows tools are started by their full path.
+- New test: `npm run test:reading` runs the real reading code in Electron against a fake usage page on this machine (no Claude, no account).
+
 ## 2.2.0
 
 - Updates install from the app: Help > About shows when the last check for updates worked, and when a new version is out, "Update to X" downloads it, checks it against the release and installs it, then the app opens again. Your data stays. Nothing is checked or downloaded without a click. Versions before 2.2.0 still need the installer from GitHub once.
