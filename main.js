@@ -234,6 +234,37 @@ function isWebLink(url) {
   }
 }
 
+// The main window opens where it was left, kept on a screen that still exists
+let pendingMaximize = false;
+
+function savedWinPlace() {
+  const s = loadSettings().winBounds;
+  if (!s || ![s.x, s.y, s.width, s.height].every(Number.isFinite)) return null;
+  const wa = screen.getDisplayNearestPoint({ x: Math.round(s.x + s.width / 2), y: Math.round(s.y + 20) }).workArea;
+  const width = Math.min(Math.max(Math.round(s.width), 420), wa.width);
+  const height = Math.min(Math.max(Math.round(s.height), 480), wa.height);
+  const x = Math.min(Math.max(Math.round(s.x), wa.x), wa.x + wa.width - width);
+  const y = Math.min(Math.max(Math.round(s.y), wa.y), wa.y + wa.height - height);
+  return { bounds: { x, y, width, height }, maximized: s.maximized === true };
+}
+
+function saveWinPlace() {
+  if (!win || win.isDestroyed() || win.isMinimized() || pendingMaximize) return;
+  const maximized = win.isMaximized() === true;
+  const b = maximized ? win.getNormalBounds() : win.getBounds();
+  if (!b || ![b.x, b.y, b.width, b.height].every(Number.isFinite)) return;
+  saveSettings({ ...loadSettings(), winBounds: { x: b.x, y: b.y, width: b.width, height: b.height, maximized } });
+}
+
+// A window started hidden is maximized on its first show, not before (maximizing shows it)
+function showSaved() {
+  if (pendingMaximize) {
+    pendingMaximize = false;
+    win.maximize();
+  }
+  win.show();
+}
+
 function createWindow() {
   const savedTheme = loadSettings().theme;
   nativeTheme.themeSource = THEMES.includes(savedTheme) ? savedTheme : "dark";
@@ -258,6 +289,20 @@ function createWindow() {
     },
   });
 
+  const place = savedWinPlace();
+  if (place) win.setBounds(place.bounds);
+  pendingMaximize = !!(place && place.maximized);
+  let placeTimer = null;
+  const keepPlace = () => {
+    clearTimeout(placeTimer);
+    placeTimer = setTimeout(saveWinPlace, 500);
+  };
+  for (const ev of ["moved", "resize", "maximize", "unmaximize"]) win.on(ev, keepPlace);
+  win.on("hide", () => {
+    clearTimeout(placeTimer);
+    saveWinPlace();
+  });
+
   win.removeMenu();
   // F5 and Ctrl+Shift+R refresh the numbers (the window has no menu, so nothing else uses them)
   win.webContents.on("before-input-event", (event, input) => {
@@ -272,11 +317,13 @@ function createWindow() {
   win.on("focus", () => requestSync("focus"));
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
   win.once("ready-to-show", () => {
-    if (!startHidden) win.show();
+    if (!startHidden) showSaved();
   });
 
   // Closing hides to the tray; quitting for real is only in the tray menu
   win.on("close", (e) => {
+    clearTimeout(placeTimer);
+    saveWinPlace();
     if (!quitting) {
       e.preventDefault();
       win.hide();
@@ -290,7 +337,7 @@ function showWindow() {
   if (!win) return;
   hidePopup();
   if (win.isMinimized()) win.restore();
-  win.show();
+  showSaved();
   win.focus();
 }
 
