@@ -90,6 +90,22 @@
 @keyframes strip-sweep { from { background-position: -60% 0; } to { background-position: 160% 0; } }
 @keyframes rest-pulse { 50% { opacity: .15; } }
 @media (prefers-reduced-motion: reduce) { #sScr.soon :is(.strip, .strip .dot, #sTime .rest) { animation: none; } }
+/* The lock. Ahead: the used bar hatched from the % used to its end, the time bar hatched from when it fills up to the
+   reset with a mark there, and a chip on the right of the reset line. Locked: the time bar hatched from now to the reset,
+   the line hatched in red with a "Locked" badge. */
+#sBar .pj { position: absolute; top: 0; bottom: 0; left: var(--pj-l, 100%); width: var(--pj-w, 0%); background: repeating-linear-gradient(135deg, var(--pause) 0 2px, transparent 2px 5px); opacity: .8; }
+#sTime .lk { position: absolute; top: 0; bottom: 0; left: var(--lk-l, 100%); width: var(--lk-w, 0%); background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--pause) 70%, transparent) 0 2px, transparent 2px 5px); }
+#sTime .ltick { position: absolute; top: -.25rem; bottom: -.25rem; left: var(--lk-l, 100%); width: 2px; margin-left: -1px; background: var(--pause); z-index: 2; }
+@media (prefers-reduced-motion: no-preference) { #sBar .pj, #sTime .lk { animation: lock-march .9s linear infinite; } }
+@keyframes lock-march { to { background-position: 7.07px 0; } }
+.lkb { display: inline-flex; align-items: center; gap: .35em; }
+.lkb svg { flex: none; width: .95em; height: .95em; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.blk--session .strip .slock { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: .4em; padding: .05rem .45rem; border: 1px solid color-mix(in srgb, var(--c) 60%, transparent); border-radius: 2px; color: var(--c); font-weight: 600; }
+.blk--session .strip .slock.hidden { display: none; }
+.blk--session .strip.no-a .rs-a, .blk--session .strip.no-b .rs-b, .blk--session .strip.no-off .lk-b { display: none; }
+#sScr.locked .strip { border-top: 1px solid color-mix(in srgb, var(--pause) 60%, transparent); background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--pause) 10%, transparent) 0 6px, transparent 6px 12px); color: var(--st); }
+#sScr.locked .strip .lkb:first-child { padding: .05rem .45rem; background: var(--pause); color: var(--scr); font-weight: 600; border-radius: 2px; }
+#sScr.locked .big { color: var(--pause); }
 /* A narrow tile: first the bar names go, then the second part of the reset line, then its word */
 @container session (max-width: 22rem) { .sbars { grid-template-columns: minmax(0, 1fr); } .sbars .k { display: none; } }
 @container session (max-width: 20rem) { .blk--session .strip .rs-b { display: none; } }
@@ -103,12 +119,21 @@
 .band .wk, .band .blk--session { grid-column: 2; }
 .band .vl, .band .wk { display: flex; align-items: center; gap: .2rem .9rem; min-width: 0; padding: .4rem .8rem; }
 .band .wk { gap: .5rem; }
-/* A column: the face's screen, then the answer, then the chips. fitBand() and fitChips() in
-   verdict.js make each line give way on its own. */
-.band .vl { flex-direction: column; justify-content: center; gap: .6rem; padding-top: .6rem; padding-bottom: .6rem; container-type: inline-size; container-name: vband; }
-.band .vtxt { flex: none; align-self: stretch; display: flex; flex-direction: column; align-items: center; gap: .35rem; min-width: 0; container-type: inline-size; container-name: verdict; }
-.band .vtop { display: flex; align-items: center; justify-content: center; gap: .2rem .9rem; min-width: 0; max-width: 100%; }
-.band .vtop.wrap { flex-wrap: wrap; }
+/* A column: the level ruler, then the face's screen with the answer and its why next to it, then the readout (a row
+   each, with dotted leaders). fitBand() and fitChips() in verdict.js make each part give way on its own. The verdict
+   takes the band's height from the week and the session (contain: size, from 720px), so the readout never makes the
+   band taller: its last rows go instead. */
+.band .vl { flex-direction: column; align-items: stretch; justify-content: center; gap: .55rem; padding-top: .55rem; padding-bottom: .55rem; container-type: inline-size; container-name: vband; }
+@media (min-width: 720px) { .band .vl { contain: size; } }
+.band .vmain { flex: none; display: flex; align-items: center; gap: .8rem; min-width: 0; }
+.band .vtxt { flex: 1 1 auto; display: flex; flex-direction: column; align-items: flex-start; gap: .3rem; min-width: 0; container-type: inline-size; container-name: verdict; }
+.band .vtop { display: flex; align-items: center; justify-content: flex-start; gap: .2rem .9rem; min-width: 0; max-width: 100%; }
+/* The why: two lines at most, whole or hidden (fitBand) */
+.band .vwhy { margin: 0; max-height: calc(2 * 1.35em); overflow: hidden; font: 400 var(--fs-xs)/1.35 var(--mono); color: var(--sm); }
+/* A narrow verdict: the answer and its why go under the face, centered */
+.band .vl.stack .vmain { flex-direction: column; gap: .45rem; }
+.band .vl.stack .vtxt { align-self: stretch; align-items: center; text-align: center; }
+.band .vl.stack .vtop { justify-content: center; }
 /* Snug (fitBand, before wrapping): less room between the pieces and no blinking cursor */
 .band .vtop.snug { column-gap: .4rem; }
 .band .vtop.snug .cur { display: none; }
@@ -118,57 +143,85 @@
 @container verdict (max-width: 22rem) { .band .ans { font-size: var(--fs-xl); } }
 @container verdict (max-width: 11rem) { .band .ans { font-size: var(--fs-lg); } } /* the narrowest window, next to the face */
 /* The face: second only to the chart, so it has a small screen of its own, in the level's color (muted while the app reads,
-   fails or sleeps) with a phosphor glow (paper does not glow). verdict.js swaps the frames, plays the effects below and turns
-   the head toward the pointer (translate). A long face gets a smaller size there. It shrinks with a narrow verdict. */
-.band .vface { position: relative; flex: none; display: grid; place-items: center; width: 10rem; max-width: 100%; min-height: 4.6rem; padding: 0 .4rem; overflow: hidden; border-radius: var(--r-sm); --fcol: var(--c, var(--sm)); border: 1px solid color-mix(in srgb, var(--fcol) 40%, transparent); background: color-mix(in srgb, var(--fcol) 7%, transparent); transition: border-color .3s, background-color .3s; }
+   dimmed offline and asleep) with a phosphor glow (paper does not glow). face.js builds it from parts: the eyes blink
+   (--blink, from the pace and the level) and look at what is wrong (data-look), the head turns toward the pointer
+   (translate) and breathes (--breath). The frame before fades out behind it (.fcg). A long face gets a smaller size. */
+.band .vface { position: relative; flex: none; display: grid; place-items: center; width: 10rem; max-width: 100%; min-height: 4.6rem; padding: 0 .4rem; overflow: hidden; border-radius: var(--r-sm); --fcol: var(--c, var(--sm)); border: 1px solid color-mix(in srgb, var(--fcol) 40%, transparent); background: color-mix(in srgb, var(--fcol) 7%, transparent); transition: border-color .3s, background-color .3s; cursor: pointer; }
 .band .vface.muted { --fcol: var(--sm); }
-.band .fc { display: block; font: 500 var(--fs-5xl)/1 var(--mono); color: var(--fcol); white-space: pre; transition: translate .25s ease-out, color .3s, opacity .3s; text-shadow: 0 0 .16em color-mix(in srgb, var(--fcol) 75%, transparent), 0 0 .6em color-mix(in srgb, var(--fcol) 40%, transparent); }
+.band :is(.fc, .fcg) { grid-area: 1 / 1; display: block; font: 500 var(--fs-5xl)/1 var(--mono); color: var(--fcol); white-space: pre; }
+.band .fc { transition: translate .25s ease-out, color .3s, opacity .4s, filter .4s; text-shadow: 0 0 .16em color-mix(in srgb, var(--fcol) 75%, transparent), 0 0 .6em color-mix(in srgb, var(--fcol) 40%, transparent); animation: face-breathe var(--breath, 3.6s) ease-in-out infinite; }
 html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: none; }
+.band .fc .eye { display: inline-block; transform: translate(var(--gx, 0), var(--gy, 0)) scale(var(--gs, 1)); transition: transform .25s ease-out; }
+.band .fc .eye i { display: inline-block; font-style: normal; transform-origin: 50% 60%; animation: face-blink var(--blink, 4.2s) infinite; }
+.band .fc.shut .eye i { animation: none; }
+.band .fc .fk { font-size: .5em; vertical-align: .9em; margin-left: .05em; }
+.band .fc[data-look="chart"] { --gy: .14em; }
+.band .fc[data-look="session"] { --gx: .14em; --gy: .05em; }
+.band .fc[data-look="refresh"] { --gx: .14em; --gy: -.14em; }
+.band .fc[data-look="you"] { --gs: 1.15; }
+.band .fcg { opacity: 0; pointer-events: none; filter: blur(1.5px); }
+.band .fcg.on { animation: face-ghost .8s ease-out; }
 .band .vface.dim .fc { opacity: .6; }
-@container vband (max-width: 14rem) { .band .vface { width: 8.5rem; } .band .fc { font-size: var(--fs-4xl); } }
+.band .vface.off .fc { opacity: .45; filter: saturate(.3); }
+.band .vface.static::before { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: repeating-linear-gradient(0deg, color-mix(in srgb, var(--st) 18%, transparent) 0 1px, transparent 1px 2px), repeating-linear-gradient(90deg, color-mix(in srgb, var(--st) 8%, transparent) 0 2px, transparent 2px 5px); animation: face-static .12s steps(2) infinite; }
+@container vband (max-width: 14rem) { .band .vface { width: 8.5rem; } .band :is(.fc, .fcg) { font-size: var(--fs-4xl); } }
 .band .fc.hop { animation: face-hop .45s ease-out; }
-.band .fc.shake { animation: face-shake .45s linear; }
-.band .fc.squash { animation: face-squash .35s ease-out; }
-.band .fc.tilt { animation: face-tilt 1.4s ease-in-out infinite; }
+.band .fc.shake { animation: face-shake .55s linear; }
+.band .fc.squash { animation: face-squash .45s ease-out; }
+.band .fc.flinch { animation: face-flinch .4s ease-out; }
+.band .fc.gasp { animation: face-gasp .4s ease-out; }
+.band .fc.exhale { animation: face-exhale .7s ease-in-out; }
+.band .fc.stretch { animation: face-stretch .7s ease-out; }
+.band .fc.sob { animation: face-sob .3s ease-in-out; }
+.band .fc.nudge { animation: face-nudge .35s linear; }
 .band .vface .zz { position: absolute; left: 62%; top: 35%; font: 600 var(--fs-sm)/1 var(--mono); color: var(--sm); pointer-events: none; animation: face-zz 2.2s ease-out forwards; }
+@keyframes face-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.08); } }
+@keyframes face-breathe { 0%, 100% { scale: 1; } 50% { scale: 1.025; } }
+@keyframes face-ghost { from { opacity: .5; } to { opacity: 0; } }
+@keyframes face-static { 0% { background-position: 0 0, 0 0; opacity: .9; } 50% { background-position: 0 3px, 4px 0; opacity: .5; } 100% { background-position: 0 1px, 2px 0; opacity: .8; } }
 @keyframes face-hop { 40% { transform: translateY(-.35rem); } 70% { transform: translateY(.05rem); } }
-@keyframes face-shake { 20% { transform: translateX(-3px); } 40% { transform: translateX(3px); } 60% { transform: translateX(-2px); } 80% { transform: translateX(2px); } }
-@keyframes face-squash { 40% { transform: scale(1.12, .86); } 75% { transform: scale(.96, 1.05); } }
-@keyframes face-tilt { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+@keyframes face-shake { 15% { transform: translateX(-4px); } 30% { transform: translateX(4px); } 45% { transform: translateX(-3px); } 60% { transform: translateX(3px); } 75% { transform: translateX(-1px); } }
+@keyframes face-squash { 35% { transform: scale(1.12, .84); } 70% { transform: scale(.95, 1.06); } }
+@keyframes face-flinch { 25% { transform: scale(.86) translateY(.15rem); } }
+@keyframes face-gasp { 35% { transform: translateY(-.2rem) scale(1.06); } }
+@keyframes face-exhale { 50% { transform: scale(1.06, .92) translateY(.12rem); } }
+@keyframes face-stretch { 50% { transform: scale(.94, 1.12) translateY(-.25rem); } }
+@keyframes face-sob { 50% { transform: translateY(.15rem); } }
+@keyframes face-nudge { 30% { transform: translateX(-3px); } 60% { transform: translateX(3px); } }
 @keyframes face-zz { from { opacity: 0; transform: translate(0, 0) scale(.8); } 20% { opacity: 1; } to { opacity: 0; transform: translate(1.4rem, -2rem) scale(1.25); } }
-/* The ring around today's point on the chart pings when the face glances at it */
+/* The ring around today's point on the chart pings when the face looks at it; the session and Refresh get a ring too */
 .plot .nowping { opacity: 0; transform-box: fill-box; transform-origin: center; pointer-events: none; }
 .plot.glance .nowping { animation: now-ping .9s ease-out 2; }
 @keyframes now-ping { from { opacity: .9; transform: scale(.35); } to { opacity: 0; transform: scale(1.4); } }
+:is(#sScr, #syncBtn).face-ping { animation: face-ping .9s ease-out 2; }
+@keyframes face-ping { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--crt-accent) 70%, transparent); } to { box-shadow: 0 0 0 .6rem transparent; } }
 @media (prefers-reduced-motion: reduce) {
-  .band .fc, .band .vface .zz, .plot .nowping { animation: none !important; }
-  .band .fc { transition: none; }
+  .band .fc, .band .fc .eye i, .band .fcg, .band .vface .zz, .band .vface.static::before, .plot .nowping, :is(#sScr, #syncBtn).face-ping { animation: none !important; }
+  .band .fc, .band .fc .eye { transition: none; }
 }
-/* The chips: an icon, a word or two (muted) and the value. A warning chip (locked) takes the Pause color. */
-.chips { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .3rem .4rem; max-width: 100%; min-width: 0; overflow: hidden; }
-.chip { flex: none; display: inline-flex; align-items: baseline; gap: .35rem; padding: .15rem .45rem; border: 1px solid transparent; background: color-mix(in srgb, var(--st) 8%, transparent); font: 400 var(--fs-xs)/1.3 var(--mono); color: var(--sm); white-space: nowrap; }
-.chip .ci { font-style: normal; color: var(--st); }
-.chip .cv { font: 600 var(--fs-sm)/1.2 var(--mono); color: var(--st); }
-.chip.warn { border-color: color-mix(in srgb, var(--pause) 60%, transparent); }
+/* The readout: a row each, an icon, a word (muted), a dotted leader and the value. A warning row (locked, the session
+   first) takes the Pause color. Words only ("Too early to tell") make a plain row. */
+.chips { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; gap: .3rem; padding-top: .5rem; border-top: 1px solid var(--sline); overflow: hidden; }
+.chips:empty, .chips.none { display: none; }
+.chip { flex: none; display: flex; align-items: center; gap: .5rem; min-width: 0; overflow: hidden; font: 500 var(--fs-xs)/1.3 var(--mono); color: var(--sm); white-space: nowrap; letter-spacing: .04em; }
+.chip .ci { flex: none; width: 1em; font-style: normal; text-align: center; color: var(--sm); }
+.chip .cw { flex: none; text-transform: uppercase; }
+.chip .cl { flex: 1 1 auto; min-width: .8rem; align-self: center; border-bottom: 1px dotted var(--sline); }
+.chip .cv { flex: none; font: 600 var(--fs-sm)/1.2 var(--mono); color: var(--st); letter-spacing: 0; }
 .chip.warn .ci, .chip.warn .cv { color: var(--pause); }
-.chip.plain { padding-left: 0; border: 0; background: none; }
+.chip.plain { white-space: normal; }
 .chip.plain .cv { font-weight: 400; color: var(--sm); }
-.chip.plain { flex: 0 1 auto; min-width: 0; white-space: normal; } /* words only ("Too early to tell"): they wrap rather than run out of a narrow verdict */
 .chip.bare .cw { display: none; }
-/* The weekly reset: no box, muted, as a note */
-.chip.quiet { background: none; padding-left: 0; padding-right: 0; }
-.chip.quiet .ci, .chip.quiet .cv { color: var(--sm); }
 .chip.quiet .cv { font-weight: 500; }
-.chip.quiet + .chip.quiet, .chip:not(.quiet) + .chip.quiet { margin-left: .4rem; }
-.band .vl.lit-bare .ruler > span.on > span:not(.shp) { display: none; }
 .band #vLevel { display: none; } /* the ruler already lights the level */
-.band .ruler { flex: none; display: flex; gap: 2px; }
-.ruler > span { flex: none; display: flex; align-items: center; justify-content: center; gap: .4em; padding: .2rem .4rem; border: 1px solid var(--sline); color: var(--sm); font: 600 var(--fs-xs)/1.2 var(--mono); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
-/* Only the lit level shows, with its name. With nothing lit (no rating yet) the five shapes stay, without names. */
-.ruler:has(> .on) > span:not(.on) { display: none; }
-.ruler > span:not(.on) > span:not(.shp) { display: none; }
+/* The ruler: Room and the four levels side by side, each its shape and name, the lit one filled. In a narrow verdict the
+   ones that are not lit keep only their shape. */
+.band .ruler { flex: none; display: flex; gap: 3px; min-width: 0; }
+.ruler > span { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: .4em; padding: .2rem .3rem; border: 1px solid var(--sline); color: color-mix(in srgb, var(--sm) 70%, transparent); font: 600 var(--fs-xs)/1.2 var(--mono); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
 .ruler > span.on { background: var(--c); border-color: var(--c); color: var(--scr); }
-.ruler .shp { background: currentColor; }
+.ruler .shp { flex: none; background: currentColor; }
+.ruler.bare > span:not(.on) { flex: none; }
+.ruler.bare > span:not(.on) > span:not(.shp) { display: none; }
 .wk .wlab { display: grid; justify-items: end; gap: .15rem; }
 .wk .wbig { flex: none; font: 500 var(--fs-xl)/1 var(--mono); white-space: nowrap; }
 /* Two rows: the week's % and bar, then today's line */
@@ -335,6 +388,66 @@ html[data-screens="paper"]:not([data-theme="dark"]) .pleds i.at { box-shadow: no
   background: var(--scr); color: var(--st); border-bottom: 2px solid var(--ink); font: 500 var(--fs-sm)/1.3 var(--mono); white-space: nowrap; overflow: hidden;
 }
 
+/* ---- Motion kit (render.js, face.js, session.js, ui.js). Each plays once, when something changes; only the scan beam
+   loops, while a reading runs. Settings > Display > Motion: Subtle keeps what explains a change, Off keeps nothing
+   (tokens.css). ---- */
+/* Power on: the first time the Overview shows, each screen opens from a bright line, then the chart draws to NOW */
+.dash.power-on :is(.band > .vl, .band > .wk, .blk--session .crt, .graph, .foot .crt) { animation: crt-on .9s cubic-bezier(.2, .7, .3, 1) both; }
+.dash.power-on .blk--session .crt { animation-delay: .06s; }
+.dash.power-on .graph { animation-delay: .12s; }
+.dash.power-on #paceSvg { animation: chart-draw 1.4s .55s ease-out both; }
+@keyframes crt-on { 0% { transform: scale(0, .01); filter: brightness(3); } 35% { transform: scale(1, .01); filter: brightness(3); } 70% { transform: scale(1, 1); filter: brightness(1.5); } 100% { transform: none; filter: none; } }
+@keyframes chart-draw { from { clip-path: inset(0 100% 0 0); } }
+/* A new reading: the bars light up again, segment by segment, and the pace LEDs one by one */
+.dash.cascade .sbar .fill { animation: bar-fill .7s steps(20, end) both; }
+.dash.cascade #sBar .fill { animation: sbar-fill .7s steps(20, end) both; }
+@keyframes bar-fill { from { width: 0; } }
+@keyframes sbar-fill { from { clip-path: inset(0 100% 0 0); } }
+.dash.cascade .pleds i { animation: led-in .3s ease-out both; }
+.dash.cascade .pleds i:nth-child(2) { animation-delay: .05s; }
+.dash.cascade .pleds i:nth-child(3) { animation-delay: .1s; }
+.dash.cascade .pleds i:nth-child(4) { animation-delay: .15s; }
+.dash.cascade .pleds i:nth-child(5) { animation-delay: .2s; }
+.dash.cascade .pleds i:nth-child(6) { animation-delay: .25s; }
+.dash.cascade .pleds i:nth-child(7) { animation-delay: .3s; }
+.dash.cascade .pleds i:nth-child(8) { animation-delay: .35s; }
+.dash.cascade .pleds i:nth-child(9) { animation-delay: .4s; }
+@keyframes led-in { from { opacity: 0; transform: scaleY(.2); } }
+/* The change floats up next to the week's % */
+.wk .wlab { position: relative; }
+.dfl { position: absolute; top: -.55rem; right: -.35rem; font: 600 var(--fs-xs)/1 var(--mono); color: var(--crt-accent); pointer-events: none; white-space: nowrap; animation: delta-rise 2.4s ease-out both; }
+@keyframes delta-rise { 0% { opacity: 0; transform: translateY(.3rem); } 15%, 75% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-.4rem); } }
+/* A reading runs: a beam scans down the screens, again and again until it ends */
+.dash.is-reading::before {
+  content: ""; position: absolute; inset: 0; z-index: 8; pointer-events: none;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--crt-accent) 8%, transparent) 60%, color-mix(in srgb, var(--crt-accent) 35%, transparent) 97%, transparent) no-repeat;
+  background-size: 100% 6rem; animation: scan-beam 1.3s linear infinite;
+}
+@keyframes scan-beam { from { background-position: 0 -6rem; } to { background-position: 0 calc(100% + 6rem); } }
+/* The level got worse: the answer glitches once */
+.band .ans.glitch { animation: ans-glitch .7s steps(1) both; }
+@keyframes ans-glitch {
+  12% { transform: translate(-4px, 1px); text-shadow: 4px 0 var(--crt-accent), -4px 0 var(--pause); }
+  24% { transform: translate(4px, -1px) skewX(10deg); clip-path: inset(20% 0 45% 0); }
+  36% { transform: translate(-2px, 0); clip-path: inset(55% 0 5% 0); text-shadow: -3px 0 var(--crt-accent), 3px 0 var(--pause); }
+  48% { transform: translate(2px, 1px); clip-path: none; }
+  60%, 100% { transform: none; text-shadow: none; clip-path: none; }
+}
+/* The session just locked: the badge is stamped on and its shackle snaps shut */
+#sScr .strip .lkb.stamp { animation: lock-stamp .45s cubic-bezier(.2, 1.4, .4, 1) both; }
+#sScr .strip .lkb.stamp svg path { animation: lock-shackle .6s cubic-bezier(.3, 1.6, .5, 1) .15s both; }
+@keyframes lock-stamp { from { opacity: 0; transform: scale(2.2) rotate(-6deg); } }
+@keyframes lock-shackle { from { transform: translateY(-3px); } }
+/* A new week: pixel confetti over the verdict, and the week bar drains */
+.confetti { position: absolute; inset: 0; z-index: 4; overflow: hidden; pointer-events: none; }
+.confetti i { position: absolute; top: -6px; left: var(--x); width: 5px; height: 5px; background: var(--k); animation: confetti-fall 1.8s cubic-bezier(.3, .6, .6, 1) var(--d) both; }
+@keyframes confetti-fall { to { transform: translateY(16rem) rotate(540deg); opacity: 0; } }
+#wBar.drain .fill { animation: bar-drain .9s steps(20, end) both; }
+@keyframes bar-drain { from { width: 100%; } }
+@media (prefers-reduced-motion: reduce) {
+  .dash :is(.vl, .wk, .crt, .graph, #paceSvg, .sbar .fill, .pleds i), .dfl, .dash.is-reading::before, .band .ans.glitch, #sScr .strip .lkb, .confetti i { animation: none !important; }
+}
+
 /* =================== Layouts =================== */
 
 /* Vertical: under 720px. The band stacks (the verdict as a row, the week with its bar and today, then the session), the
@@ -348,13 +461,15 @@ html[data-screens="paper"]:not([data-theme="dark"]) .pleds i.at { box-shadow: no
   .dash { --gut: 2.4rem; --well-pad: .3rem; --well-gap: .3rem; }
   .band { grid-template-columns: minmax(0, 1fr); }
   .band :is(.vl, .wk, .blk--session) { grid-column: 1; grid-row: auto; }
-  /* The verdict is a row again: the face's screen on the left, the answer and the chips next to it */
-  .band .vl { flex-direction: row; justify-content: flex-start; gap: .7rem; padding-top: .4rem; padding-bottom: .4rem; }
+  /* The verdict packs tighter: the face's screen with the answer and its why next to it, then two readout rows at most.
+     The ruler is left to screen readers: the face, the answer and their color already show the level. */
+  .band .vl { gap: .45rem; padding-top: .4rem; padding-bottom: .4rem; }
   .band .vface { width: 7rem; }
   .band .vface { min-height: 3rem; }
   .band .fc { font-size: var(--fs-2xl); }
-  .band .vtxt { flex: 1 1 auto; align-items: flex-start; }
-  .band .vtop, .chips { justify-content: flex-start; }
+  .band .vwhy { max-height: 1.35em; }
+  .chips { padding-top: .35rem; }
+  .chips > .chip:nth-child(n + 3) { display: none; }
   .graph, .gbody { flex: none; }
   /* About 36rem is everything else in the window: the chart takes what is left, between 9 and 17rem */
   .gbody { grid-template-rows: clamp(9rem, 100vh - 36rem, 17rem) auto auto; }

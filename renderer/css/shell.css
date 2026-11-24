@@ -33,6 +33,40 @@
 @media (prefers-reduced-motion: reduce) { .lamp.is-updating .shp { animation: none; } }
 .rd { font: 500 var(--fs-xs) var(--mono); color: var(--ink2); white-space: nowrap; }
 #syncBtn { min-width: 6rem; }
+/* The lamp is a key: it opens the automatic reading menu */
+button.lamp { min-height: 2rem; cursor: pointer; }
+button.lamp:hover { border-color: var(--crt-line); }
+button.lamp:focus-visible { outline: 2px solid var(--fc); outline-offset: 2px; }
+/* Automatic reading on: a ring around Refresh's arrow drains toward the next reading (--ring-off, 0 to 100) */
+#syncBtn .rg, #syncBtn .rg-bg { display: none; }
+#syncBtn.ringed .ico { width: 1.35em; height: 1.35em; margin-block: -.2em; }
+#syncBtn.ringed .arw { transform: scale(.6); transform-origin: 12px 12px; stroke-width: 3.4; }
+#syncBtn.ringed :is(.rg, .rg-bg) { display: inline; stroke-width: 2.2; }
+#syncBtn .rg-bg { stroke: color-mix(in srgb, currentColor 22%, transparent); }
+#syncBtn .rg { stroke: var(--cobalt); stroke-dasharray: 100; stroke-dashoffset: var(--ring-off, 0); transform: rotate(-90deg); transform-origin: 12px 12px; transition: stroke-dashoffset 1s linear; }
+#syncBtn.ring-paused .rg { stroke: var(--ink2); stroke-dasharray: 4 6; stroke-dashoffset: 0; }
+@media (prefers-reduced-motion: reduce) { #syncBtn .rg { transition: none; } }
+
+/* The automatic reading menu, under the lamp (placed by auto-read.js) */
+.automenu {
+  position: fixed; z-index: 30; width: min(21rem, calc(100vw - 1rem)); display: flex; flex-direction: column; gap: .6rem; padding: .6rem;
+  background: var(--win); border: 1px solid var(--edge); border-radius: var(--r-sm); box-shadow: 0 10px 28px rgba(0, 0, 0, .4); -webkit-app-region: no-drag;
+}
+.automenu.hidden { display: none; }
+.automenu .am-now { justify-content: space-between; }
+.automenu .am-now .kb { padding: .1rem .4rem; border-bottom-width: 2px; font-size: var(--fs-xs); }
+.am-sec { display: flex; flex-direction: column; gap: .4rem; padding-top: .55rem; border-top: 1px solid var(--edge); }
+.am-h { font: 600 var(--fs-xs)/1.2 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink2); }
+.am-h2 { display: flex; justify-content: space-between; gap: .6rem; font: 500 var(--fs-xs)/1.2 var(--mono); color: var(--ink2); }
+.am-st { margin: 0; font-size: var(--fs-sm); line-height: 1.4; }
+.am-every { gap: .25rem; }
+.am-every .key { flex: 1 1 auto; min-width: 2.2rem; padding-inline: .4rem; }
+.am-acts { display: flex; flex-wrap: wrap; gap: .35rem; }
+.am-log { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; height: .75rem; }
+.am-log i { background: var(--free); }
+.am-log i.bad { outline: 1px solid var(--pause); outline-offset: -1px; background: repeating-linear-gradient(135deg, var(--pause) 0 2px, transparent 2px 4px); } /* hatched, not only red */
+.am-logt { display: flex; justify-content: space-between; font: 500 var(--fs-xs)/1.2 var(--mono); color: var(--ink2); }
+.automenu .am-set { justify-content: flex-start; }
 #connectBtn .short { display: none; }
 .rule { flex: none; height: .5rem; margin: .1rem 0 0; background: repeating-linear-gradient(0deg, var(--cobalt) 0 2px, transparent 2px 4px); }
 

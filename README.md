@@ -47,7 +47,7 @@ There are three ways to get the numbers in. The app uses the most recent reading
 
 A reading happens when you act: clicking Refresh, pressing F5 or Ctrl+Shift+R, an optional global shortcut, opening the app, coming back to it, or opening the tray card. There is no timer unless you turn on the optional one below. At most one reading per minute, with a hard time limit.
 
-Claude's Consumer Terms do not allow automated access outside the API. An optional 5 minute timer exists in Settings > Advanced. It is off by default and turning it on shows that warning. Use it at your own risk.
+Claude's Consumer Terms do not allow automated access outside the API. Automatic reading (every 1 to 60 minutes, or Smart) is in Settings > Data > Danger zone. It is off by default, and turning it on shows that warning and asks you to hold a key. Use it at your own risk.
 
 If Claude changes the format of its usage data, the app does not guess. It shows an error and asks you to type the numbers in until it is updated.
 

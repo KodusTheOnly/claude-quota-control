@@ -43,7 +43,7 @@ document.querySelectorAll(".toc-k[data-target]").forEach((key) =>
   key.addEventListener("click", () => {
     const section = document.getElementById(key.dataset.target);
     markTocKey(tocKeys(state.view), key);
-    section.scrollIntoView({ block: "start", behavior: reducedMotion.matches ? "auto" : "smooth" });
+    section.scrollIntoView({ block: "start", behavior: reducedMotion.matches || motionLevel() === "off" ? "auto" : "smooth" });
   })
 );
 

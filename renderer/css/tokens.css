@@ -152,3 +152,43 @@ html[data-screens="paper"]:not([data-theme="dark"]) {
   --num-flash: #1F3FA6; --num-halo: transparent; /* paper does not glow: the number flashes in the accent */
   --well-lo: rgba(0, 0, 0, .18);
 }
+
+/* Amber and Green screens (Settings, Screens): a CRT with that phosphor, in either theme. Only the neutral inks, the
+   lines and the glow change; the levels keep their colors (they carry the meaning), and the text keeps 4.5:1 or more. */
+html[data-screens="amber"] {
+  --scr: #0F0B05;
+  --st: #FFDDA8;
+  --sm: #C9A06A;
+  --sl: #2A2010;
+  --sline: #4A381C;
+  --crt-inset: #2A2010;
+  --crt-hi: #F0CC96; --crt-line: #8A6C40; --crt-hover: #1E170C; --crt-field: #140F07; --crt-thumb: #5A4626;
+  --tick: #FFF2DC;
+  --crt-bright: #FFF2DC;
+  --crt-grid: #2A2112; --crt-grid-day: #3A2E18;
+  --crt-glow: rgba(255, 176, 60, .08);
+  --crt-scan: rgba(255, 200, 120, .035);
+  --num-flash: #FFF2DC; --num-halo: rgba(255, 196, 110, .7);
+}
+html[data-screens="green"] {
+  --scr: #050E07;
+  --st: #C8FFD4;
+  --sm: #7FC48F;
+  --sl: #11261A;
+  --sline: #1F4029;
+  --crt-inset: #11261A;
+  --crt-hi: #A8EDB8; --crt-line: #4F8A5E; --crt-hover: #0C1A10; --crt-field: #07130A; --crt-thumb: #2C5A38;
+  --tick: #EAFFEE;
+  --crt-bright: #EAFFEE;
+  --crt-grid: #12261A; --crt-grid-day: #1A3323;
+  --crt-glow: rgba(92, 255, 138, .08);
+  --crt-scan: rgba(160, 255, 180, .035);
+  --num-flash: #EAFFEE; --num-halo: rgba(120, 255, 160, .65);
+}
+
+/* Motion (Settings, Display). Off: nothing moves (also when Windows asks for less motion). Subtle: only what explains a
+   change plays; the decoration (the face's breath and afterglow, the power on, the scan beam, the glitch, the confetti,
+   the marching hatches) stays still. */
+html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="off"] *::after { animation: none !important; transition: none !important; }
+html[data-motion="subtle"] .band .fc:not(:is(.hop, .shake, .squash, .flinch, .gasp, .exhale, .stretch, .sob, .nudge)) { animation: none !important; } /* the breath; its reactions still play */
+html[data-motion="subtle"] :is(.band .fcg, .band .vface.static::before, .dash.power-on .crt, .dash.power-on .band > :is(.vl, .wk), .dash.power-on .graph, .dash.power-on #paceSvg, .dash.is-reading::before, .confetti i, .band .ans.glitch, #sBar .pj, #sTime .lk) { animation: none !important; }

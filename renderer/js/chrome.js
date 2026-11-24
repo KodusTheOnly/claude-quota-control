@@ -23,10 +23,13 @@ function renderChrome(src) {
   setLevelClass(lamp, STATE_LEVEL[st]);
   lamp.classList.toggle("is-updating", st === "updating");
   // A live region: written only when the text changes. The age comes from the render that already runs every 30 s.
-  setText($("lampText"), st === "none" ? t("src.none") : t(`state.${st}`));
+  // With automatic reading on, a fresh reading's "Live" gives way to the timer: "Auto · 10 min" and the time to the
+  // next reading (auto-read.js keeps that countdown going). Updating, stale and offline keep their words: they matter more.
+  const auto = st === "fresh" && autoOn();
+  setText($("lampText"), st === "none" ? t("src.none") : auto ? autoLampWord() : t(`state.${st}`));
   // The narrow header can cut the word short. While updating, the tooltip also says the numbers are from the last reading.
-  lamp.title = st === "updating" ? t("msg.updating") : $("lampText").textContent;
-  setText($("lampAgeTxt"), st === "fresh" ? `· ${lampAge(Date.now() - lastUpdate())}` : ""); // hidden by CSS where the header has no room for it
+  lamp.title = st === "updating" ? t("msg.updating") : auto ? t("hd.autoTitle", { what: autoMenuStatus() }) : $("lampText").textContent;
+  setText($("lampAgeTxt"), auto ? autoLampAge() : st === "fresh" ? `· ${lampAge(Date.now() - lastUpdate())}` : ""); // hidden by CSS where the header has no room for it
   $("lampAge").textContent = src ? t("hd.read", { time: fmtTime(lastUpdate()) }) : "";
   $("lampAge").title = src ? `${sourceLabel(src)} ${ago(lastUpdate())}` : "";
   const connected = Boolean(state.settings.claudeConnected);

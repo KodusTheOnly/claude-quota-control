@@ -281,6 +281,48 @@ test("the global shortcut registers, changes, refuses bad keys and turns off", a
   assert.deepEqual(await app.ipc.handle["shortcut-status"](), { state: "off", keys: null });
 });
 
+test("automatic reading: the choice is checked, saved and timed, and an old switch still works", async (t) => {
+  const app = await loadMain(t, { settings: CONNECTED });
+  assert.deepEqual(await app.ipc.handle["auto-read-state"](), { every: 0, minutes: null, since: null, nextAt: null, paused: null, pauseUntil: null, log: [] }, "off by default");
+  assert.equal((await app.ipc.handle["auto-read-action"]({}, "pause")).pauseUntil, null, "the menu cannot pause a timer that is off");
+
+  let s = await app.ipc.handle["set-settings"]({}, { autoReadEvery: 10 });
+  assert.equal(s.autoReadEvery, 10);
+  let st = await app.ipc.handle["auto-read-state"]();
+  assert.equal(st.every, 10);
+  assert.equal(st.nextAt, Date.now() + 10 * MIN);
+  const sent = app.win.webContents.sent.filter(([ch]) => ch === "auto-read-state");
+  assert.equal(sent.at(-1)[1].nextAt, st.nextAt, "the window hears about the next reading");
+
+  st = await app.ipc.handle["auto-read-action"]({}, "pause");
+  assert.equal(st.paused, "user");
+  assert.equal(st.pauseUntil, Date.now() + 60 * MIN);
+  st = await app.ipc.handle["auto-read-action"]({}, "resume");
+  assert.equal(st.paused, null);
+  assert.equal(st.pauseUntil, null);
+
+  await app.ipc.handle["claude-sync"]({}, {});
+  assert.deepEqual((await app.ipc.handle["auto-read-state"]()).log, [], "a reading that could not start is not logged");
+
+  s = await app.ipc.handle["set-settings"]({}, { autoReadEvery: 2 });
+  assert.equal(s.autoReadEvery, 0, "a value that is not a choice turns it off");
+  assert.equal((await app.ipc.handle["auto-read-state"]()).nextAt, null);
+
+  s = await app.ipc.handle["set-settings"]({}, { autoReadEvery: "smart", autoReadActiveOnly: 0 });
+  assert.equal(s.autoReadActiveOnly, false);
+  st = await app.ipc.handle["auto-read-state"]();
+  assert.equal(st.minutes, 15, "smart and calm");
+  app.ipc.on["auto-read-hint"]({}, true);
+  assert.equal((await app.ipc.handle["auto-read-state"]()).minutes, 5, "smart and busy");
+});
+
+test("automatic reading: a settings file from before the choice keeps its 5 minute timer", async (t) => {
+  const app = await loadMain(t, { settings: { ...CONNECTED, autoRead: true } });
+  const st = await app.ipc.handle["auto-read-state"]();
+  assert.equal(st.every, 5);
+  assert.equal(st.nextAt, Date.now() + 5 * MIN);
+});
+
 test("a combination another app already owns is reported, not hidden", async (t) => {
   const app = await loadMain(t, { shortcutAvailable: false });
   await app.ipc.handle["set-settings"]({}, { shortcutOn: true });
@@ -398,12 +440,12 @@ const FULL = {
   weights: [1, 1, 2, 0.5, 1, 0, 1],
   activeHours: { start: 9, end: 1 },
   extra: { currency: "USD", symbol: "$", balance: 15.8, spent: 4.2, limit: 20, autoReload: false, at: T0 },
-  language: "pt-BR", theme: "light", screens: "crt", showExtra: false, miniWindow: false, codeLogs: false,
+  language: "pt-BR", theme: "light", screens: "amber", motion: "subtle", showExtra: false, miniWindow: false, codeLogs: false,
   shortcutOn: true, shortcutKeys: "Ctrl+Alt+Y", fiveHourThreshold: 80, remindEvery: 4,
   notifyAll: true, notifyLevel: false, notifyResets: true, notifySpikes: false, notifyExtra: true,
   reserve: 10, reserveRelease: 24, autoWeights: true,
 };
-const EXPORTED_KEYS = ["manual", "readings", "sessions", "weights", "activeHours", "extra", "language", "theme", "screens", "showExtra", "miniWindow", "codeLogs", "shortcutOn", "shortcutKeys", "fiveHourThreshold", "remindEvery", "notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "reserve", "reserveRelease", "autoWeights"];
+const EXPORTED_KEYS = ["manual", "readings", "sessions", "weights", "activeHours", "extra", "language", "theme", "screens", "motion", "showExtra", "miniWindow", "codeLogs", "shortcutOn", "shortcutKeys", "fiveHourThreshold", "remindEvery", "notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "reserve", "reserveRelease", "autoWeights"];
 const backups = (dir) => (fs.existsSync(path.join(dir, "backups")) ? fs.readdirSync(path.join(dir, "backups")).sort() : []);
 const readBackup = (dir, name) => JSON.parse(fs.readFileSync(path.join(dir, "backups", name), "utf8"));
 const tmpFile = (t, name) => {

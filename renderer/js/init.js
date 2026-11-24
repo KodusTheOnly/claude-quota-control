@@ -55,7 +55,7 @@ async function init() {
   api.onAutoReadStopped(async () => {
     state.settings = await api.getSettings();
     bindSettings();
-    toast(t("adv.autoStopped"), "error");
+    toast(t("auto.stopped"), "error");
   });
   api.onFocusUpdate(focusUpdate);
   api.onSyncRequest((opts) => runSync({ auto: Boolean(opts && opts.auto) }));

@@ -2,7 +2,7 @@
 // Reads ~/.claude/claude-quota-control.json and owns the window, the tray, notifications,
 // "start with Windows" and the collector install.
 
-const { app, BrowserWindow, Tray, Menu, nativeImage, nativeTheme, ipcMain, Notification, shell, screen, dialog, globalShortcut } = require("electron");
+const { app, BrowserWindow, Tray, Menu, nativeImage, nativeTheme, ipcMain, Notification, shell, screen, dialog, globalShortcut, powerMonitor } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
@@ -13,7 +13,7 @@ const claude = require("./claude-sync");
 const { readActivity } = require("./claude-activity");
 const i18n = require("./renderer/i18n.js");
 const { setupUpdates } = require("./updater");
-const { createRefreshPolicy, normalizeAccelerator, TIMER_EVERY, timerVerdict } = require("./refresh-policy");
+const { createRefreshPolicy, normalizeAccelerator, timerVerdict, AUTO_READ_CHOICES, autoReadEvery, autoReadDelay, autoReadSkip, inActiveHours } = require("./refresh-policy");
 
 const SLUG = "claude-quota-control";
 const BACKUP_SUFFIX = ".quota-control-backup";
@@ -31,7 +31,8 @@ const SETTINGS_FILE = path.join(app.getPath("userData"), "settings.json");
 const DEFAULT_SETTINGS = {
   language: "en",
   theme: "dark", // a new install opens dark
-  screens: "paper", // the data screens in the light theme: light paper (default) or dark CRT. The dark theme is always CRT.
+  screens: "paper", // the data screens: light paper (default, light theme only; the dark theme shows CRT then), CRT, amber or green CRT
+  motion: "full", // how much moves: everything, only what explains a change, or nothing (the system's reduced motion wins)
   openAtLogin: false,
   notifyAll: true,
   notifyLevel: true,
@@ -44,7 +45,11 @@ const DEFAULT_SETTINGS = {
   manual: null,
   notified: {},
   codeLogs: true, // the hourly strip may use Claude Code's local logs (timestamps and token counts only)
-  autoRead: false, // opt-in timer that reads usage every few minutes (see the warning in Settings)
+  // The opt-in timer (see the warning in Settings): autoReadEvery is how often, in minutes or "smart". It has no
+  // default here on purpose: without it, an older settings file's autoRead: true still means every 5 minutes.
+  autoRead: false,
+  autoReadActiveOnly: true, // the timer reads only inside the active hours (Settings > Plan), when there are some
+  autoReadIdlePause: true, // the timer skips its readings while the PC is idle or locked
   reserve: 0, // emergency reserve, % of the week kept out of the daily plan (off by default)
   reserveRelease: 48, // hours before the reset over which what is left of the reserve joins the plan (0 = never)
   pastWeeks: false, // the "4 wk" key on the week chart: the last 4 weeks drawn with this one
@@ -59,7 +64,8 @@ const FRAME = {
   dark: { color: "#17191B", symbol: "#E8E6DE" },
 };
 const THEMES = ["system", "light", "dark"];
-const SCREENS = ["crt", "paper"];
+const SCREENS = ["crt", "paper", "amber", "green"];
+const MOTIONS = ["full", "subtle", "off"]; // Settings > Display > Motion
 const frameColors = () => FRAME[nativeTheme.shouldUseDarkColors ? "dark" : "light"];
 
 // The title bar buttons are drawn by the system, so they have to be recolored with the theme
@@ -297,7 +303,7 @@ function showUpdate() {
 // Asks the renderer for a reading of the usage page. refresh-policy.js decides whether a reason may
 // run: what the user does always runs; opening the app, coming back to it and opening the tray card
 // are automatic, quiet and need a connected account. The only timer is the optional one in
-// Settings > Advanced (autoRead, off by default): see applyAutoRead().
+// Settings > Data > Danger zone (autoReadEvery, off by default): see applyAutoRead().
 const refreshPolicy = createRefreshPolicy();
 let rendererIsReady = false; // before this the window cannot take a request, so it would be lost
 
@@ -307,30 +313,93 @@ function requestSync(reason) {
   if (run) win.webContents.send("sync-request", { auto });
 }
 
-// Optional timer: reads every 5 minutes while the app runs. Off by default and hidden in Settings,
-// because Anthropic's Consumer Terms speak against automated access. It stops by itself when Claude
-// asks for a login or a check, or after a few failed readings in a row.
-let autoReadTimer = null;
-let autoReadFails = 0;
+// Optional timer: reads every few minutes while the app runs (1 to 60, or "smart"). Off by default and in the
+// Danger zone of Settings, because Anthropic's Consumer Terms speak against automated access. It stops by itself
+// when Claude asks for a login or a check, or after a few failed readings in a row. It can skip its readings outside
+// the active hours and while the PC is idle or locked. One timeout at a time, set again after each turn.
+const IDLE_AFTER_S = 5 * 60; // the PC counts as idle after this long without input
+const autoRead = { timer: null, fails: 0, since: 0, nextAt: null, paused: null, hot: false, pauseUntil: 0, log: [] };
+const AUTO_LOG_KEEP = 12; // the last readings, any kind, for the Refresh menu: when, and whether it worked. Memory only.
+const AUTO_PAUSE_MS = 60 * 60 * 1000; // "Pause for 1 hour" in the Refresh menu
 
-function applyAutoRead() {
-  const on = Boolean(loadSettings().autoRead);
-  if (!on && autoReadTimer) {
-    clearInterval(autoReadTimer);
-    autoReadTimer = null;
-  }
-  if (on && !autoReadTimer) {
-    autoReadFails = 0;
-    autoReadTimer = setInterval(() => requestSync("timer"), TIMER_EVERY);
-  }
+function autoReadState() {
+  const s = loadSettings();
+  const every = autoReadEvery(s);
+  const inActive = inActiveHours(new Date(), cleanActiveHours(s.activeHours));
+  const delay = autoReadDelay({ every, hot: autoRead.hot, inActive });
+  const pauseUntil = autoRead.pauseUntil > Date.now() ? autoRead.pauseUntil : null;
+  return { every, minutes: delay ? delay / 60000 : null, since: every ? autoRead.since : null, nextAt: autoRead.nextAt, paused: pauseUntil ? "user" : autoRead.paused, pauseUntil, log: autoRead.log.slice() };
+}
+function sendAutoReadState() {
+  if (win && !win.isDestroyed()) win.webContents.send("auto-read-state", autoReadState());
 }
 
+// Sets the next turn from now, or stops the timer when it is off
+function applyAutoRead({ restart = true } = {}) {
+  clearTimeout(autoRead.timer);
+  autoRead.timer = null;
+  const s = loadSettings();
+  const every = autoReadEvery(s);
+  if (!every) {
+    autoRead.nextAt = null;
+    autoRead.paused = null;
+    autoRead.pauseUntil = 0;
+    autoRead.fails = 0;
+    sendAutoReadState();
+    return;
+  }
+  const delay = autoReadDelay({ every, hot: autoRead.hot, inActive: inActiveHours(new Date(), cleanActiveHours(s.activeHours)) });
+  if (restart) autoRead.since = Date.now();
+  autoRead.nextAt = Math.max(Date.now(), autoRead.since + delay);
+  autoRead.timer = setTimeout(autoReadTurn, autoRead.nextAt - Date.now());
+  sendAutoReadState();
+}
+
+function autoReadTurn() {
+  const s = loadSettings();
+  if (autoRead.pauseUntil > Date.now()) return applyAutoRead(); // paused from the Refresh menu: wait it out
+  autoRead.pauseUntil = 0;
+  const idleState = powerMonitor && powerMonitor.getSystemIdleState ? powerMonitor.getSystemIdleState(IDLE_AFTER_S) : "unknown";
+  autoRead.paused = autoReadSkip({
+    inActive: inActiveHours(new Date(), cleanActiveHours(s.activeHours)),
+    activeOnly: s.autoReadActiveOnly !== false,
+    idleState,
+    idlePause: s.autoReadIdlePause !== false,
+  });
+  if (!autoRead.paused) requestSync("timer");
+  applyAutoRead();
+}
+
+// The window says whether the week or the session is busy (a session running, or the week Tight or Pause), which
+// Smart reads more often for. A hotter state can bring the next turn closer; a calmer one waits for the next turn.
+on("auto-read-hint", (_e, hot) => {
+  const next = Boolean(hot);
+  if (next === autoRead.hot) return;
+  autoRead.hot = next;
+  if (autoReadEvery(loadSettings()) === "smart") applyAutoRead({ restart: false });
+});
+handle("auto-read-state", () => autoReadState());
+// The Refresh menu: pause the timer for an hour, take the pause back, or skip the next reading (the next one comes a
+// whole interval from now). Only while the timer is on; nothing here turns it on.
+handle("auto-read-action", (_e, action) => {
+  if (!autoReadEvery(loadSettings())) return autoReadState();
+  if (action === "pause") autoRead.pauseUntil = Date.now() + AUTO_PAUSE_MS;
+  else if (action === "resume") autoRead.pauseUntil = 0;
+  else if (action !== "skip") return autoReadState();
+  applyAutoRead({ restart: action !== "pause" });
+  return autoReadState();
+});
+
 function noteAutoReadResult(res) {
-  if (!autoReadTimer) return;
-  const verdict = timerVerdict(res && res.ok ? null : (res && res.error) || "fail", autoReadFails);
-  autoReadFails = verdict.fails;
+  if (res && !["too-soon", "already-open", "closed"].includes(res.error)) {
+    autoRead.log = [...autoRead.log, { at: Date.now(), ok: Boolean(res.ok) }].slice(-AUTO_LOG_KEEP);
+    sendAutoReadState();
+  }
+  if (!autoReadEvery(loadSettings())) return;
+  const verdict = timerVerdict(res && res.ok ? null : (res && res.error) || "fail", autoRead.fails);
+  autoRead.fails = verdict.fails;
   if (!verdict.stop) return;
-  const next = { ...loadSettings(), autoRead: false };
+  const next = { ...loadSettings(), autoReadEvery: 0, autoRead: false };
   saveSettings(next);
   applyAutoRead();
   if (win && !win.isDestroyed()) win.webContents.send("auto-read-stopped", { reason: (res && res.error) || "fail" });
@@ -810,7 +879,7 @@ handle("app-info", () => ({ version: app.getVersion(), electron: process.version
 
 const BACKUP_KEYS = [
   "manual", "readings", "sessions", "weights", "activeHours", "extra",
-  "language", "theme", "screens", "notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "fiveHourThreshold", "remindEvery",
+  "language", "theme", "screens", "motion", "notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "fiveHourThreshold", "remindEvery",
   "showExtra", "miniWindow", "codeLogs", "shortcutOn", "shortcutKeys", "reserve", "reserveRelease", "pastWeeks", "autoWeights",
 ];
 // Active hours (Settings > Plan): whole hours 0-23, start and end different, or null for the whole day.
@@ -905,6 +974,7 @@ function cleanBackupSettings(st) {
   if (typeof st.language === "string") next.language = i18n.normalize(st.language);
   if (THEMES.includes(st.theme)) next.theme = st.theme;
   if (SCREENS.includes(st.screens)) next.screens = st.screens;
+  if (MOTIONS.includes(st.motion)) next.motion = st.motion;
   for (const k of BOOLEAN_KEYS) if (typeof st[k] === "boolean") next[k] = st[k];
   if (THRESHOLDS.includes(st.fiveHourThreshold)) next.fiveHourThreshold = st.fiveHourThreshold;
   if (st.remindEvery === "smart" || REMIND_HOURS.includes(st.remindEvery)) next.remindEvery = st.remindEvery;
@@ -1055,6 +1125,7 @@ function applySettings(patch) {
     nativeTheme.themeSource = next.theme;
   }
   if ("screens" in patch) next.screens = SCREENS.includes(patch.screens) ? patch.screens : "paper";
+  if ("motion" in patch) next.motion = MOTIONS.includes(patch.motion) ? patch.motion : "full";
   if ("activeHours" in patch) next.activeHours = cleanActiveHours(patch.activeHours);
   if ("shortcutOn" in patch || "shortcutKeys" in patch) {
     // Only a combination that passes the check is kept, so the settings file never holds a bad one
@@ -1064,8 +1135,14 @@ function applySettings(patch) {
     applyShortcut(next);
     if (!keys) shortcutState = "invalid";
   }
+  if ("autoReadEvery" in patch) {
+    next.autoReadEvery = AUTO_READ_CHOICES.includes(patch.autoReadEvery) ? patch.autoReadEvery : 0;
+    next.autoRead = false; // the old switch: from here on the choice above says it all
+  }
+  for (const key of ["autoReadActiveOnly", "autoReadIdlePause"]) if (key in patch) next[key] = Boolean(patch[key]);
   saveSettings(next);
-  if ("autoRead" in patch) applyAutoRead();
+  if ("autoReadEvery" in patch) autoRead.fails = 0;
+  if (["autoRead", "autoReadEvery", "autoReadActiveOnly", "autoReadIdlePause", "activeHours"].some((k) => k in patch)) applyAutoRead({ restart: "autoReadEvery" in patch });
   if ("weights" in patch || "activeHours" in patch || "reserve" in patch || "reserveRelease" in patch) writeCollectorLanguage();
   return next;
 }
@@ -1232,6 +1309,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on("before-quit", () => {
     quitting = true;
     stopProbe();
+    clearTimeout(autoRead.timer);
   });
   app.on("will-quit", () => globalShortcut.unregisterAll());
 

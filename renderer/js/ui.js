@@ -16,14 +16,49 @@ function setText(elem, text) {
 
 // Writes a number. When a new reading changes it, it glows for a moment (.glow in crt.css; still with reduced motion).
 // The first number written, over the "–" placeholder, does not glow.
+// How much moves (Settings > Display > Motion): "full", "subtle" (only what explains a change) or "off". Windows asking
+// for less motion (prefers-reduced-motion) makes it "off", whatever the setting.
+const reducedMotionQuery = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+function motionLevel() {
+  if (reducedMotionQuery && reducedMotionQuery.matches) return "off";
+  const m = typeof state !== "undefined" && state.settings && state.settings.motion;
+  return m === "subtle" || m === "off" ? m : "full";
+}
+
+// A number that a new reading changed: it rolls to the new value (a whole number, with or without %), glows for a
+// moment, and with data-delta the change floats up next to it ("+2%"). Off: it only changes.
+const NUM_RE = /^(-?\d+)(%?)$/;
 function setNum(elem, text) {
   const prev = elem.textContent;
   if (prev === text) return;
-  elem.textContent = text;
+  if (elem._roll && typeof cancelAnimationFrame === "function") cancelAnimationFrame(elem._roll);
+  const a = NUM_RE.exec(elem.dataset.num || prev);
+  const b = NUM_RE.exec(text);
+  elem.dataset.num = text;
+  const roll = a && b && a[2] === b[2] && prev && prev !== "–" && motionLevel() !== "off" && typeof requestAnimationFrame === "function";
+  if (roll) {
+    const from = Number(a[1]);
+    const to = Number(b[1]);
+    const t0 = performance.now();
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / 650);
+      elem.textContent = k < 1 ? `${Math.round(from + (to - from) * (1 - (1 - k) ** 3))}${b[2]}` : text;
+      if (k < 1) elem._roll = requestAnimationFrame(step);
+    };
+    elem._roll = requestAnimationFrame(step);
+  } else elem.textContent = text;
   if (!prev || prev === "–") return;
   elem.classList.remove("glow");
   void elem.offsetWidth; // restart the animation
   elem.classList.add("glow");
+  if (elem.dataset.delta !== undefined && a && b && a[2] === b[2]) floatDelta(elem, Number(b[1]) - Number(a[1]), b[2]);
+}
+function floatDelta(elem, diff, suffix) {
+  if (!diff || motionLevel() === "off" || !elem.parentElement) return;
+  const f = node("span", "dfl", `${diff > 0 ? "+" : "-"}${Math.abs(diff)}${suffix}`);
+  f.setAttribute("aria-hidden", "true");
+  f.addEventListener("animationend", () => f.remove());
+  elem.parentElement.append(f);
 }
 
 function node(tag, cls, text) {

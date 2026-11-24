@@ -89,9 +89,33 @@
 #shortcutNote.is-error { display: flex; gap: .6rem; align-items: flex-start; margin: .2rem .2rem 0; padding: .5rem .7rem; background: var(--card); border-top: 2px solid var(--ink); color: var(--ink); font-size: var(--fs-sm); }
 #shortcutNote.is-error::before { content: ""; flex: none; width: .9rem; height: .9rem; margin-top: .25rem; background: var(--danger); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 
-/* Danger zone */
-.dz { display: flex; flex-direction: column; gap: .4rem; margin-top: .4rem; padding-top: .6rem; border-top: 2px dashed var(--danger); }
+/* Danger zone: a box with a hazard stripe on top. Reading by itself, then deleting the data. */
+.dz { display: flex; flex-direction: column; gap: .6rem; margin-top: .6rem; padding: .9rem .8rem .8rem; border: 1px solid color-mix(in srgb, var(--danger) 70%, transparent); border-radius: var(--r-sm); background: color-mix(in srgb, var(--danger) 4%, var(--card)); position: relative; overflow: hidden; }
+.dz::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 6px; background: repeating-linear-gradient(135deg, var(--danger) 0 8px, transparent 8px 16px); }
+.dz > .grp-h { color: var(--danger); }
 .dz .acts { padding: .2rem; }
+.ar-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .3rem .8rem; }
+.ar-status { display: inline-flex; align-items: center; gap: .4rem; font: 600 var(--fs-xs)/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); }
+.ar-status .dot { width: .5rem; height: .5rem; border-radius: 50%; background: currentColor; }
+.ar-status[data-tone="on"] { color: var(--free); }
+.ar-status[data-tone="on"] .dot { animation: lamp-pulse 1.6s ease-in-out infinite; }
+.ar-status[data-tone="pending"] { color: var(--danger); }
+.ar-status[data-tone="paused"] { color: var(--ink2); }
+#autoReadEvery .key { min-width: 3rem; }
+#autoReadEvery .key.pend { border-style: dashed; border-color: var(--danger); color: var(--danger); background: transparent; }
+#autoReadFast { color: var(--danger); }
+.ar-warn { display: flex; flex-direction: column; gap: .6rem; padding: .7rem .8rem; background: var(--win); border: 1px solid color-mix(in srgb, var(--danger) 55%, transparent); border-radius: var(--r-sm); }
+.ar-warn-t { display: flex; gap: .6rem; margin: 0; font-size: var(--fs-sm); line-height: 1.5; }
+.ar-bang { flex: none; display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; background: var(--danger); color: var(--card); font: 600 var(--fs-sm)/1 var(--mono); }
+/* Hold to turn on: the key fills while it is held and turns it on when full */
+.key.hold { position: relative; overflow: hidden; color: var(--danger); border-color: var(--danger); touch-action: none; user-select: none; }
+.key.hold b { position: relative; font-weight: 600; }
+.key.hold .hold-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: color-mix(in srgb, var(--danger) 30%, transparent); transition: width .2s ease-out; }
+.key.hold.is-holding .hold-fill { width: 100%; transition: width 1.5s linear; }
+@media (prefers-reduced-motion: reduce) { .key.hold.is-holding .hold-fill { transition: none; } .ar-status .dot { animation: none !important; } }
+.ar-opts { display: flex; flex-direction: column; gap: .2rem; }
+.dz-del { display: flex; flex-direction: column; gap: .3rem; padding-top: .7rem; border-top: 1px dashed color-mix(in srgb, var(--danger) 45%, transparent); }
+.dz-del .lb { font-size: var(--fs-md); }
 .key.dng { border-bottom-color: var(--danger); gap: .6rem; }
 .key.dng::before { content: ""; width: .6rem; height: .6rem; background: var(--danger); }
 
@@ -167,11 +191,3 @@
   .toc { position: sticky; top: 0; z-index: 4; }
   .doc .blk { scroll-margin-top: 5.6rem; }
 }
-
-/* Advanced: closed by default, so the riskier options stay out of sight */
-.adv { border-top: 1px solid var(--edge); margin-top: .4rem; }
-.adv > summary { cursor: pointer; padding: .6rem .8rem; font-size: var(--fs-sm); letter-spacing: .08em; text-transform: uppercase; opacity: .75; list-style: none; }
-.adv > summary::-webkit-details-marker { display: none; }
-.adv > summary::before { content: "▸ "; }
-.adv[open] > summary::before { content: "▾ "; }
-.adv > summary:hover, .adv > summary:focus-visible { opacity: 1; }

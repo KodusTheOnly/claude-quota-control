@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { MIN_GAP, FOCUS_GAP, TIMER_EVERY, TIMER_MAX_FAILS, timerVerdict, decide, createRefreshPolicy, normalizeAccelerator } = require("../refresh-policy");
+const { MIN_GAP, FOCUS_GAP, TIMER_EVERY, TIMER_MAX_FAILS, timerVerdict, decide, createRefreshPolicy, normalizeAccelerator, autoReadEvery, autoReadDelay, autoReadSkip, inActiveHours } = require("../refresh-policy");
 
 const MIN = 60 * 1000;
 const NOW = 1_000_000_000_000;
@@ -100,4 +100,41 @@ test("the timer stops on a login or challenge page, and after 3 failures in a ro
   assert.deepEqual(timerVerdict("offline", 2), { stop: false, fails: 2 });
   assert.deepEqual(timerVerdict("format", 0), { stop: false, fails: 1 });
   assert.equal(timerVerdict("fail", TIMER_MAX_FAILS - 1).stop, true);
+});
+
+test("auto read: the choice, and an older settings file's switch still means every 5 minutes", () => {
+  assert.equal(autoReadEvery({}), 0);
+  assert.equal(autoReadEvery(null), 0);
+  assert.equal(autoReadEvery({ autoRead: true }), 5);
+  assert.equal(autoReadEvery({ autoRead: true, autoReadEvery: 0 }), 0, "a choice made since wins");
+  for (const v of [1, 3, 10, 60, "smart"]) assert.equal(autoReadEvery({ autoReadEvery: v }), v);
+  for (const v of [2, -1, "5", "fast", 1.5]) assert.equal(autoReadEvery({ autoReadEvery: v }), 0, String(v));
+});
+
+test("auto read: how long until the next reading", () => {
+  assert.equal(autoReadDelay({ every: 0 }), null);
+  assert.equal(autoReadDelay({ every: 1 }), MIN);
+  assert.equal(autoReadDelay({ every: 30, hot: true, inActive: false }), 30 * MIN, "a fixed choice ignores the rest");
+  assert.equal(autoReadDelay({ every: "smart", hot: true }), 5 * MIN);
+  assert.equal(autoReadDelay({ every: "smart", hot: false }), 15 * MIN);
+  assert.equal(autoReadDelay({ every: "smart", hot: true, inActive: false }), 60 * MIN);
+});
+
+test("auto read: a due reading is skipped outside the active hours and while the PC is idle, when asked", () => {
+  assert.equal(autoReadSkip({}), null);
+  assert.equal(autoReadSkip({ inActive: false }), "hours");
+  assert.equal(autoReadSkip({ inActive: false, activeOnly: false }), null);
+  assert.equal(autoReadSkip({ idleState: "idle" }), "idle");
+  assert.equal(autoReadSkip({ idleState: "locked" }), "idle");
+  assert.equal(autoReadSkip({ idleState: "locked", idlePause: false }), null);
+  assert.equal(autoReadSkip({ idleState: "unknown" }), null);
+});
+
+test("auto read: active hours, also across midnight", () => {
+  const at = (h) => new Date(2026, 10, 23, h, 30);
+  assert.equal(inActiveHours(at(3), null), true);
+  const day = { start: 9, end: 18 };
+  assert.deepEqual([8, 9, 17, 18].map((h) => inActiveHours(at(h), day)), [false, true, true, false]);
+  const night = { start: 9, end: 1 };
+  assert.deepEqual([0, 1, 8, 9, 23].map((h) => inActiveHours(at(h), night)), [true, false, false, true, true]);
 });

@@ -23,7 +23,7 @@ function load(nowMs, settings) {
     I18N: { t: (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k), getLang: () => "en", locale: () => "en-US" },
   };
   vm.createContext(sandbox);
-  for (const f of ["core.js", "hourly.js", "learn.js", "compute.js", "ui.js", "blocks/verdict.js", "tray.js"]) {
+  for (const f of ["core.js", "hourly.js", "learn.js", "compute.js", "ui.js", "blocks/verdict.js", "blocks/face.js", "tray.js"]) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "renderer", "js", f), "utf8"), sandbox);
   }
   vm.runInContext(`state.settings = ${JSON.stringify(settings)}; var syncBusy = false; var dataState = () => "fresh";

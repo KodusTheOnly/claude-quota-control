@@ -31,13 +31,14 @@
         <button class="key nav-btn" type="button" data-view="help" data-i18n="nav.help">Help</button>
       </nav>
       <div class="sync">
-        <span class="lamp lc lv-none" id="lamp" role="status"><span class="shp"></span><span id="lampText"></span><span id="lampAgeTxt"></span></span>
+        <!-- The data state, or the automatic reading timer when it is on. A click opens the automatic reading menu. -->
+        <button class="lamp lc lv-none" id="lamp" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="autoMenu"><span class="shp"></span><span id="lampText" role="status"></span><span id="lampAgeTxt"></span></button>
         <span class="rd" id="lampAge"></span>
         <button class="key hidden" type="button" id="moreBtn" aria-haspopup="true" aria-expanded="false" aria-controls="ovMenu" title="More" aria-label="More" data-i18n-title="hd.more" data-i18n-aria="hd.more">
           <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
         </button>
         <button class="key hidden" type="button" id="syncBtn" title="Reads Claude's usage page now" data-i18n-title="hero.syncTitle">
-          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle class="rg-bg" cx="12" cy="12" r="10.8"/><circle class="rg" cx="12" cy="12" r="10.8" pathLength="100"/><g class="arw"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></g></svg>
           <span id="syncLabel" data-i18n="hd.refresh">Refresh</span>
         </button>
         <button class="key hidden" type="button" id="connectBtn" title="Connect Claude account" data-i18n-title="hero.connect"><span class="long" data-i18n="hero.connect">Connect Claude account</span><span class="short" data-i18n="hero.connectShort">Connect</span></button>
@@ -51,6 +52,36 @@
       </div>
     </header>
     <div class="rule" aria-hidden="true"></div>
+
+    <!-- Automatic reading menu: opens from the lamp (auto-read.js). Turning the timer on stays in Settings, with its warning. -->
+    <div class="automenu hidden" id="autoMenu" role="group" aria-label="Automatic reading" data-i18n-aria="am.title">
+      <button class="key mb am-now" type="button" id="amNow"><span data-i18n="am.now">Read now</span><kbd class="kb">F5</kbd></button>
+      <div class="am-sec">
+        <span class="am-h" data-i18n="am.title">Automatic reading</span>
+        <p class="am-st" id="amStatus"></p>
+        <div class="segc am-every hidden" id="amEvery" role="radiogroup" aria-label="How often" data-i18n-aria="am.every">
+          <button class="key mb" type="button" role="radio" aria-checked="false" data-value="1">1</button>
+          <button class="key mb" type="button" role="radio" aria-checked="false" data-value="3">3</button>
+          <button class="key mb" type="button" role="radio" aria-checked="false" data-value="5">5</button>
+          <button class="key mb" type="button" role="radio" aria-checked="false" data-value="10">10</button>
+          <button class="key mb" type="button" role="radio" aria-checked="false" data-value="15">15</button>
+          <button class="key mb" type="button" role="radio" aria-checked="false" data-value="30">30</button>
+          <button class="key mb" type="button" role="radio" aria-checked="false" data-value="60">60</button>
+          <button class="key mb" type="button" role="radio" aria-checked="false" data-value="smart" data-i18n="auto.smart">Smart</button>
+        </div>
+        <div class="am-acts hidden" id="amActs">
+          <button class="key mb" type="button" id="amPause" data-i18n="am.pause">Pause for 1 hour</button>
+          <button class="key mb" type="button" id="amSkip" data-i18n="am.skip">Skip the next reading</button>
+        </div>
+      </div>
+      <div class="am-sec">
+        <div class="am-h2"><span class="am-h" data-i18n="am.last">Last readings</span><span id="amLogSum"></span></div>
+        <div class="am-log hidden" id="amLog" role="img"></div>
+        <div class="am-logt"><span id="amLogFrom"></span><span id="amLogTo"></span></div>
+        <p class="am-st hidden" id="amLogNone" data-i18n="am.logNone"></p>
+      </div>
+      <button class="key mb am-set" type="button" id="amSettings" data-i18n="am.settings">Automatic reading settings</button>
+    </div>
 
     <!-- Errors: a strip that pushes the content down, on every screen. Short confirmations use the floating toast. -->
     <div class="msg err hidden" id="errMsg" role="alert">
@@ -108,28 +139,29 @@
           <article class="blk blk--week" id="blkWeek" aria-labelledby="tWeek">
             <h2 class="sr-only" id="tWeek" data-i18n="card.week">Week</h2>
             <div class="band crt" id="vScr">
-              <div class="vl">
-                <!-- The face's own small screen: verdict.js plays it (decoration only, the level is in the words and the ruler) -->
-                <div class="vface" id="vSlot" aria-hidden="true"><span class="fc" id="vFace"></span></div>
-                <div class="vtxt">
-                <div class="vtop" id="vTop">
-                <p class="ans"><span id="vAns"></span><span class="cur" aria-hidden="true"></span></p>
-                <!-- The level for screen readers: the answer, the face and its color already show it -->
-                <div class="ruler sr-only" id="vRuler" role="img">
+              <div class="vl" id="vCard">
+                <!-- The level ruler: Room and the four levels, the one that applies lit with its name -->
+                <div class="ruler" id="vRuler" role="img">
                   <span class="lv-room"><span class="shp"></span><span data-i18n="level.room.name">Room</span></span>
                   <span class="lv-free"><span class="shp"></span><span data-i18n="level.free.name">Free</span></span>
                   <span class="lv-moderate"><span class="shp"></span><span data-i18n="level.moderate.name">Moderate</span></span>
                   <span class="lv-tight"><span class="shp"></span><span data-i18n="level.tight.name">Tight</span></span>
                   <span class="lv-pause"><span class="shp"></span><span data-i18n="level.pause.name">Pause</span></span>
                 </div>
+                <div class="vmain">
+                  <!-- The face's own small screen: verdict.js plays it (decoration only, the level is in the words and the ruler) -->
+                  <div class="vface" id="vSlot" aria-hidden="true"><span class="fcg" id="vGhost"></span><span class="fc" id="vFace"></span></div>
+                  <div class="vtxt">
+                    <div class="vtop" id="vTop"><p class="ans"><span id="vAns"></span><span class="cur" aria-hidden="true"></span></p></div>
+                    <p class="vwhy" id="vWhy"></p>
+                  </div>
                 </div>
-                <!-- The second line: a few chips, each an icon, a word or two and the value (the full sentence is its title) -->
+                <!-- The readout: a row each, an icon, a word or two, a dotted leader and the value (the full sentence is its title) -->
                 <div class="chips" id="vChips"></div>
                 <span class="lv lv-none" id="vLevel"><span class="shp"></span><span class="lvn"></span></span>
-                </div>
               </div>
               <div class="wk" id="wScr">
-                <span class="wlab"><span class="tl" data-i18n="card.week">Week</span><span class="wbig" id="wUsed"></span></span>
+                <span class="wlab"><span class="tl" data-i18n="card.week">Week</span><span class="wbig" id="wUsed" data-delta></span></span>
                 <!-- The week bar: used (solid, dimmer up to where today began), what this pace will still use (hatched), what is
                      left over at the reset (dashed box), past the limit (red stub out of the bar's end), and where the week can go
                      today (the white mark) -->
@@ -149,12 +181,13 @@
                   <!-- Used against time: how much of the session is spent, and how much of its 5 hours has passed -->
                   <div class="sbars">
                     <span class="k" data-i18n="session.usedKey">Used</span>
-                    <div class="sbar" id="sBar" role="img"><div class="tr"><i class="fill"></i></div></div>
+                    <div class="sbar" id="sBar" role="img"><div class="tr"><i class="fill"></i><i class="pj"></i></div></div>
                     <span class="k" id="sTimeKey" data-i18n="session.timeKey">Time</span>
-                    <div class="sbar" id="sTime" role="img"><div class="tr"><i class="fill"></i><i class="rest"></i></div></div>
+                    <div class="sbar" id="sTime" role="img"><div class="tr"><i class="fill"></i><i class="rest"></i><i class="lk"></i></div><b class="ltick hidden"></b></div>
                   </div>
-                  <!-- Always there, so the tile keeps its size: the reset time, and in the last 50 minutes the warning -->
-                  <p class="strip" id="sResets"><i class="dot" aria-hidden="true"></i><span id="sResetsText"></span></p>
+                  <!-- Always there, so the tile keeps its size: the reset time, and in the last 50 minutes the warning. On the same
+                       line, on the right: when the session will lock at this pace and for how long (or that it is locked). -->
+                  <p class="strip" id="sResets"><i class="dot" aria-hidden="true"></i><span id="sResetsText"></span><span class="slock hidden" id="sLock"></span></p>
                 </div>
               </article>
             </div>
@@ -319,6 +352,11 @@
                     </span>
                   </div>
                   <p class="gt hidden" id="collectorNote"></p>
+                  <label class="set tgl">
+                    <span class="lb"><span data-i18n="coll.logs">Use Claude Code logs for the hourly strip</span><small data-i18n="coll.logsNote"></small></span>
+                    <input type="checkbox" id="codeLogs">
+                    <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                  </label>
                 </div>
               </article>
 
@@ -460,6 +498,16 @@
                     <div class="segc" id="screens" role="radiogroup" aria-labelledby="screensLabel">
                       <button class="key" type="button" role="radio" aria-checked="false" data-value="paper" data-i18n="screens.paper">Paper</button>
                       <button class="key" type="button" role="radio" aria-checked="false" data-value="crt" data-i18n="screens.crt">CRT</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="amber" data-i18n="screens.amber">Amber</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="green" data-i18n="screens.green">Green</button>
+                    </div>
+                  </div>
+                  <div class="set stk" role="group" aria-labelledby="motionLabel">
+                    <div class="lb"><span id="motionLabel" data-i18n="motion.label">Motion</span><small data-i18n="motion.note"></small></div>
+                    <div class="segc" id="motion" role="radiogroup" aria-labelledby="motionLabel">
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="full" data-i18n="motion.full">Full</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="subtle" data-i18n="motion.subtle">Subtle</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="off" data-i18n="motion.off">Off</button>
                     </div>
                   </div>
                   <label class="set tgl">
@@ -511,26 +559,56 @@
                     <button class="key" type="button" id="importData" data-i18n="data.import">Import backup</button>
                   </div>
                 </div>
-                <details class="adv" id="advanced">
-                  <summary data-i18n="adv.title">Advanced</summary>
-                  <div class="grp">
-                    <label class="set tgl">
-                      <span class="lb"><span data-i18n="adv.logs">Use Claude Code logs for the hourly strip</span><small data-i18n="adv.logsNote"></small></span>
-                      <input type="checkbox" id="codeLogs">
-                      <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
-                    </label>
-                    <label class="set tgl">
-                      <span class="lb"><span data-i18n="adv.auto">Read usage every 5 minutes</span><small data-i18n="adv.autoNote"></small></span>
-                      <input type="checkbox" id="autoRead">
-                      <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
-                    </label>
+                <!-- The Danger zone: reading by itself (automated access, see the warning) and deleting the data -->
+                <section class="dz" aria-labelledby="tDz">
+                  <h3 class="grp-h" id="tDz" data-i18n="data.dz">Danger zone</h3>
+                  <div class="set stk" role="group" aria-labelledby="autoReadLabel">
+                    <div class="ar-head">
+                      <span class="lb" id="autoReadLabel" data-i18n="auto.title">Read usage automatically</span>
+                      <span class="ar-status" id="autoReadStatus" role="status"><span class="dot" aria-hidden="true"></span><span id="autoReadStatusText"></span></span>
+                    </div>
+                    <p class="gt" data-i18n="auto.text"></p>
+                    <div class="segc" id="autoReadEvery" role="radiogroup" aria-labelledby="autoReadLabel">
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="0" data-i18n="auto.off">Off</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="1">1 min</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="3">3</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="5">5</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="10">10</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="15">15</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="30">30</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="60">60</button>
+                      <button class="key" type="button" role="radio" aria-checked="false" data-value="smart" data-i18n="auto.smart">Smart</button>
+                    </div>
+                    <p class="gt is-error hidden" id="autoReadFast" aria-live="polite"></p>
+                    <p class="gt hidden" id="autoReadSmartNote" data-i18n="auto.smartNote"></p>
                   </div>
-                </details>
-                <div class="dz">
-                  <h3 class="grp-h" data-i18n="data.dz">Danger zone</h3>
-                  <p class="gt" data-i18n="data.deleteText"></p>
-                  <div class="acts"><button class="key dng" type="button" id="manualClear" data-i18n="data.delete">Delete my data</button></div>
-                </div>
+                  <div class="ar-warn hidden" id="autoReadWarn">
+                    <p class="ar-warn-t"><span class="ar-bang" aria-hidden="true">!</span><span data-i18n="auto.warn"></span></p>
+                    <div class="acts">
+                      <button class="key hold" type="button" id="autoReadHold" aria-describedby="autoReadHoldHint"><span class="hold-fill" aria-hidden="true"></span><b id="autoReadHoldText" data-i18n="auto.hold">Hold to turn on</b></button>
+                      <button class="key" type="button" id="autoReadCancel" data-i18n="auto.cancel">Cancel</button>
+                    </div>
+                    <p class="gt" id="autoReadHoldHint" data-i18n="auto.holdHint"></p>
+                  </div>
+                  <div class="ar-opts hidden" id="autoReadOpts">
+                    <label class="set tgl sub">
+                      <span class="lb"><span data-i18n="auto.activeOnly">Only in my active hours</span><small id="autoReadActiveNote"></small></span>
+                      <input type="checkbox" id="autoReadActiveOnly">
+                      <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                    </label>
+                    <label class="set tgl sub">
+                      <span class="lb" data-i18n="auto.idle">Pause while the PC is idle or locked</span>
+                      <input type="checkbox" id="autoReadIdlePause">
+                      <span class="tgl-sw" aria-hidden="true"><span class="w-on" data-i18n="set.on">ON</span><span class="tgl-cap"></span><span class="w-off" data-i18n="set.off">OFF</span></span>
+                    </label>
+                    <p class="gt" id="autoReadFacts" aria-live="polite"></p>
+                  </div>
+                  <div class="dz-del">
+                    <span class="lb" data-i18n="data.delete">Delete my data</span>
+                    <p class="gt" data-i18n="data.deleteText"></p>
+                    <div class="acts"><button class="key dng" type="button" id="manualClear" data-i18n="data.delete">Delete my data</button></div>
+                  </div>
+                </section>
               </article>
             </div>
           </div>
@@ -712,6 +790,7 @@
   <script src="js/tip.js"></script>
   <script src="js/chrome.js"></script>
   <script src="js/blocks/verdict.js"></script>
+  <script src="js/blocks/face.js"></script>
   <script src="js/blocks/today.js"></script>
   <script src="js/blocks/session.js"></script>
   <script src="js/blocks/extra.js"></script>
@@ -732,6 +811,7 @@
   <script src="js/render.js"></script>
   <script src="js/account.js"></script>
   <script src="js/settings.js"></script>
+  <script src="js/auto-read.js"></script>
   <script src="js/init.js"></script>
 </body>
 </html>

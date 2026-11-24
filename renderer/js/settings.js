@@ -97,8 +97,11 @@ function applyTheme() {
   const choice = (state.settings && state.settings.theme) || "dark";
   const dark = choice === "dark" || (choice === "system" && darkQuery.matches);
   document.documentElement.dataset.theme = dark ? "dark" : "light";
-  // The data screens: in the light theme, light paper (the default) or dark CRT. The dark theme is always CRT.
-  document.documentElement.dataset.screens = !dark && (state.settings && state.settings.screens) !== "crt" ? "paper" : "crt";
+  // The data screens: light paper (the default, light theme only: the dark theme shows CRT then), CRT, or a CRT with an
+  // amber or green phosphor (either theme)
+  const sc = state.settings && state.settings.screens;
+  document.documentElement.dataset.screens = sc === "amber" || sc === "green" ? sc : !dark && sc !== "crt" ? "paper" : "crt";
+  document.documentElement.dataset.motion = motionLevel();
 }
 // The chart is drawn with the screen colors, so a change of the system theme draws it again
 darkQuery.addEventListener("change", () => {
@@ -108,6 +111,13 @@ darkQuery.addEventListener("change", () => {
 bindChoice($("theme"), async (value) => {
   state.settings = await api.setSettings({ theme: value });
   setChoice($("theme"), value);
+  applyTheme();
+  render();
+});
+if (reducedMotionQuery) reducedMotionQuery.addEventListener("change", applyTheme); // Windows asks for less motion, or no longer
+bindChoice($("motion"), async (value) => {
+  state.settings = await api.setSettings({ motion: value });
+  setChoice($("motion"), value);
   applyTheme();
   render();
 });
@@ -371,13 +381,14 @@ function bindSettings() {
   $("miniWindow").checked = Boolean(s.miniWindow);
   $("openAtLogin").checked = s.openAtLogin;
   $("codeLogs").checked = s.codeLogs !== false;
-  $("autoRead").checked = Boolean(s.autoRead);
+  renderAutoRead();
   $("shortcutOn").checked = Boolean(s.shortcutOn);
   paintShortcutKeys();
   renderShortcutNote();
   setChoice($("language"), I18N.getLang());
   setChoice($("theme"), s.theme || "dark");
-  setChoice($("screens"), s.screens === "crt" ? "crt" : "paper");
+  setChoice($("screens"), ["crt", "amber", "green"].includes(s.screens) ? s.screens : "paper");
+  setChoice($("motion"), ["subtle", "off"].includes(s.motion) ? s.motion : "full");
   const anchor = (s.manual && s.manual.anchor) || (autoSource() && autoSource().data.weekly.resetsAt);
   if (anchor && document.activeElement !== $("aReset")) $("aReset").value = toLocalInput(nextReset(anchor));
   $("anchorForm").classList.toggle("hidden", !needsAnchorForm(s));
@@ -398,14 +409,133 @@ $("notifyExtra").addEventListener("change", (e) => saveSetting({ notifyExtra: e.
 
 $("openAtLogin").addEventListener("change", (e) => saveSetting({ openAtLogin: e.target.checked }));
 $("codeLogs").addEventListener("change", (e) => saveSetting({ codeLogs: e.target.checked }));
-// The timer asks first: it is automated access, which Claude's terms do not cover
-$("autoRead").addEventListener("change", (e) => {
-  if (e.target.checked && !confirm(t("adv.autoConfirm"))) {
-    e.target.checked = false;
+// Reading by itself (Danger zone). It is automated access, which Claude's terms do not allow, so turning it on from
+// Off takes a choice and then holding a key for a moment, with the warning in view. Changing how often while it is
+// on, or turning it off, takes effect at once.
+const AUTO_HOLD_MS = 1500;
+const autoUi = { pending: null, holdTimer: null };
+const autoEvery = (s = state.settings) => {
+  const v = s && s.autoReadEvery;
+  if ([0, 1, 3, 5, 10, 15, 30, 60, "smart"].includes(v)) return v;
+  return s && s.autoRead === true ? 5 : 0;
+};
+const autoValue = (str) => (str === "smart" ? "smart" : Number(str));
+
+// About how many readings a day: within the active hours when they are set and the timer keeps to them.
+// Smart gives a range: every 15 minutes when calm, every 5 when busy, and every 60 outside the active hours.
+function autoReadsPerDay(every, s = state.settings) {
+  const a = activeHours(s);
+  const keep = a && s.autoReadActiveOnly !== false;
+  const inside = a ? activeHoursBetween(0, DAY, a) : 24;
+  const outside = keep || !a ? 0 : 24 - inside;
+  if (every === "smart") return { lo: Math.round((inside * 60) / 15 + outside), hi: Math.round((inside * 60) / 5 + outside) };
+  const n = Math.round(((keep ? inside : 24) * 60) / every);
+  return { lo: n, hi: n };
+}
+
+function renderAutoRead() {
+  const s = state.settings;
+  const every = autoEvery(s);
+  const on = every !== 0;
+  const pending = on ? null : autoUi.pending;
+  if (on) autoUi.pending = null;
+  const shown = pending ?? every;
+  setChoice($("autoReadEvery"), String(shown));
+  $("autoReadEvery").querySelectorAll('[role="radio"]').forEach((k) => k.classList.toggle("pend", pending !== null && k.dataset.value === String(pending)));
+  $("autoReadWarn").classList.toggle("hidden", pending === null);
+  $("autoReadOpts").classList.toggle("hidden", shown === 0);
+  $("autoReadSmartNote").classList.toggle("hidden", shown !== "smart");
+  const fast = shown === 1 || shown === 3;
+  $("autoReadFast").classList.toggle("hidden", !fast);
+  if (fast) $("autoReadFast").textContent = t("auto.fast", { n: shown, reads: autoReadsPerDay(shown).lo, times: Math.round(10 / shown) });
+  $("autoReadActiveOnly").checked = s.autoReadActiveOnly !== false;
+  $("autoReadIdlePause").checked = s.autoReadIdlePause !== false;
+  const a = activeHours(s);
+  $("autoReadActiveNote").textContent = a ? t("auto.activeNote", { from: `${pad(a.start)}:00`, to: `${pad(a.end)}:00` }) : t("auto.activeNone");
+  renderAutoStatus();
+}
+
+// The status next to the title and the line of facts under the options. autoLive (auto-read.js) is the main process's
+// own state: the next turn, and whether the last one was skipped.
+function renderAutoStatus() {
+  const s = state.settings;
+  const every = autoEvery(s);
+  const live = typeof autoLive === "object" && autoLive ? autoLive : {};
+  let key = "auto.status.off";
+  let vars = {};
+  let tone = "off";
+  if (every) {
+    tone = live.paused ? "paused" : "on";
+    key = live.paused ? `auto.status.paused.${live.paused}` : every === "smart" ? "auto.status.smart" : "auto.status.on";
+    vars = { n: every === "smart" ? live.minutes || 15 : every };
+  } else if (autoUi.pending !== null) {
+    key = "auto.status.pending";
+    tone = "pending";
+  }
+  $("autoReadStatusText").textContent = t(key, vars);
+  $("autoReadStatus").dataset.tone = tone;
+  const shown = every || autoUi.pending;
+  if (!shown) return;
+  const per = autoReadsPerDay(shown, s);
+  const reads = per.lo === per.hi ? String(per.lo) : t("auto.range", { lo: per.lo, hi: per.hi });
+  const next = every && live.nextAt ? fmtTime(live.nextAt) : "–";
+  $("autoReadFacts").textContent = t("auto.facts", { reads, next });
+}
+
+async function pickAutoRead(value) {
+  stopHold();
+  const v = autoValue(value);
+  if (v === 0 || autoEvery() !== 0) {
+    autoUi.pending = null;
+    await saveSetting({ autoReadEvery: v });
+    renderAutoRead();
     return;
   }
-  saveSetting({ autoRead: e.target.checked });
+  autoUi.pending = v; // from Off: the warning and the hold key come first
+  renderAutoRead();
+}
+bindChoice($("autoReadEvery"), pickAutoRead);
+$("autoReadCancel").addEventListener("click", () => {
+  stopHold();
+  autoUi.pending = null;
+  renderAutoRead();
 });
+
+function startHold() {
+  if (autoUi.pending === null || autoUi.holdTimer) return;
+  const key = $("autoReadHold");
+  key.classList.add("is-holding");
+  $("autoReadHoldText").textContent = t("auto.holding");
+  autoUi.holdTimer = setTimeout(async () => {
+    const v = autoUi.pending;
+    stopHold();
+    autoUi.pending = null;
+    await saveSetting({ autoReadEvery: v });
+    renderAutoRead();
+    toast(t("auto.turnedOn"));
+  }, AUTO_HOLD_MS);
+}
+function stopHold() {
+  clearTimeout(autoUi.holdTimer);
+  autoUi.holdTimer = null;
+  $("autoReadHold").classList.remove("is-holding");
+  $("autoReadHoldText").textContent = t("auto.hold");
+}
+$("autoReadHold").addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  $("autoReadHold").setPointerCapture(e.pointerId);
+  startHold();
+});
+for (const ev of ["pointerup", "pointercancel", "lostpointercapture"]) $("autoReadHold").addEventListener(ev, stopHold);
+$("autoReadHold").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  e.preventDefault();
+  if (!e.repeat) startHold();
+});
+$("autoReadHold").addEventListener("keyup", (e) => (e.key === "Enter" || e.key === " ") && stopHold());
+$("autoReadHold").addEventListener("blur", stopHold);
+$("autoReadActiveOnly").addEventListener("change", (e) => saveSetting({ autoReadActiveOnly: e.target.checked }).then(renderAutoRead));
+$("autoReadIdlePause").addEventListener("change", (e) => saveSetting({ autoReadIdlePause: e.target.checked }).then(renderAutoRead));
 bindChoice($("language"), async (value) => {
   state.settings = await api.setSettings({ language: I18N.normalize(value) });
   setChoice($("language"), I18N.normalize(value));

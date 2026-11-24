@@ -9,8 +9,38 @@ const MANUAL_REASONS = new Set(["button", "menu", "keyboard", "shortcut", "strip
 // Happens by itself: needs a connected account and stays silent when it fails
 const AUTO_REASONS = new Set(["open", "focus", "popup", "timer"]);
 
-// The optional timer (off by default, Settings > Advanced) reads this often
-const TIMER_EVERY = 5 * 60 * 1000;
+// The optional timer (off by default, Settings > Data > Danger zone). How often it reads, in minutes, or "smart".
+// 0 is off. A settings file from before the choice had only autoRead: true, which was every 5 minutes.
+const AUTO_READ_CHOICES = [0, 1, 3, 5, 10, 15, 30, 60, "smart"];
+const TIMER_EVERY = 5 * 60 * 1000; // the old fixed timer, and what autoRead: true still means
+function autoReadEvery(s) {
+  if (!s) return 0;
+  if (AUTO_READ_CHOICES.includes(s.autoReadEvery)) return s.autoReadEvery;
+  return s.autoRead === true ? TIMER_EVERY / 60000 : 0;
+}
+// Smart: every 5 minutes while a session runs or the week is Tight or Pause ("hot"), every 15 otherwise, and every
+// 60 outside the active hours
+const SMART_MIN = { hot: 5, calm: 15, outside: 60 };
+// How long until the next reading, in ms, or null when the timer is off
+function autoReadDelay({ every, hot = false, inActive = true }) {
+  if (!every) return null;
+  const min = every === "smart" ? (!inActive ? SMART_MIN.outside : hot ? SMART_MIN.hot : SMART_MIN.calm) : every;
+  return min * 60 * 1000;
+}
+// Why a reading that is due is skipped: "hours" (outside the active hours, when the user asked for only those) or
+// "idle" (the PC is idle or locked, when the user asked to pause then). null: it runs.
+function autoReadSkip({ inActive = true, activeOnly = true, idleState = "active", idlePause = true }) {
+  if (activeOnly && !inActive) return "hours";
+  if (idlePause && (idleState === "idle" || idleState === "locked")) return "idle";
+  return null;
+}
+// Inside the active hours { start, end } (whole hours, the window may cross midnight), or always when there are none.
+// Same rule as activeSpans() in renderer/js/core.js.
+function inActiveHours(date, a) {
+  if (!a) return true;
+  const h = date.getHours();
+  return a.start < a.end ? h >= a.start && h < a.end : h >= a.start || h < a.end;
+}
 // It switches itself off after this many failed readings in a row
 const TIMER_MAX_FAILS = 3;
 // Errors that say nothing about the connection (the user is offline, or a reading is already running)
@@ -82,4 +112,4 @@ function normalizeAccelerator(input) {
   return ["Ctrl", "Alt", "Shift"].filter((m) => mods.has(m)).concat(key).join("+");
 }
 
-module.exports = { MIN_GAP, FOCUS_GAP, TIMER_EVERY, TIMER_MAX_FAILS, timerVerdict, MANUAL_REASONS, AUTO_REASONS, decide, createRefreshPolicy, normalizeAccelerator };
+module.exports = { MIN_GAP, FOCUS_GAP, TIMER_EVERY, TIMER_MAX_FAILS, timerVerdict, AUTO_READ_CHOICES, SMART_MIN, autoReadEvery, autoReadDelay, autoReadSkip, inActiveHours, MANUAL_REASONS, AUTO_REASONS, decide, createRefreshPolicy, normalizeAccelerator };
