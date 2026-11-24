@@ -59,6 +59,9 @@ function compute(src) {
   const m = { now, today, g, usedStart, ceiling, reserveMode, budget, spent, dayOff, idle, todayRatio, leftAtDayStart, w, perDay, five, pace, days, rolled, forecast, learn, proj, drops, given };
   m.lv = computeLevels(m);
   m.head = headroom(m);
+  // While the verdict follows today's budget (usualPaceOnly), the week's color follows the verdict, so the bar,
+  // the chart and the tray agree with it. The burst at the end of the bar still shows where the usual pace leads.
+  if (usualPaceOnly(m) && !weekAtPause(w.used, hoursToReset(m))) m.lv.week = m.head.level;
   // The last day with room to spend: the risk is leaving it unused, not running out, so the week takes the accent
   m.endRoom = Boolean(m.head.room) && w.resetsAt - now <= DAY;
   // Today's own share of the plan; the rest of today's budget was carried over from earlier days
@@ -109,7 +112,14 @@ const hoursToReset = (m) => (m.w.resetsAt - m.now) / HOUR;
 // walks to the goal at the reset with the plan's own shape, so "expected" keeps meaning "on plan from here".
 // Without a give-back it is expectedUsed (core.js).
 function expectedLine(m, w = weights()) {
-  let f = (ms) => expectedUsed(m.w.resetsAt, ms, w, m.g);
+  // The first day of the week (from the reset to the next midnight) expects its whole share from the start: the line
+  // starts at the day's limit, so a little use right after the reset is never "ahead of the plan". From the next
+  // midnight on it is the plan's line, which meets that value there. The budget does not use this line.
+  const start = m.w.resetsAt - WEEK;
+  const s = new Date(start);
+  const firstEnd = Math.min(new Date(s.getFullYear(), s.getMonth(), s.getDate() + 1).getTime(), m.w.resetsAt);
+  const firstDay = expectedUsed(m.w.resetsAt, firstEnd, w, m.g);
+  let f = (ms) => (ms < firstEnd ? firstDay : expectedUsed(m.w.resetsAt, ms, w, m.g));
   for (const d of [...(m.drops || [])].sort((x, y) => x.at - y.at)) {
     const prev = f;
     const e0 = prev(d.at);
@@ -149,14 +159,21 @@ function computeLevels(m) {
   return { ...lv, expected, weekRatio, proj, projRatio, lock, slow, need, doing, room };
 }
 
+// The projection rests on the past weeks alone: this week has under MIN_WEIGHTED_DAYS or under 1% of its own
+const usualPaceOnly = (m) => Boolean(m.proj && m.proj.weeks > 0 && (m.proj.elapsed < MIN_WEIGHTED_DAYS || m.w.used < 1));
+
 // The answer to "can I use Claude until the reset?" follows the projection (the week's level while
 // there is none yet). Only one thing can raise it: a week already at WEEK_PAUSE_AT or more (see weekAtPause).
 function headroom(m) {
   const signals = [];
   const add = (level, reason, until) => signals.push({ level, reason, until });
 
-  const base = m.lv.projection ?? m.lv.week ?? 0;
+  // Early in a week with history the projection is mostly the past weeks and a few noisy hours, not this week: the
+  // answer follows today's budget instead (Tight at most). The chips still show where the usual pace leads.
+  const usualOnly = usualPaceOnly(m);
+  const base = usualOnly ? Math.min(m.lv.today ?? 0, 2) : m.lv.projection ?? m.lv.week ?? 0;
   if (weekAtPause(m.w.used, hoursToReset(m))) add(3, t("reason.weekAt", { pct: pct(m.w.used) }), m.w.resetsAt);
+  else if (usualOnly && base > 0) add(base, t("reason.todayOver", { pct: pct(m.todayRatio * 100) }), m.w.resetsAt);
   else if (base > 0 && m.lv.lock && m.lv.lock.at !== null) add(base, t("reason.weekLocked", { goal: m.g.goal, when: fmtWhen(m.lv.lock.at, m.now), dur: lockDur(m.lv.lock.hours) }), m.w.resetsAt);
   else if (base > 0) add(base, t("reason.weekRatio", { ratio: m.lv.weekRatio === null ? "–" : fmtNum(m.lv.weekRatio, 2, 2) }), m.w.resetsAt);
 
@@ -447,7 +464,7 @@ function paceSeries(m, cells = null, starts = []) {
   // A point wherever the slope changes: every midnight and, with active hours, every edge of the window.
   // A give-back drops the line straight down where it happened (expectedLine).
   const expAt = expectedLine(m, w);
-  const expected = [{ x: s0, y: 0 }];
+  const expected = [{ x: s0, y: expAt(weekStart) }];
   const bends = new Set();
   for (const p of weightPieces(weekStart, m.w.resetsAt, w)) bends.add(p.from).add(p.to);
   for (let k = 1; k <= 8; k++) bends.add(midnight(k));

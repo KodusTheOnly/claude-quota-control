@@ -216,6 +216,29 @@ test("compute: on the first day a week with no history is still too early to tel
   assert.equal(out.band, null);
 });
 
+// A week whose past weeks hit the limit, early on Tuesday: the projection is mostly those weeks
+function heavyStart(used) {
+  const now = at(2026, 11, 10, 20);
+  const src = { kind: "manual", data: { updatedAt: now, weekly: { used, resetsAt: RESET }, fiveHour: null, dayStart: { day: "2026-11-10", at: at(2026, 11, 10, 8), used: 0 }, days: { ...history(4, [25, 25, 25, 25, 25, 25, 25]), "2026-11-10": { spent: used, budget: 14, endUsed: used } } } };
+  const sb = load(now, { manual: src.data });
+  sb.__src = src;
+  return plain(vm.runInContext("(() => { const m = compute(__src); return { proj: m.lv.projection, today: m.lv.today, week: m.lv.week, head: m.head.level, reason: m.head.reason }; })()", sb));
+}
+
+test("compute: early in the week, within today's budget, the verdict is calm", () => {
+  const out = heavyStart(1);
+  assert.equal(out.today, 0);
+  assert.equal(out.head, 0);
+});
+
+test("compute: early in the week, over today's budget, the verdict follows today and stops at Tight", () => {
+  const out = heavyStart(25);
+  assert.equal(out.today, 3);
+  assert.equal(out.head, 2);
+  assert.equal(out.reason, "reason.todayOver");
+  assert.equal(out.week, 2, "the week bar takes the verdict's level");
+});
+
 test("the budget does not move when the app learns: only the projection does", () => {
   const run = (days) => {
     const now = at(2026, 11, 12, 14);

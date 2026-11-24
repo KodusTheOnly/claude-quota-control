@@ -313,6 +313,7 @@
 
       "reason.weekAt": "Weekly limit is at {pct}.",
       "reason.weekLocked": "At this pace the week hits the limit {when}, {dur} before the reset.",
+      "reason.todayOver": "Today is at {pct} of its budget.",
       "reason.free.session": "session at {pct}",
       "reason.free.week": "week at {pct}",
       "reason.free.today": "{pct} of today's budget used",
@@ -1012,6 +1013,7 @@
 
       "reason.weekAt": "O limite semanal está em {pct}.",
       "reason.weekLocked": "Nesse ritmo a semana chega ao limite {when}, {dur} antes do reset.",
+      "reason.todayOver": "Hoje está em {pct} do orçamento.",
       "reason.free.session": "sessão em {pct}",
       "reason.free.week": "semana em {pct}",
       "reason.free.today": "{pct} do orçamento de hoje usado",

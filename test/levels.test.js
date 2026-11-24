@@ -142,12 +142,19 @@ test("the week level follows the hours locked out, not used / expected", () => {
 });
 
 test("before there is a projection, the week uses used / expected", () => {
-  const m = run(reading({ used: 6, now: at(2026, 10, 28, 20) })); // half a day in: expected 7.1%, ratio 0.84
+  const m = run(reading({ used: 12, now: at(2026, 10, 29, 8) })); // a day in: expected 14.3%, ratio 0.84
   assert.equal(m.lv.projection, null);
   assert.equal(m.lv.week, 1);
   const row = m.math.week.find(([k]) => k === "math.weekScale");
   assert.equal(row[1], "math.weekScaleRatio");
   assert.ok(m.math.week.some(([k]) => k === "math.cutoffsRatio"));
+});
+
+test("on the first day the expected is the whole day's share from the reset, so a little use is not ahead of it", () => {
+  // Reset Wed 08:00, even plan: Wednesday's 16 hours are 16/24 of a day, 9.5% of the week
+  const m = run(reading({ used: 6, now: at(2026, 10, 28, 9) }));
+  assert.ok(Math.abs(m.lv.expected - 100 / 7 * (16 / 24)) < 1e-6, String(m.lv.expected));
+  assert.equal(m.lv.week, 0);
 });
 
 test("a week at 95% or more reads Pause in the week level, the verdict and the math", () => {

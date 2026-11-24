@@ -110,9 +110,12 @@ test("the chart's axis starts at the reset, but keeps at least 16 hours for the 
   assert.equal(vm.runInContext(`chartAxisStart(${at(2026, 10, 28)})`, sb), at(2026, 10, 28));
 });
 
-test("the expected line rises from 0 to 100% and never goes backwards", () => {
+test("the expected line starts at the first day's share, rises to 100% and never goes backwards", () => {
   const s = run(reading(), "paceSeries(__m)");
-  assert.deepEqual([s.expected[0].x, s.expected[0].y], [s.s0, 0]);
+  // Reset Wed 08:00, even plan: the first day expects its 16 hours (9.5%) from the reset on, flat until midnight
+  assert.equal(s.expected[0].x, s.s0);
+  assert.ok(Math.abs(s.expected[0].y - 100 / 7 * (16 / 24)) < 1e-6, String(s.expected[0].y));
+  assert.ok(Math.abs(s.expected.find((p) => p.x === 1).y - s.expected[0].y) < 1e-6, "flat until the first midnight");
   const last = s.expected[s.expected.length - 1];
   assert.deepEqual([last.x, last.y], [s.span, 100]);
   for (let i = 1; i < s.expected.length; i++) {
