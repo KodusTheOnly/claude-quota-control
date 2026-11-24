@@ -195,8 +195,17 @@ function faceBuild() {
   $("vFace").replaceChildren(face.el.pre, face.el.l, face.el.m, face.el.r, face.el.post, face.el.k);
   return face.el;
 }
-function faceShow(p) {
+// ms: how long this frame stays. A quick frame leaves no afterglow, so a fast loop (the reading's) does not pile up
+// frames behind the face.
+const FACE_GHOST_MIN = 300;
+function faceShow(p, ms) {
   const e = faceBuild();
+  const text = faceText(p);
+  if (face.shown && text !== face.shown) {
+    if (ms !== undefined && ms < FACE_GHOST_MIN) faceGhostOff();
+    else faceGhost();
+  }
+  face.shown = text;
   e.pre.textContent = p.pre;
   e.l.firstChild.textContent = p.l;
   e.m.textContent = p.m;
@@ -205,19 +214,26 @@ function faceShow(p) {
   e.k.textContent = p.k;
   // Closed, tired or crying eyes do not blink
   $("vFace").classList.toggle("shut", "-=T><".includes(p.l));
-  const text = faceText(p);
-  if (face.shown && text !== face.shown) faceGhost(face.shown);
-  face.shown = text;
 }
-// The frame before fades out behind the new one, as on a phosphor screen
-function faceGhost(text) {
+// The frame before fades out behind the new one, as on a phosphor screen. It is a copy of the face as it is on screen
+// (its parts, where it looks, where the head turned, its breath and effect right now), so the two layers line up.
+function faceGhost() {
   if (faceReduced()) return;
+  const fc = $("vFace");
   const g = $("vGhost");
-  g.textContent = text;
-  g.style.fontSize = $("vFace").style.fontSize;
+  const cs = getComputedStyle(fc);
+  g.replaceChildren(...[...fc.childNodes].map((n) => n.cloneNode(true)));
+  g.dataset.look = fc.dataset.look || "";
+  g.style.fontSize = fc.style.fontSize;
+  g.style.translate = fc.style.translate;
+  g.style.scale = cs.scale;
+  g.style.transform = cs.transform;
   g.classList.remove("on");
   void g.offsetWidth; // restart the fade
   g.classList.add("on");
+}
+function faceGhostOff() {
+  $("vGhost").classList.remove("on");
 }
 // The face's size comes from the CSS; a face too long for the screen gets a smaller one (Plex Mono is 0.6em a character)
 function faceFit(texts) {
@@ -287,7 +303,7 @@ function facePlay(steps, done = faceSettle) {
       return done();
     }
     const s = steps[i++];
-    faceShow(s.f || face.rest);
+    faceShow(s.f || face.rest, s.ms);
     faceFx(s.fx);
     faceLook(s.look || null);
     faceStatic(s.scr === "static");

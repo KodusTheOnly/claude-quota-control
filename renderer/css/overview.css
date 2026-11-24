@@ -151,14 +151,15 @@
 .band :is(.fc, .fcg) { grid-area: 1 / 1; display: block; font: 500 var(--fs-5xl)/1 var(--mono); color: var(--fcol); white-space: pre; }
 .band .fc { transition: translate .25s ease-out, color .3s, opacity .4s, filter .4s; text-shadow: 0 0 .16em color-mix(in srgb, var(--fcol) 75%, transparent), 0 0 .6em color-mix(in srgb, var(--fcol) 40%, transparent); animation: face-breathe var(--breath, 3.6s) ease-in-out infinite; }
 html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: none; }
-.band .fc .eye { display: inline-block; transform: translate(var(--gx, 0), var(--gy, 0)) scale(var(--gs, 1)); transition: transform .25s ease-out; }
+.band :is(.fc, .fcg) .eye { display: inline-block; transform: translate(var(--gx, 0), var(--gy, 0)) scale(var(--gs, 1)); transition: transform .25s ease-out; }
 .band .fc .eye i { display: inline-block; font-style: normal; transform-origin: 50% 60%; animation: face-blink var(--blink, 4.2s) infinite; }
 .band .fc.shut .eye i { animation: none; }
-.band .fc .fk { font-size: .5em; vertical-align: .9em; margin-left: .05em; }
-.band .fc[data-look="chart"] { --gy: .14em; }
-.band .fc[data-look="session"] { --gx: .14em; --gy: .05em; }
-.band .fc[data-look="refresh"] { --gx: .14em; --gy: -.14em; }
-.band .fc[data-look="you"] { --gs: 1.15; }
+.band :is(.fc, .fcg) .eye i { font-style: normal; }
+.band :is(.fc, .fcg) .fk { font-size: .5em; vertical-align: .9em; margin-left: .05em; }
+.band :is(.fc, .fcg)[data-look="chart"] { --gy: .14em; }
+.band :is(.fc, .fcg)[data-look="session"] { --gx: .14em; --gy: .05em; }
+.band :is(.fc, .fcg)[data-look="refresh"] { --gx: .14em; --gy: -.14em; }
+.band :is(.fc, .fcg)[data-look="you"] { --gs: 1.15; }
 .band .fcg { opacity: 0; pointer-events: none; filter: blur(1.5px); }
 .band .fcg.on { animation: face-ghost .8s ease-out; }
 .band .vface.dim .fc { opacity: .6; }
