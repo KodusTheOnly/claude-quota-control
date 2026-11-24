@@ -13,7 +13,7 @@ const claude = require("./claude-sync");
 const { readActivity } = require("./claude-activity");
 const i18n = require("./renderer/i18n.js");
 const { setupUpdates } = require("./updater");
-const { createRefreshPolicy, normalizeAccelerator, timerVerdict, AUTO_READ_CHOICES, autoReadEvery, autoReadDelay, autoReadSkip, inActiveHours } = require("./refresh-policy");
+const { createRefreshPolicy, normalizeAccelerator, timerVerdict, MIN_GAP, AUTO_READ_CHOICES, autoReadEvery, autoReadDelay, autoReadSkip, inActiveHours } = require("./refresh-policy");
 
 const SLUG = "claude-quota-control";
 const BACKUP_SUFFIX = ".quota-control-backup";
@@ -348,7 +348,9 @@ function applyAutoRead({ restart = true } = {}) {
     sendAutoReadState();
     return;
   }
-  const delay = autoReadDelay({ every, hot: autoRead.hot, inActive: inActiveHours(new Date(), cleanActiveHours(s.activeHours)) });
+  // Never closer than the one-minute gap after the last reading plus a second, or a 1 minute choice would land just
+  // inside the gap and read every other turn
+  const delay = Math.max(MIN_GAP + 1000, autoReadDelay({ every, hot: autoRead.hot, inActive: inActiveHours(new Date(), cleanActiveHours(s.activeHours)) }));
   if (restart) autoRead.since = Date.now();
   autoRead.nextAt = Math.max(Date.now(), autoRead.since + delay);
   autoRead.timer = setTimeout(autoReadTurn, autoRead.nextAt - Date.now());
@@ -398,7 +400,11 @@ function noteAutoReadResult(res) {
   if (!autoReadEvery(loadSettings())) return;
   const verdict = timerVerdict(res && res.ok ? null : (res && res.error) || "fail", autoRead.fails);
   autoRead.fails = verdict.fails;
-  if (!verdict.stop) return;
+  if (!verdict.stop) {
+    // A reading that ran, by the timer or by hand, starts the wait again: the next one comes a whole interval after it ends
+    if (res && !["too-soon", "already-open", "closed"].includes(res.error)) applyAutoRead();
+    return;
+  }
   const next = { ...loadSettings(), autoReadEvery: 0, autoRead: false };
   saveSettings(next);
   applyAutoRead();

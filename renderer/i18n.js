@@ -880,7 +880,7 @@
       "sum.aria": "Resumo",
       "sum.today": "hoje até {pct}%",
       "today.line": "até {to} · faltam {left}",
-      "today.lineOver": "{over} além do limite de hoje ({to})",
+      "today.lineOver": "{over} além do limite ({to})",
       "sum.projected": "{pct}% de projeção",
       "sum.early": "Cedo demais",
       "mod.sessionShort": "Sessão",
