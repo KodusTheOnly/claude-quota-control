@@ -274,3 +274,33 @@ test("the strong part of the room box starts where the projection ends, and its 
   assert.equal(fast.mid, null);
   assert.equal(fast.spend, 0);
 });
+
+// Session pace. The window resets at 00:50, so it opened at 19:50 (0%).
+const SP_RESET = at(2026, 11, 26, 0) + 50 * 60000;
+const spAt = (h, m) => at(2026, 11, 25, h) + m * 60000;
+const sp = (now, readings) => plain(vm.runInContext(`sessionPace({ resetsAt: ${SP_RESET} }, ${now})`, load(now, { readings })));
+const spRead = (h, m, s, to) => ({ at: spAt(h, m), s, sr: SP_RESET, ...(to ? { to } : {}) });
+
+test("session pace: nothing in the window's first 30 minutes", () => {
+  assert.deepEqual(sp(spAt(20, 15), [spRead(19, 58, 0), spRead(20, 15, 8)]), { known: false });
+});
+
+test("session pace: a missed first reading does not turn a busy start into a lock", () => {
+  // 0% at 19:58 and 9% at 20:23 alone would fill at ~00:36; counted from 19:50 the session lasts past its reset
+  const p = sp(spAt(20, 23), [spRead(19, 58, 0), spRead(20, 23, 9)]);
+  assert.equal(p.known, true);
+  assert.equal(p.fullAt, null);
+});
+
+test("session pace: one reading is enough once the window's start counts", () => {
+  const p = sp(spAt(20, 30), [spRead(20, 30, 20)]);
+  assert.equal(p.known, true);
+  assert.equal(p.fullAt, spAt(20, 30) + 80 / (20 / (40 * 60000)));
+});
+
+test("session pace: late in the window a burst still warns", () => {
+  // Idle until 23:00, then 80% in an hour: the start is past the 90 minutes, so the recent pace counts
+  const p = sp(spAt(24, 0), [spRead(21, 0, 0), spRead(23, 0, 0), spRead(23, 30, 40), spRead(24, 0, 80)]);
+  assert.equal(p.known, true);
+  assert.ok(p.fullAt && p.fullAt < SP_RESET);
+});

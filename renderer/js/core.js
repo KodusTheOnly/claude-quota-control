@@ -582,14 +582,20 @@ function weekPaceRecent(now, readings = (state.settings && state.settings.readin
   return rate > 0 ? rate : null;
 }
 
-// Session pace: compares readings from the same 5-hour window
+// Session pace: compares readings from the same 5-hour window, over its last 90 minutes.
+// In its first SESSION_PACE_AFTER minutes it says nothing, like the session's level. The window opens at 0% (its first
+// message starts it), so its start is a point too: while it is inside those 90 minutes, the pace counts from there and a
+// busy start or a missed first reading cannot make a short burst look like the whole session.
 function sessionPace(five, now) {
   if (!five || !five.resetsAt) return null;
+  const start = five.resetsAt - SESSION_LEN;
+  if (now - start < SESSION_PACE_AFTER * MIN) return { known: false };
   // A repeated reading (with a "to" time) counts as two points: when it started and when it ended
   const pts = ((state.settings && state.settings.readings) || [])
     .flatMap((r) => (r.to ? [r, { ...r, at: r.to }] : [r]))
     .filter((r) => r.s !== null && r.sr && Math.abs(r.sr - five.resetsAt) < 10 * MIN && now - r.at < 2 * HOUR)
     .sort((a, b) => a.at - b.at);
+  if (!pts.length || pts[0].at > start) pts.unshift({ at: start, s: 0 });
   if (pts.length < 2) return { known: false };
   const latest = pts[pts.length - 1];
   const first = pts.find((p) => latest.at - p.at <= 90 * MIN) || pts[0];
