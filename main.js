@@ -368,7 +368,7 @@ function requestSync(reason) {
 }
 
 // Optional timer: reads every few minutes while the app runs (1 to 60, or "smart"). Off by default and in the
-// Danger zone of Settings, since it reads Claude by itself and should be used with care. It stops by itself
+// Danger zone of Settings, since Claude's Consumer Terms limit automated access outside the API. It stops by itself
 // when Claude asks for a login or a check, or after a few failed readings in a row. It can skip its readings outside
 // the active hours and while the PC is idle or locked. One timeout at a time, set again after each turn.
 const IDLE_AFTER_S = 5 * 60; // the PC counts as idle after this long without input

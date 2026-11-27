@@ -411,7 +411,7 @@ $("notifyNoReading").addEventListener("change", (e) => saveSetting({ notifyNoRea
 
 $("openAtLogin").addEventListener("change", (e) => saveSetting({ openAtLogin: e.target.checked }));
 $("codeLogs").addEventListener("change", (e) => saveSetting({ codeLogs: e.target.checked }));
-// Reading by itself (Danger zone). It reads Claude again and again with no click, so turning it on from
+// Reading by itself (Danger zone). Claude's Consumer Terms limit automated access outside the API, so turning it on from
 // Off takes a choice and then holding a key for a moment, with the warning in view. Changing how often while it is
 // on, or turning it off, takes effect at once.
 const AUTO_HOLD_MS = 1500;
