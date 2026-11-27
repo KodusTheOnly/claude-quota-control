@@ -288,6 +288,7 @@ function renderPaceGauge(m) {
   const zone = paceZone(m);
   const leds = [...g.children];
   g.classList.toggle("end", Boolean(m.endRoom));
+  $("pWord").textContent = zone === null ? "" : t(PACE_ZONES[zone]); // the zone in words next to the LEDs
   if (zone === null) {
     leds.forEach((l) => l.classList.remove("on", "at"));
     setTip(g, "pace", t("pace.none"));
