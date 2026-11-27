@@ -159,8 +159,10 @@ function renderWeek(m) {
       ? [["chart.legLimitExtra", cssVar("--moderate"), "dot"]]
       : [["chart.legLimit", legRed, "dot"], ["chart.legLocked", legRed, "hatch"]]
     : [];
+  const gapLeg = (s.gaps || []).length ? [["chart.legGap", cssVar("--crt-accent"), "dots"], ["chart.legGapBars", weekColor, "bars"]] : [];
   const legend = [
     ...lockLeg,
+    ...gapLeg,
     ...(s.over.length ? [["chart.legOver", legRed, ""]] : []),
     ...(s.used.some((p) => p.est) ? [["chart.legEst", weekColor, "dotted"]] : []),
     ...(s.band ? [["chart.legRange", weekColor, "range"]] : []),
@@ -176,6 +178,8 @@ function renderWeek(m) {
       if (style === "tick") Object.assign(line.style, { width: "0", height: "1em", borderTop: "0", borderLeft: `2px solid ${legMuted}`, marginRight: ".7em" }); // a short vertical tick, as on the chart
       else if (style === "range") Object.assign(line.style, { borderTopWidth: "7px", opacity: ".35" }); // the fan's fill
       else if (style === "active") Object.assign(line.style, { borderTopWidth: "3px", opacity: ".75" }); // the bar under the HRS strip
+      else if (style === "dots") Object.assign(line.style, { height: ".8em", borderTop: "0", background: `radial-gradient(${color} 1px, transparent 1.5px) 0 0 / 4px 4px`, opacity: ".8" }); // the no-reading dots
+      else if (style === "bars") Object.assign(line.style, { width: ".5em", height: "1em", borderTop: "0", borderLeft: "0", background: `linear-gradient(${color}, ${color}) center / 2px 100% no-repeat, linear-gradient(${color}, ${color}) top / 100% 1.5px no-repeat, linear-gradient(${color}, ${color}) bottom / 100% 1.5px no-repeat`, opacity: ".7", marginRight: ".6em" }); // a bar of where the line could be
       else if (style === "dot") Object.assign(line.style, { width: ".8em", height: ".8em", borderTop: "0", borderRadius: "50%", background: color }); // the padlock's circle
       else if (style === "hatch") Object.assign(line.style, { height: ".8em", borderTop: "0", background: `repeating-linear-gradient(45deg, ${color} 0 2px, transparent 2px 5px)`, opacity: ".75" }); // the locked band
       else if (style) line.style.borderTopStyle = style;

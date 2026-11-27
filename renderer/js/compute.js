@@ -448,13 +448,14 @@ function limitsFirst(m) {
 //   lock      from T to the reset along the 100% line, the time without Claude (null when there is none)
 //   band      the likely range at the reset, a fan from now (null when there is none)
 //   wait      while the session is at its limit, the flat start of the projection up to its reset: { x0, x1 } (null otherwise)
+//   gaps      stretches with no reading in which the week went up (readingGaps in hourly.js): [{ x0, x1, y0, y1, from, to }]
 //   end       what the projection says at its end: { kind: "reset", pct }, { kind: "lock", ms } (T) or { kind: "limit", ms }
 //   room      what is still free before the reset: a box from now to the reset, from what is used to the plan's
 //             ceiling at the reset ({ x0, x1, y0, y1 }), null when nothing is left or on the reserve. With a projection that
 //             ends inside it, mid is where it ends (the pace so far uses the box up to there) and spend is what is left
 //             above it, the same number as the band's "to spend" chip; otherwise (no projection yet, or a pace that reaches the
 //             goal) mid is null and spend is 0: nothing extra to spend
-function paceSeries(m, cells = null, starts = [], locks = []) {
+function paceSeries(m, cells = null, starts = [], locks = [], gaps = []) {
   const w = weights();
   const first = startOfDay(m.w.resetsAt - WEEK);
   const dayIdx = (ms) => Math.round((startOfDay(ms) - first) / DAY);
@@ -682,7 +683,10 @@ function paceSeries(m, cells = null, starts = [], locks = []) {
     const high = Math.min(m.lv.proj.high, 100);
     if (high - low >= 1) band = { x0: wait ? wait.x1 : nowX, x1: span, y0: m.w.used, low, high };
   }
-  return { a0: toX(chartAxisStart(weekStart)), s0, span, nowX, todayIdx, rest, expected, used, over, proj, lock, band, reserve, room, goal: m.g.goal, end: endLabel, usedNow: m.w.used, starts: startsOut, sessionLocks: sessionLocksOut, wait };
+  const gapsOut = gaps
+    .filter((g) => g.to > weekStart && g.from < m.now)
+    .map((g) => ({ ...g, x0: toX(Math.max(g.from, weekStart)), x1: Math.min(toX(Math.min(g.to, m.now)), nowX), y0: g.w0, y1: g.w1 }));
+  return { a0: toX(chartAxisStart(weekStart)), s0, span, nowX, todayIdx, rest, expected, used, over, proj, lock, band, reserve, room, goal: m.g.goal, end: endLabel, usedNow: m.w.used, starts: startsOut, sessionLocks: sessionLocksOut, wait, gaps: gapsOut };
 }
 
 // Saving a reading (typed in or read from Claude)

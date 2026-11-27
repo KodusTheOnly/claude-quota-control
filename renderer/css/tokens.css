@@ -191,4 +191,4 @@ html[data-screens="green"] {
    the marching hatches) stays still. */
 html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="off"] *::after { animation: none !important; transition: none !important; }
 html[data-motion="subtle"] .band .fc:not(:is(.hop, .shake, .squash, .flinch, .gasp, .exhale, .stretch, .sob, .nudge)) { animation: none !important; } /* the breath; its reactions still play */
-html[data-motion="subtle"] :is(.band .fcg, .band .vface.static::before, .dash.power-on .crt, .dash.power-on .band > :is(.vl, .wk), .dash.power-on .graph, .dash.power-on #paceSvg, .dash.is-reading::before, .confetti i, .band .ans.glitch, #sBar .pj, #sTime .lk) { animation: none !important; }
+html[data-motion="subtle"] :is(.hc.ns, .band .fcg, .band .vface.static::before, .dash.power-on .crt, .dash.power-on .band > :is(.vl, .wk), .dash.power-on .graph, .dash.power-on #paceSvg, .dash.is-reading::before, .confetti i, .band .ans.glitch, #sBar .pj, #sTime .lk) { animation: none !important; }

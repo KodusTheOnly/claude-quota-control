@@ -37,7 +37,9 @@ function drawPaceChart() {
   const L = Math.max($("hcells").getBoundingClientRect().left - box.getBoundingClientRect().left, 0);
   const R = 0;
   const T = 0.75 * rem;
-  const B = 0.25 * rem;
+  // A stretch with no reading gets a ruler under the chart, so the bottom margin makes room for it
+  const gaps = (s.gaps || []).filter((g) => g.x1 > g.x0);
+  const B = gaps.length ? 1.15 * rem : 0.25 * rem;
   // x is in days from the midnight that starts the first day. The axis runs from a0 (the reset, or 08:00 of the first day
   // when the reset is later: chartAxisStart) to the next reset: a narrower first column, six whole days, then the week's
   // last hours up to the reset (another narrow column). Hours before the reset that are on the axis are shaded.
@@ -129,6 +131,26 @@ function drawPaceChart() {
     }
   }
 
+  // Stretches with no reading in which the week went up: accent dots on the scanlines, few next to each reading (where
+  // the line is known) and most in the middle (where it is least known). One path per shade, so a long gap stays light.
+  for (const g of gaps) {
+    const x0 = X(g.x0);
+    const x1 = X(g.x1);
+    if (x1 - x0 < 4) continue;
+    const shades = ["", ""];
+    for (let y = T + 2, j = 0; y < H - B - 1; y += 4, j++) {
+      for (let x = x0 + 3 + (j % 2) * 2.5, i = 0; x < x1 - 1.6; x += 5, i++) {
+        const u = (x - x0) / (x1 - x0);
+        const r = gapNoise(i, j);
+        if (r < 0.04 + 0.5 * Math.sin(Math.PI * u) ** 1.4) shades[gapNoise(j, i) < 0.5 ? 0 : 1] += `M${x.toFixed(1)} ${y}h1.6v1.6h-1.6z`;
+      }
+    }
+    shades.forEach((d, k) => d && add("path", { d, fill: accent, opacity: k ? ".45" : ".25" }));
+    // The whole stretch says what it is on hover
+    const hit = add("rect", { x: x0, y: T, width: x1 - x0, height: H - T - B, fill: "transparent" });
+    el("title", {}, hit).textContent = t("chart.gapTip", { dur: fmtDur(g.to - g.from), from: gapWhen(g.from, m.now), to: gapWhen(g.to, m.now), pct: fmtNum(g.y1 - g.y0, 0, 1) });
+  }
+
   // Where the week can go today (today.js): a dashed line across today's column, the white mark of the week bar
   const limit = todayLimit(m);
   const tx0 = X(Math.max(s.todayIdx, s.s0));
@@ -166,6 +188,37 @@ function drawPaceChart() {
     if (sLocks.some((l) => mid > l.x && mid < l.xUntil)) return lockColor;
     return dayColor(Math.floor(mid));
   };
+  // In each stretch with no reading: one thin bar per hour, from the lowest to the highest the line may have been at in
+  // that hour. It closes on each reading (known) and opens in the middle (least known), never past the two readings.
+  for (const g of gaps) {
+    const rise = g.y1 - g.y0;
+    const width = X(g.x1) - X(g.x0);
+    if (rise <= 0 || width < 6) continue;
+    const reach = (x) => {
+      const u = (x - g.x0) / (g.x1 - g.x0);
+      const guess = yAt(s.used, x) ?? g.y0;
+      const h = 0.55 * rise * Math.sin(Math.PI * u);
+      return [Math.max(guess - h, g.y0), Math.min(guess + h, g.y1)];
+    };
+    const hourX = 1 / 24;
+    for (let x = Math.ceil(g.x0 / hourX) * hourX - hourX; x < g.x1; x += hourX) {
+      const a = Math.max(x, g.x0);
+      const b = Math.min(x + hourX, g.x1);
+      if (b - a < hourX / 4) continue;
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (let k = 0; k <= 4; k++) {
+        const [l, h] = reach(a + ((b - a) * k) / 4);
+        lo = Math.min(lo, l);
+        hi = Math.max(hi, h);
+      }
+      const cx = X((a + b) / 2);
+      if (Y(lo) - Y(hi) < 3) continue;
+      const c = dayColor(Math.floor((a + b) / 2));
+      add("line", { x1: cx, x2: cx, y1: Y(hi), y2: Y(lo), stroke: c, opacity: ".5", "stroke-width": 2 });
+      for (const v of [lo, hi]) add("line", { x1: cx - 2.5, x2: cx + 2.5, y1: Y(v), y2: Y(v), stroke: c, opacity: ".7", "stroke-width": 1.5 });
+    }
+  }
   const areas = [];
   for (let i = 1; i < s.used.length; i++) {
     const c = segColor(i);
@@ -223,6 +276,26 @@ function drawPaceChart() {
   if (!lockNow) add("circle", { cx: nx, cy: ny, r: 5, fill: color });
   // A ring that pings when the verdict's face glances at the chart (verdict.js puts .glance on the plot)
   add("circle", { cx: nx, cy: ny, r: 13, fill: "none", stroke: color, "stroke-width": 2, class: "nowping" });
+
+  // Under each stretch with no reading, a ruler in the bottom margin: |—— no reading · 19h 25m ——|, the words only
+  // when they fit
+  for (const g of gaps) {
+    const x0 = X(g.x0);
+    const x1 = X(g.x1);
+    if (x1 - x0 < 6) continue;
+    const ry = H - 0.5 * rem;
+    const label = text((x0 + x1) / 2, ry + 0.3 * rem, t("chart.gapRuler", { dur: fmtDur(g.to - g.from) }), { fill: accent, "text-anchor": "middle", opacity: ".85", class: "lbl" });
+    const half = label.getBBox().width / 2 + 6;
+    const mid = (x0 + x1) / 2;
+    const fits = x1 - x0 > 2 * half + 12;
+    if (!fits) label.remove();
+    const line = { stroke: accent, opacity: ".7", "stroke-width": 1 };
+    if (fits) {
+      add("line", { x1: x0, x2: mid - half, y1: ry, y2: ry, ...line });
+      add("line", { x1: mid + half, x2: x1, y1: ry, y2: ry, ...line });
+    } else add("line", { x1: x0, x2: x1, y1: ry, y2: ry, ...line });
+    for (const x of [x0, x1]) add("line", { x1: x, x2: x, y1: ry - 4, y2: ry + 4, ...line });
+  }
 
   // Each limit: a padlock in a red circle where it was hit (amber with "$" when extra usage kept you going). Hollow when
   // no reading came close before it: it was hit somewhere between the last one under the limit and this one. The ones
@@ -335,9 +408,19 @@ function lockIcon(x, y, r, { hollow = false, extra = false, red, amber, ink }) {
 }
 
 // The padlock's tip: when the limit was hit (or between which readings), when Claude is back and for how long it was locked
+// "15:08" today, "Tue 17:40" on another day of the week (fmtWhen only names the days ahead)
+function gapWhen(ms, now) {
+  return Math.abs(startOfDay(ms) - startOfDay(now)) < DAY / 2 ? fmtTime(ms) : `${shortWeekday(new Date(ms))} ${fmtTime(ms)}`;
+}
+
+// A steady pseudo-random number in [0, 1) for a dot of the no-reading pattern, so it does not jump at every redraw
+function gapNoise(i, j) {
+  const v = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
+  return v - Math.floor(v);
+}
+
 function lockTip(l, extraOn, now) {
-  // "15:08" today, "Tue 17:40" on another day of the week (fmtWhen only names the days ahead)
-  const when = (ms) => (Math.abs(startOfDay(ms) - startOfDay(now)) < DAY / 2 ? fmtTime(ms) : `${shortWeekday(new Date(ms))} ${fmtTime(ms)}`);
+  const when = (ms) => gapWhen(ms, now);
   if (extraOn) return t("chart.lockTipExtra", { when: when(l.at) });
   const back = when(l.until);
   const dur = fmtDur(l.until - l.at);
@@ -462,7 +545,8 @@ function placeLabels(items, obstacles, bounds) {
 function renderPaceChart(m) {
   const starts = sessionStartsFrom(state.settings.readings, m.w.resetsAt - WEEK, m.now);
   const locks = sessionLocks(state.settings.readings, m.w.resetsAt - WEEK, m.now);
-  chartInput = { m, series: paceSeries(m, hoursUsageFor(m).cells, starts, locks) };
+  const gaps = readingGaps({ readings: state.settings.readings, weekStart: m.w.resetsAt - WEEK, now: m.now });
+  chartInput = { m, series: paceSeries(m, hoursUsageFor(m).cells, starts, locks, gaps) };
   drawPaceChart();
 }
 

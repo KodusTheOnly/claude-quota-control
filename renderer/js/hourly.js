@@ -5,14 +5,18 @@
 // Where an increase goes, in order of how much is known:
 //   1) the readings were close together (EXACT_SPAN): it happened right there
 //   2) Claude Code wrote answers in those hours: split in proportion to that activity
-//   3) a 5-hour session was running: split evenly over the part of the session inside the gap
+//   3) the 5-hour sessions the two readings saw: full weight on the part of them inside the gap. When the gap between
+//      those sessions is long enough to hold a whole other session nobody saw (5 hours or more), the active hours in
+//      it get half weight too: use may have happened there
 //   4) nothing narrows it down and the gap is long: left out, it is not drawn at all
 // Anything from 2 to 3 is an estimate and is drawn as one. A gap with no increase is still useful:
-// it proves nothing was used there, so those hours count as covered.
+// it proves nothing was used there, so those hours count as covered. The hours of a gap with an increase that got
+// none of it are blind: something was used in the gap and nothing says it was not there.
 
 const HOURLY_EXACT_SPAN = 20 * 60 * 1000;
 const HOURLY_MAX_BLIND_SPAN = 6 * 3600000;
 const HOURLY_SESSION_MS = 5 * 3600000;
+const HOURLY_UNSEEN_WEIGHT = 0.5; // an active hour where a session nobody saw may have run, next to one that was seen
 
 function hourlyHourStart(ms) {
   const d = new Date(ms);
@@ -22,10 +26,12 @@ function hourlyHourStart(ms) {
 
 // readings: the log from core.js ({ at, w, s, sr, to }). activity: Map or [[hourStart, weight]].
 // weekStart: when the current week began. now: the current time.
-// Returns { cells: Map(hourStart -> { v, exact, covered }), maxV, left }.
+// active(from, to): how many ms of from..to fall inside the active hours (all of them when left out).
+// Returns { cells: Map(hourStart -> { v, exact, covered, blind }), maxV, left }.
 //   v: % of the weekly limit placed in that hour. exact: every part of it came from close readings.
-//   covered: some reading brackets the hour. left: % that could not be placed.
-function hourlyUsage({ readings, activity, weekStart, now }) {
+//   covered: some reading brackets the hour. blind: in a gap with an increase, and none of it placed here.
+//   left: % that could not be placed.
+function hourlyUsage({ readings, activity, weekStart, now, active = (from, to) => to - from }) {
   const act = activity instanceof Map ? activity : new Map(activity || []);
   const pts = [{ at: weekStart, w: 0, sr: null }];
   for (const r of readings || []) {
@@ -39,7 +45,7 @@ function hourlyUsage({ readings, activity, weekStart, now }) {
   let left = 0;
   const cell = (h) => {
     let c = cells.get(h);
-    if (!c) cells.set(h, (c = { v: 0, exact: true, covered: false }));
+    if (!c) cells.set(h, (c = { v: 0, exact: true, covered: false, blind: false }));
     return c;
   };
 
@@ -66,11 +72,24 @@ function hourlyUsage({ readings, activity, weekStart, now }) {
     let estimated = !exact;
     if (total <= 0) {
       const windows = [a.sr, b.sr].filter((x) => Number.isFinite(x)).map((sr) => [sr - HOURLY_SESSION_MS, sr]);
-      weights = segs.map((s) => windows.reduce((sum, [w0, w1]) => sum + Math.max(Math.min(s.to, w1) - Math.max(s.from, w0), 0), 0));
+      const overlap = (s, w0, w1) => Math.max(Math.min(s.to, w1) - Math.max(s.from, w0), 0);
+      // Between the end of what the first reading saw and the start of what the second saw. Only a span of a whole
+      // session or more can hold one nobody saw (a session runs 5 hours from its first message).
+      const seenTo = Number.isFinite(a.sr) ? Math.max(a.sr, a.at) : a.at;
+      const seenFrom = Number.isFinite(b.sr) ? Math.min(b.sr - HOURLY_SESSION_MS, b.at) : b.at;
+      const unseen = seenFrom - seenTo >= HOURLY_SESSION_MS ? [seenTo, seenFrom] : null;
+      weights = segs.map((s) => {
+        const seen = windows.reduce((sum, [w0, w1]) => sum + overlap(s, w0, w1), 0);
+        if (!unseen) return seen;
+        const u0 = Math.max(s.from, unseen[0]);
+        const u1 = Math.min(s.to, unseen[1]);
+        return seen + (u1 > u0 ? HOURLY_UNSEEN_WEIGHT * active(u0, u1) : 0);
+      });
       total = weights.reduce((x, y) => x + y, 0);
       if (total <= 0) {
         if (span > HOURLY_MAX_BLIND_SPAN) {
           left += delta;
+          for (const s of segs) cell(s.h).blind = true;
           continue;
         }
         weights = segs.map((s) => s.to - s.from);
@@ -78,8 +97,11 @@ function hourlyUsage({ readings, activity, weekStart, now }) {
       }
     }
     segs.forEach((s, k) => {
-      if (weights[k] <= 0) return;
       const c = cell(s.h);
+      if (weights[k] <= 0) {
+        if (!exact) c.blind = true;
+        return;
+      }
       c.v += (delta * weights[k]) / total;
       c.covered = true;
       if (estimated) c.exact = false;
@@ -89,6 +111,24 @@ function hourlyUsage({ readings, activity, weekStart, now }) {
   let maxV = 0;
   for (const c of cells.values()) maxV = Math.max(maxV, c.v);
   return { cells, maxV, left };
+}
+
+// The stretches with no reading in which the week went up: between two readings (the first one's last time, "to") at
+// least minSpan apart, with a rise of half a point or more. Only real readings: the week's start is not one.
+// Returns [{ from, to, w0, w1 }], oldest first.
+const HOURLY_GAP_MIN = 3600000;
+function readingGaps({ readings, weekStart, now, minSpan = HOURLY_GAP_MIN }) {
+  const pts = (readings || [])
+    .filter((r) => r && Number.isFinite(r.at) && Number.isFinite(r.w) && r.at >= weekStart && r.at <= now)
+    .sort((a, b) => a.at - b.at);
+  const out = [];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1];
+    const b = pts[i];
+    const from = Number.isFinite(a.to) && a.to > a.at && a.to <= b.at ? a.to : a.at;
+    if (b.at - from >= minSpan && b.w - a.w >= 0.5) out.push({ from, to: b.at, w0: a.w, w1: b.w });
+  }
+  return out;
 }
 
 // ---- The used line in steps ----

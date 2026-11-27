@@ -1,6 +1,7 @@
 // HRS strip above the days: when in the week the usage happened.
 // One cell per hour (per 3 hours when the window is narrow). Solid = placed from close readings,
-// dim = an estimate, empty = nothing used or not known. hourly.js does the placing; this file only draws.
+// dim = an estimate, static (no signal) = in a gap where the week went up and nothing says whether it was this hour,
+// empty = nothing used or not known. hourly.js does the placing; this file only draws.
 
 let hoursCache = { activity: [], fetchedAt: 0, weekStart: 0 };
 let hoursM = null;
@@ -19,7 +20,7 @@ function hourBlockStart(ms, step) {
 function hoursUsageFor(m) {
   const activity = state.settings.codeLogs === false ? NO_ACTIVITY : hoursCache.activity;
   if (hoursMemo && hoursMemo.m === m && hoursMemo.activity === activity) return hoursMemo.res;
-  const res = hourlyUsage({ readings: state.settings.readings || [], activity, weekStart: m.w.resetsAt - WEEK, now: m.now });
+  const res = hourlyUsage({ readings: state.settings.readings || [], activity, weekStart: m.w.resetsAt - WEEK, now: m.now, active: (from, to) => activeHoursBetween(from, to) * HOUR });
   hoursMemo = { m, activity, res };
   return res;
 }
@@ -56,14 +57,16 @@ function drawHours() {
     let v = 0;
     let exact = true;
     let covered = false;
+    let blind = true;
     for (let k = 0; k < step; k++) {
       const c = cells.get(t0 + k * HOUR);
+      if (!c || !c.blind) blind = false;
       if (!c) continue;
       v += c.v;
       covered = covered || c.covered;
       if (c.v > 0 && !c.exact) exact = false;
     }
-    blocks.push({ t0, v, exact, covered });
+    blocks.push({ t0, v, exact, covered, blind });
     const d = new Date(t0);
     d.setHours(d.getHours() + step);
     t0 = d.getTime();
@@ -98,6 +101,10 @@ function drawHours() {
         c.classList.add(b.exact ? "m" : "e", `lv-${lvKey(dayLevel.get(dayKey(b.t0)) ?? 0)}`);
         c.style.setProperty("--a", (0.18 + 0.82 * (b.v / max)).toFixed(2));
         setTip(c, "plain", t(b.exact ? "hrs.tipMeasured" : "hrs.tipEst", { when, pct: fmtNum(shown, 0, 1) }));
+      } else if (b.blind && b.t0 < m.now) {
+        // No signal: the week went up in a gap with no reading, and nothing says whether it was in this hour
+        c.classList.add("ns");
+        setTip(c, "plain", t("hrs.tipBlind", { when }));
       } else {
         setTip(c, "plain", t(b.covered ? "hrs.tipNone" : "hrs.tipUnknown", { when }));
       }

@@ -206,6 +206,20 @@ const SCENARIOS = {
     ];
     return s;
   },
+  // No reading from Tuesday 20:00 to Wednesday 15:30, while the week went from 19% to 29%: the gap gets its dots, its
+  // ruler and its bars, and the hours nothing says anything about get static on the HRS strip. Active hours 08:00 to 24:00.
+  gap: (s) => {
+    const sr = s.manual.fiveHour.resetsAt;
+    const srY = TODAY - DAY + 21 * HOUR;
+    s.activeHours = { start: 8, end: 0 };
+    s.readings = [
+      { at: TODAY - DAY + 19 * HOUR, w: 17, s: 40, sr: srY },
+      { at: TODAY - DAY + 20 * HOUR, w: 19, s: 55, sr: srY },
+      { at: TODAY + 15.5 * HOUR, w: 29, s: 30, sr },
+      { at: NOW - 2 * 60000, w: 31, s: 58, sr },
+    ];
+    return s;
+  },
   // The same limits with extra usage set up: nothing was blocked, so amber marks and no locked band
   lockextra: (s) => {
     const extra = s.extra;
