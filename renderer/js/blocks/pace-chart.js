@@ -193,7 +193,12 @@ function drawPaceChart() {
     const tick = add("line", { x1: X(st.x), x2: X(st.x), y1: H - B - TICK, y2: H - B, stroke: PAL.muted, "stroke-width": 2 });
     el("title", {}, tick).textContent = t("chart.sessionStart", { time: fmtTime(st.ms) });
   }
-  if (showProj) add("polyline", { points: fmt(s.proj), fill: "none", stroke: color, "stroke-width": 2, "stroke-dasharray": "6 5" });
+  if (showProj) {
+    // While the session is at its limit the projection waits for its reset: that flat start is red dots, not a forecast
+    const walk = s.wait ? s.proj.filter((p) => p.x >= s.wait.x1 - 1e-9) : s.proj;
+    if (s.wait) add("line", { x1: X(s.wait.x0), x2: X(s.wait.x1), y1: Y(s.usedNow), y2: Y(s.usedNow), stroke: PAL.red, opacity: ".85", "stroke-width": 2, "stroke-dasharray": "2 5", "stroke-linecap": "round" });
+    if (walk.length > 1) add("polyline", { points: fmt(walk), fill: "none", stroke: color, "stroke-width": 2, "stroke-dasharray": "6 5" });
+  }
   // Where the projection ends at the reset: a dot (the number is up in the band, "at reset"), kept whole at the right edge
   if (showProj && s.end && s.end.kind === "reset") {
     const e = projPx[projPx.length - 1];

@@ -304,3 +304,37 @@ test("session pace: late in the window a burst still warns", () => {
   assert.equal(p.known, true);
   assert.ok(p.fullAt && p.fullAt < SP_RESET);
 });
+
+// While the 5-hour session is at its limit the week cannot move until the session resets
+function lockedReading({ used = 100, extra = null } = {}) {
+  const r = reading();
+  r.src.data.fiveHour = { used, resetsAt: r.now + 3 * 3600000, at: r.now };
+  if (extra) r.settings = { extra };
+  return r;
+}
+
+test("a locked session makes the projection wait for its reset", () => {
+  const free = run(reading(), "({ p: __m.proj, s: paceSeries(__m) })");
+  const locked = run(lockedReading(), "({ p: __m.proj, s: paceSeries(__m) })");
+  const resetAt = lockedReading().now + 3 * 3600000;
+  assert.equal(free.p.from, reading().now);
+  assert.equal(locked.p.from, resetAt);
+  // Fewer days left to spend at the same pace: the week ends lower
+  assert.ok(locked.p.left < free.p.left);
+  assert.ok(locked.p.projected < free.p.projected);
+  assert.equal(locked.p.rate, free.p.rate);
+  // The line stays flat up to the reset, then walks; the fan starts there too
+  const s = locked.s;
+  assert.ok(s.wait && s.wait.x0 === s.nowX && s.wait.x1 > s.nowX);
+  assert.deepEqual(s.proj.slice(0, 2).map((p) => p.y), [33, 33]);
+  assert.equal(s.proj[1].x, s.wait.x1);
+  assert.equal(s.band.x0, s.wait.x1);
+  assert.equal(free.s.wait, null);
+});
+
+test("the projection does not wait under the limit, or with extra usage left to spend", () => {
+  const under = run(lockedReading({ used: 99.4 }), "__m.proj.from");
+  assert.equal(under, reading().now);
+  const extra = run(lockedReading({ extra: { balance: 5, limit: null, spent: null } }), "__m.proj.from");
+  assert.equal(extra, reading().now);
+});

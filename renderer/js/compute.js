@@ -54,7 +54,11 @@ function compute(src) {
   const drops = rolled ? [] : weekDrops((state.settings && state.settings.readings) || [], w.resetsAt - WEEK, now);
   // What Claude gave back this week: it still counts toward the pace, since it was used
   const given = drops.reduce((s, d) => s + d.from - d.to, 0);
-  const proj = learnedProjection(w.used, w.resetsAt, now, weights(), learn, given);
+  // While the session is at its limit (and no extra usage carries on) the week cannot move until the session resets:
+  // the projection waits for that
+  const extra = state.settings && state.settings.extra;
+  const lockedUntil = five && five.resetsAt > now && asShownPct(five.used) >= 100 && !extraCoversLimit(extra) ? five.resetsAt : null;
+  const proj = learnedProjection(w.used, w.resetsAt, now, weights(), learn, given, lockedUntil || now);
   const forecast = forecastWeek(w, now, proj);
   const m = { now, today, g, usedStart, ceiling, reserveMode, budget, spent, dayOff, idle, todayRatio, leftAtDayStart, w, perDay, five, pace, days, rolled, forecast, learn, proj, drops, given };
   m.lv = computeLevels(m);
@@ -92,7 +96,7 @@ function forecastWeek(w, now, p) {
   // Judged on the projection as shown (whole percent), the same number the levels rate
   if (asShownPct(p.projected) <= 100) return { kind: "fits", spare: Math.max(100 - p.projected, 0), perDay: p.rate };
   // The walk can run past the reset when the last day is short; fall back to the reset itself
-  return { kind: "short", eta: paceReaches(100, w.used, p.rate, now, w.resetsAt, p.w) || w.resetsAt, perDay: p.rate };
+  return { kind: "short", eta: paceReaches(100, w.used, p.rate, p.from ?? now, w.resetsAt, p.w) || w.resetsAt, perDay: p.rate };
 }
 
 // Status level
@@ -140,7 +144,7 @@ function computeLevels(m) {
   // As shown: the projection appears as a whole percent
   const projRatio = proj ? asShownPct(proj.projected) / 100 : null;
   // The same pace as the projection and the dashed line: when it reaches LOCK_AT and how long before the reset
-  const lock = proj ? weekLockout(m.w.used, proj.rate, m.now, m.w.resetsAt, proj.w, m.g.goal) : null;
+  const lock = proj ? weekLockout(m.w.used, proj.rate, proj.from ?? m.now, m.w.resetsAt, proj.w, m.g.goal) : null;
   const lockLevel = lock ? levelFromLockout(lock.hours) : null;
   const lv = {
     session: m.five ? sessionLevel(m.five.used, m.now, m.five.resetsAt) : null,
@@ -443,6 +447,7 @@ function limitsFirst(m) {
 //   proj      where the pace so far leads: until the reset, or until T when the level counts hours locked out (it reaches 100%)
 //   lock      from T to the reset along the 100% line, the time without Claude (null when there is none)
 //   band      the likely range at the reset, a fan from now (null when there is none)
+//   wait      while the session is at its limit, the flat start of the projection up to its reset: { x0, x1 } (null otherwise)
 //   end       what the projection says at its end: { kind: "reset", pct }, { kind: "lock", ms } (T) or { kind: "limit", ms }
 //   room      what is still free before the reset: a box from now to the reset, from what is used to the plan's
 //             ceiling at the reset ({ x0, x1, y0, y1 }), null when nothing is left or on the reserve. With a projection that
@@ -608,8 +613,11 @@ function paceSeries(m, cells = null, starts = [], locks = []) {
     proj = [{ x: nowX, y: m.w.used }];
     let y = m.w.used;
     const xOf = (ms) => (ms >= m.w.resetsAt ? span : toX(ms));
+    // While the session is at its limit the line stays flat until it resets (proj.from), then walks on
+    const from = Math.max(m.lv.proj.from ?? m.now, m.now);
+    if (from > m.now) proj.push({ x: xOf(from), y });
     // The projection walks on its own weights (the plan's, pulled toward the past weeks: learn.js)
-    const pieces = m.now < m.w.resetsAt ? weightPieces(m.now, m.w.resetsAt, m.lv.proj.w) : [];
+    const pieces = from < m.w.resetsAt ? weightPieces(from, m.w.resetsAt, m.lv.proj.w) : [];
     // Lockout at or before the first piece starts (it sits at its start, or now)
     if (lockAt !== null && (!pieces.length || lockAt <= pieces[0].from)) {
       if (lockAt > m.now) proj.push({ x: toX(lockAt), y: m.g.goal });
@@ -663,14 +671,18 @@ function paceSeries(m, cells = null, starts = [], locks = []) {
     const spend = mid !== null ? asShownPct(m.ceiling) - asShownPct(m.lv.proj.projected) : 0;
     room = { x0: nowX, x1: span, y0: m.w.used, y1: top, mid, spend: Math.max(spend, 0) };
   }
-  // The likely range at the reset, as a fan from now: { x0, x1, y0, low, high } (null with no projection or no width)
+  // Where the projection waits for the session's reset: { x0, x1 } (null when it does not wait)
+  const waitTo = m.lv.proj && m.lv.proj.from > m.now ? Math.min(toX(m.lv.proj.from), span) : null;
+  const wait = waitTo !== null && waitTo > nowX ? { x0: nowX, x1: waitTo } : null;
+  // The likely range at the reset, as a fan from now (from the session's reset while it waits for it):
+  // { x0, x1, y0, low, high } (null with no projection or no width)
   let band = null;
   if (m.lv.proj && m.w.used < 100 && nowX < span) {
     const low = Math.min(m.lv.proj.low, 100);
     const high = Math.min(m.lv.proj.high, 100);
-    if (high - low >= 1) band = { x0: nowX, x1: span, y0: m.w.used, low, high };
+    if (high - low >= 1) band = { x0: wait ? wait.x1 : nowX, x1: span, y0: m.w.used, low, high };
   }
-  return { a0: toX(chartAxisStart(weekStart)), s0, span, nowX, todayIdx, rest, expected, used, over, proj, lock, band, reserve, room, goal: m.g.goal, end: endLabel, usedNow: m.w.used, starts: startsOut, sessionLocks: sessionLocksOut };
+  return { a0: toX(chartAxisStart(weekStart)), s0, span, nowX, todayIdx, rest, expected, used, over, proj, lock, band, reserve, room, goal: m.g.goal, end: endLabel, usedNow: m.w.used, starts: startsOut, sessionLocks: sessionLocksOut, wait };
 }
 
 // Saving a reading (typed in or read from Claude)

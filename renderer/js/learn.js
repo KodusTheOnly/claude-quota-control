@@ -130,12 +130,14 @@ function forecastCalibration(L, x, elapsed, left) {
 //   weeks     how many past weeks it learned from
 // given: what Claude gave back this week (weekDrops in compute.js). It was used, so the pace counts it, but it is
 // no longer on the week: the end walks on from what is used now.
-function learnedProjection(used, resetsAt, now, planW = weights(), L = null, given = 0) {
+// from: when the week can move again (the 5-hour session's reset while it is at its limit, now otherwise). Nothing is
+// spent before it, so the days left to project count from there.
+function learnedProjection(used, resetsAt, now, planW = weights(), L = null, given = 0, from = now) {
   const w = forecastWeights(planW, L, resetsAt);
   const n = L ? L.n : 0;
   const elapsed = weightedDays(resetsAt - WEEK, now, w);
   if (!n && elapsed < MIN_WEIGHTED_DAYS) return null;
-  const left = weightedDays(now, resetsAt, w);
+  const left = weightedDays(Math.max(from, now), resetsAt, w);
   const usual = n ? L.meanEnd / 7 : null;
   const gross = used + Math.max(given || 0, 0);
   const rate = mixedRate(gross, elapsed, usual, priorDays(n));
@@ -144,7 +146,7 @@ function learnedProjection(used, resetsAt, now, planW = weights(), L = null, giv
   const x = Math.round((startOfDay(now) - first) / DAY) + (now - startOfDay(now)) / DAY;
   const spread = BAND_Z * forecastCalibration(L, x, elapsed, left) * forecastSpread(rate, elapsed, left, n);
   return {
-    elapsed, left, rate, projected, w, weeks: n, usual,
+    elapsed, left, rate, projected, w, weeks: n, usual, from: Math.min(Math.max(from, now), resetsAt),
     own: elapsed > 0.05 ? gross / elapsed : null,
     low: Math.max(projected - spread, used),
     high: projected + spread,
