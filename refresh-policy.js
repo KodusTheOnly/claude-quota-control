@@ -34,6 +34,22 @@ function autoReadSkip({ inActive = true, activeOnly = true, idleState = "active"
   if (idlePause && (idleState === "idle" || idleState === "locked")) return "idle";
   return null;
 }
+// While the 5-hour session is at its limit nothing can change but by hand, so the timer waits for the session's reset
+// and reads LOCK_RESUME_AFTER after it. Returns when to read again (ms), or null when the session is not locked.
+// fiveHour: { used, resetsAt } from the last reading. With extra usage that can still be spent the limit does not stop
+// you (extraCoversLimit in renderer/js/core.js, mirrored here; a test checks they agree).
+const LOCK_RESUME_AFTER = 60 * 1000;
+function extraCoversLimit(extra) {
+  if (!extra) return false;
+  if (extra.balance > 0) return true;
+  return extra.limit > 0 && Number.isFinite(extra.spent) && extra.spent < extra.limit;
+}
+function sessionLockedUntil({ fiveHour, extra } = {}, now = Date.now()) {
+  if (!fiveHour || !Number.isFinite(fiveHour.used) || !Number.isFinite(fiveHour.resetsAt)) return null;
+  if (Math.round(fiveHour.used) < 100 || fiveHour.resetsAt <= now || extraCoversLimit(extra)) return null;
+  return fiveHour.resetsAt + LOCK_RESUME_AFTER;
+}
+
 // Inside the active hours { start, end } (whole hours, the window may cross midnight), or always when there are none.
 // Same rule as activeSpans() in renderer/js/core.js.
 function inActiveHours(date, a) {
@@ -112,4 +128,4 @@ function normalizeAccelerator(input) {
   return ["Ctrl", "Alt", "Shift"].filter((m) => mods.has(m)).concat(key).join("+");
 }
 
-module.exports = { MIN_GAP, FOCUS_GAP, TIMER_EVERY, TIMER_MAX_FAILS, timerVerdict, AUTO_READ_CHOICES, SMART_MIN, autoReadEvery, autoReadDelay, autoReadSkip, inActiveHours, MANUAL_REASONS, AUTO_REASONS, decide, createRefreshPolicy, normalizeAccelerator };
+module.exports = { MIN_GAP, FOCUS_GAP, TIMER_EVERY, TIMER_MAX_FAILS, timerVerdict, AUTO_READ_CHOICES, SMART_MIN, autoReadEvery, autoReadDelay, autoReadSkip, inActiveHours, LOCK_RESUME_AFTER, extraCoversLimit, sessionLockedUntil, MANUAL_REASONS, AUTO_REASONS, decide, createRefreshPolicy, normalizeAccelerator };

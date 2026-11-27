@@ -24,6 +24,7 @@ function autoLampWord() {
 }
 function autoLampAge() {
   if (autoLive.paused === "user") return `· ${t("hd.paused.user", { time: fmtTime(autoLive.pauseUntil) })}`;
+  if (autoLive.paused === "session" && autoLive.nextAt) return `· ${t("hd.next", { time: fmtTime(autoLive.nextAt) })}`;
   if (autoLive.paused) return `· ${t(`hd.paused.${autoLive.paused}`)}`;
   const left = autoLeft();
   return left === null ? "" : `· ${t("hd.next", { time: autoClock(left) })}`;
@@ -33,6 +34,7 @@ function autoLampAge() {
 function autoMenuStatus() {
   if (!autoOn()) return t("am.status.off");
   if (autoLive.paused === "user") return t("am.status.user", { time: fmtTime(autoLive.pauseUntil) });
+  if (autoLive.paused === "session") return t("am.status.session", { time: autoLive.nextAt ? fmtTime(autoLive.nextAt) : "–" });
   if (autoLive.paused) return t(`am.status.${autoLive.paused}`);
   const time = autoLive.nextAt ? fmtTime(autoLive.nextAt) : "–";
   return t(autoLive.every === "smart" ? "am.status.smart" : "am.status.on", { n: autoMinutes(), time });

@@ -138,3 +138,30 @@ test("auto read: active hours, also across midnight", () => {
   const night = { start: 9, end: 1 };
   assert.deepEqual([0, 1, 8, 9, 23].map((h) => inActiveHours(at(h), night)), [true, false, false, true, true]);
 });
+
+test("a session at its limit makes the timer wait for its reset, plus a minute", () => {
+  const { sessionLockedUntil, LOCK_RESUME_AFTER } = require("../refresh-policy");
+  const now = 1_000_000;
+  const resetsAt = now + 3 * 3600000;
+  assert.equal(sessionLockedUntil({ fiveHour: { used: 100, resetsAt } }, now), resetsAt + LOCK_RESUME_AFTER);
+  assert.equal(sessionLockedUntil({ fiveHour: { used: 99.6, resetsAt } }, now), resetsAt + LOCK_RESUME_AFTER); // shown as 100%
+  assert.equal(sessionLockedUntil({ fiveHour: { used: 99.4, resetsAt } }, now), null);
+  assert.equal(sessionLockedUntil({ fiveHour: { used: 100, resetsAt: now - 1 } }, now), null); // already reset
+  assert.equal(sessionLockedUntil({ fiveHour: null }, now), null);
+  assert.equal(sessionLockedUntil({}, now), null);
+  // Extra usage with money left: the limit does not stop you, so the timer keeps going
+  assert.equal(sessionLockedUntil({ fiveHour: { used: 100, resetsAt }, extra: { balance: 3 } }, now), null);
+  assert.equal(sessionLockedUntil({ fiveHour: { used: 100, resetsAt }, extra: { balance: 0, limit: 20, spent: 20 } }, now), resetsAt + LOCK_RESUME_AFTER);
+});
+
+test("the main process and the window agree on when extra usage covers the limit", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const vm = require("node:vm");
+  const sandbox = { document: { getElementById: () => ({}) }, window: { quota: {} }, I18N: { t: (k) => k, getLang: () => "en", locale: () => "en-US" } };
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "renderer", "js", "core.js"), "utf8"), sandbox);
+  const { extraCoversLimit } = require("../refresh-policy");
+  const cases = [null, {}, { balance: 5 }, { balance: 0 }, { limit: 10, spent: 3 }, { limit: 10, spent: 10 }, { limit: 0, spent: 0 }, { balance: null, limit: 10, spent: null }];
+  for (const e of cases) assert.equal(extraCoversLimit(e), sandbox.extraCoversLimit(e), JSON.stringify(e));
+});

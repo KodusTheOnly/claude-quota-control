@@ -13,7 +13,7 @@ const claude = require("./claude-sync");
 const { readActivity } = require("./claude-activity");
 const i18n = require("./renderer/i18n.js");
 const { setupUpdates } = require("./updater");
-const { createRefreshPolicy, normalizeAccelerator, timerVerdict, MIN_GAP, AUTO_READ_CHOICES, autoReadEvery, autoReadDelay, autoReadSkip, inActiveHours } = require("./refresh-policy");
+const { createRefreshPolicy, normalizeAccelerator, timerVerdict, MIN_GAP, AUTO_READ_CHOICES, autoReadEvery, autoReadDelay, autoReadSkip, inActiveHours, sessionLockedUntil } = require("./refresh-policy");
 
 const SLUG = "claude-quota-control";
 const BACKUP_SUFFIX = ".quota-control-backup";
@@ -406,6 +406,12 @@ function applyAutoRead({ restart = true } = {}) {
   const delay = Math.max(MIN_GAP + 1000, autoReadDelay({ every, hot: autoRead.hot, inActive: inActiveHours(new Date(), cleanActiveHours(s.activeHours)) }));
   if (restart) autoRead.since = Date.now();
   autoRead.nextAt = Math.max(Date.now(), autoRead.since + delay);
+  // The session at its limit: nothing to read until it resets, so the next turn waits for that
+  const lockedUntil = sessionLockedUntil({ fiveHour: s.manual && s.manual.fiveHour, extra: s.extra }, Date.now());
+  if (lockedUntil) {
+    autoRead.nextAt = Math.max(autoRead.nextAt, lockedUntil);
+    autoRead.paused = "session";
+  } else if (autoRead.paused === "session") autoRead.paused = null;
   autoRead.timer = setTimeout(autoReadTurn, autoRead.nextAt - Date.now());
   sendAutoReadState();
 }
@@ -414,6 +420,7 @@ function autoReadTurn() {
   const s = loadSettings();
   if (autoRead.pauseUntil > Date.now()) return applyAutoRead(); // paused from the Refresh menu: wait it out
   autoRead.pauseUntil = 0;
+  if (sessionLockedUntil({ fiveHour: s.manual && s.manual.fiveHour, extra: s.extra }, Date.now())) return applyAutoRead({ restart: false }); // still locked
   const idleState = powerMonitor && powerMonitor.getSystemIdleState ? powerMonitor.getSystemIdleState(IDLE_AFTER_S) : "unknown";
   autoRead.paused = autoReadSkip({
     inActive: inActiveHours(new Date(), cleanActiveHours(s.activeHours)),
@@ -1202,6 +1209,12 @@ function applySettings(patch) {
   saveSettings(next);
   if ("autoReadEvery" in patch) autoRead.fails = 0;
   if (["autoRead", "autoReadEvery", "autoReadActiveOnly", "autoReadIdlePause", "activeHours"].some((k) => k in patch)) applyAutoRead({ restart: "autoReadEvery" in patch });
+  // A new reading saved (or extra usage changed) can lock or free the session: the timer waits for its reset or stops waiting
+  else if (("manual" in patch || "extra" in patch) && autoReadEvery(loadSettings())) {
+    const st = loadSettings();
+    const locked = Boolean(sessionLockedUntil({ fiveHour: st.manual && st.manual.fiveHour, extra: st.extra }, Date.now()));
+    if (locked !== (autoRead.paused === "session")) applyAutoRead({ restart: false });
+  }
   if ("weights" in patch || "activeHours" in patch || "reserve" in patch || "reserveRelease" in patch) writeCollectorLanguage();
   return next;
 }

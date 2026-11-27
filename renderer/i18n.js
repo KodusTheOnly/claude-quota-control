@@ -493,6 +493,7 @@
       "am.status.user": "Paused until {time}.",
       "am.status.idle": "Paused while the PC is idle or locked.",
       "am.status.hours": "Paused outside your active hours.",
+      "am.status.session": "Paused while the session is at its limit · next at {time}, a minute after it resets.",
       "am.status.off": "Off. You can turn it on in Settings > Data > Danger zone.",
       "am.pause": "Pause for 1 hour",
       "am.resume": "Resume now",
@@ -528,6 +529,7 @@
       "auto.status.smart": "Smart · now {n} min",
       "auto.status.paused.idle": "Paused · PC idle",
       "auto.status.paused.hours": "Paused · outside active hours",
+      "auto.status.paused.session": "Paused · session at its limit, next at {time}",
       "auto.stopped": "Automatic reading turned itself off. Claude asked for a login or a check, or readings kept failing.",
       "data.confirm": "Delete the saved reset time, your readings and the history you typed in?",
 
@@ -1252,6 +1254,7 @@
       "am.status.user": "Pausada até {time}.",
       "am.status.idle": "Pausada enquanto o PC está ocioso ou bloqueado.",
       "am.status.hours": "Pausada fora das suas horas ativas.",
+      "am.status.session": "Pausado enquanto a sessão está no limite · próxima às {time}, um minuto depois do reset.",
       "am.status.off": "Desligada. Dá para ligar em Ajustes > Dados > Zona de risco.",
       "am.pause": "Pausar por 1 hora",
       "am.resume": "Retomar agora",
@@ -1287,6 +1290,7 @@
       "auto.status.smart": "Smart · agora {n} min",
       "auto.status.paused.idle": "Pausado · PC ocioso",
       "auto.status.paused.hours": "Pausado · fora das horas ativas",
+      "auto.status.paused.session": "Pausado · sessão no limite, próxima às {time}",
       "auto.stopped": "A leitura automática se desligou sozinha. O Claude pediu login ou uma verificação, ou as leituras continuaram falhando.",
       "data.confirm": "Apagar o horário de reset salvo, as suas leituras e o histórico que você digitou?",
 

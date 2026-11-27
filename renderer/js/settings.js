@@ -467,7 +467,7 @@ function renderAutoStatus() {
   if (every) {
     tone = live.paused ? "paused" : "on";
     key = live.paused ? `auto.status.paused.${live.paused}` : every === "smart" ? "auto.status.smart" : "auto.status.on";
-    vars = { n: every === "smart" ? live.minutes || 15 : every };
+    vars = { n: every === "smart" ? live.minutes || 15 : every, time: live.nextAt ? fmtTime(live.nextAt) : "–" };
   } else if (autoUi.pending !== null) {
     key = "auto.status.pending";
     tone = "pending";
