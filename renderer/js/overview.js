@@ -3,14 +3,6 @@
 
 let lastM = null; // the last numbers drawn, for the things that open on a click
 
-// The summary line the vertical format keeps at the top while the page scrolls
-function renderSummary(m) {
-  paintLevel($("sumLevel"), m.head.level, m.head.name);
-  const limit = todayLimit(m);
-  $("sumLeft").textContent = m.idle ? t("today.idle") : m.dayOff ? t("today.dayOff") : limit === null ? t("today.onReserve") : t("sum.today", { pct: r0(limit) });
-  $("sumProj").textContent = m.lv.proj ? t("sum.projected", { pct: r0(Math.min(m.lv.proj.projected, 100)) }) : t("sum.early");
-}
-
 function renderOverview(m, fresh = false) {
   lastM = m;
   applyAutoWeights(m); // Settings > Plan, "Follow my usual week": saves and draws again when the plan changes
@@ -21,16 +13,14 @@ function renderOverview(m, fresh = false) {
   renderPast(m); // before the week: the chart draws the past weeks
   renderWeek(m);
   renderHours(m);
-  fitTall(); // after: it measures what the week left
-  renderSummary(m);
   renderTypeIn(m);
   if ($("mathDrawer").open) renderMathDrawer(m);
   renderPlanMenu(m);
 }
 
-// Type it in and Math: in the header from 1100px up (there is room next to the tabs, and the Overview
+// Type it in and Math: in the header from 1280px up (there is room next to the tabs, and the Overview
 // loses a row), in the "..." menu below that. Only shown on the Overview itself.
-const OV_KEYS_WIDE = window.matchMedia("(min-width: 1100px)");
+const OV_KEYS_WIDE = window.matchMedia("(min-width: 1280px)");
 
 function closeOvMenu() {
   $("ovMenu").classList.add("hidden");

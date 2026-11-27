@@ -196,10 +196,8 @@ function fitBand() {
     if (top.scrollWidth <= top.clientWidth + 1) break;
   }
   if (!why.textContent || why.scrollHeight > why.clientHeight + 1 || why.scrollWidth > why.clientWidth + 1) why.classList.add("hidden");
-  // The ruler: in the vertical window it is left to screen readers (the face, the answer and their color show the level);
-  // elsewhere the names of the levels that are not lit go when they do not fit
+  // The ruler: the names of the levels that are not lit go when they do not fit
   const ruler = $("vRuler");
-  ruler.classList.toggle("sr-only", window.matchMedia("(max-width: 719px)").matches);
   ruler.classList.remove("bare");
   if ([...ruler.children].some((s) => s.scrollWidth > s.clientWidth + 1)) ruler.classList.add("bare");
   fitChips();

@@ -171,7 +171,7 @@ const SCENARIOS = {
     return s;
   },
   // The "4 wk" key on, with four past weeks recorded (one reached 100% on its sixth day), and a session earlier today:
-  // the past weeks are in the chart, or in their own block in a tall vertical window, with Today by hour above them
+  // the past weeks are dashed lines in the chart
   pastweeks: (s) => {
     s.pastWeeks = true;
     const ends = [[12, 25, 38, 48, 52, 66, 71], [18, 33, 52, 61, 64, 80, 88], [25, 47, 63, 74, 78, 94, 97], [28, 52, 70, 86, 91, 100, 100]];

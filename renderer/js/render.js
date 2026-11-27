@@ -99,7 +99,6 @@ function go(view) {
     bindSettings();
   }
   if (changed) document.querySelector(".content").scrollTop = 0; // every screen starts at its top
-  syncToc();
 }
 
 function focusUpdate() {

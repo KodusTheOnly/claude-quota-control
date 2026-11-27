@@ -87,7 +87,7 @@ async function openOverview(browser, opts) {
   await page.evaluate((t) => document.documentElement.setAttribute("data-theme", t), theme);
   await page.waitForSelector(scenario === "nodata" ? "#setup:not(.hidden)" : "#dash:not(.hidden)");
   if (scenario === "updating") await page.click("#syncBtn");
-  // In the vertical format the two keys sit in the "..." menu
+  // Under 1100px the two keys sit in the "..." menu
   const openMenu = async () => { if (await page.isVisible("#moreBtn")) await page.click("#moreBtn"); };
   if (interaction === "math") { await openMenu(); await page.click('[data-math="week"]'); }
   if (interaction === "type") { await openMenu(); await page.click("#typeBtn"); }

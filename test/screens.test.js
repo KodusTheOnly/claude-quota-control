@@ -26,19 +26,6 @@ test("ids are unique", () => {
   assert.deepEqual(dupes, []);
 });
 
-test("every contents key in Settings and Help points at a section", () => {
-  const bad = [...html.matchAll(/class="key toc-k[^"]*"[^>]*\bdata-target="([^"]+)"/g)].map((m) => m[1]).filter((id) => !ids.has(id));
-  assert.deepEqual(bad, []);
-});
-
-test("every section of Settings has a contents key", () => {
-  const part = html.slice(html.indexOf('id="view-settings"'));
-  const section = part.slice(0, part.indexOf("</section>"));
-  const keys = [...section.matchAll(/data-target="([^"]+)"/g)].map((m) => m[1]);
-  const numbered = [...section.matchAll(/<article class="blk" id="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(numbered, keys, "sections and keys are in the same order");
-});
-
 test("every topic of Help has a tile, in the same order", () => {
   const part = html.slice(html.indexOf('id="view-help"'));
   const section = part.slice(0, part.indexOf("</section>"));

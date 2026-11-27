@@ -1,20 +1,16 @@
-// The window sizes the Overview is tested at, grouped by the format they should get.
-// wide:     960px or wider and at least 1.3x wider than tall
-// medium:   720px or wider, otherwise
-// vertical: under 720px
+// The window sizes the Overview is tested at. The window goes from 1100x520 to 1920x1080 (WIN_MIN and WIN_MAX in
+// main.js), so the Overview never scrolls. The format names the header's layout, chosen by width (overview.js):
+// medium:   under 1280px (Type it in and Math in the "..." menu)
+// wide:     1280px or wider (Type it in and Math in the header)
 const SIZES = [
-  ...[[960, 540], [1024, 576], [1078, 550], [1080, 480], [1280, 720], [1366, 728], [1600, 900], [1920, 1040], [2560, 1400]].map(([w, h]) => ({ w, h, format: "wide" })),
-  ...[[760, 900], [900, 700], [960, 800], [1100, 1000]].map(([w, h]) => ({ w, h, format: "medium" })),
-  // Too short for everything to fit (about 36rem is needed): these keep the layout and let it scroll
-  ...[[720, 480], [720, 540], [800, 600]].map(([w, h]) => ({ w, h, format: "medium-short" })),
-  ...[[420, 480], [420, 540], [420, 900], [540, 960], [600, 1000], [420, 1240], [420, 1440]].map(([w, h]) => ({ w, h, format: "vertical" })),
+  ...[[1100, 520], [1100, 640], [1100, 780], [1200, 1000]].map(([w, h]) => ({ w, h, format: "medium" })),
+  ...[[1280, 520], [1280, 720], [1366, 728], [1600, 900], [1920, 1040], [1920, 1080]].map(([w, h]) => ({ w, h, format: "wide" })),
 ];
 
-function formatOf(w, h) {
-  if (w >= 960 && w / h >= 1.3) return "wide";
-  return w >= 720 ? "medium" : "vertical";
+function formatOf(w) {
+  return w >= 1280 ? "wide" : "medium";
 }
-// Formats that may scroll
-const SCROLLS = ["vertical", "medium-short"];
+// Formats that may scroll: none, the window is never smaller than the Overview needs
+const SCROLLS = [];
 
 module.exports = { SIZES, formatOf, SCROLLS };

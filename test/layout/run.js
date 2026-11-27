@@ -6,7 +6,7 @@
 //   npm run test:layout                 the full matrix
 //   npm run test:layout -- --quick      English, light theme, a few states (fast, for working)
 //   npm run test:layout -- --shots      also save a screenshot of every case in test/layout/out/
-//   npm run test:layout -- --only=1280x720,420x540   limit to some sizes
+//   npm run test:layout -- --only=1280x720,1100x520   limit to some sizes
 //   npm run test:layout -- --lang=pt-BR --theme=dark --scenario=stale   limit to a language, theme or state
 //   npm run test:layout -- --view=settings   only one screen (panel, settings, help, history, about or tray)
 //   npm run test:layout -- --screens=crt     the light theme on CRT screens (paper, its default, when left out)
@@ -39,7 +39,7 @@ function buildCases() {
   const scenarios = pick(option("scenario"), quick ? ["moderate", "pause", "stale"] : SCENARIOS);
   // --quick covers every level: Free and Tight too, but only at one size per format, to keep it light
   const quickLevels = quick && !option("scenario") ? ["free", "tight"] : [];
-  const QUICK_LEVEL_SIZES = ["1280x720", "760x900", "420x540"];
+  const QUICK_LEVEL_SIZES = ["1280x720", "1100x520"];
   const views = pick(option("view"), ["panel", "settings", "help", "history", "about", "tray"]);
   // Settings and Help: the usual state, and one with no account and a shortcut that another app already uses (the longest texts)
   const docStates = quick ? [["moderate", "off"]] : [["moderate", "off"], ["noaccount", "taken"]];

@@ -44,7 +44,7 @@
         <button class="key hidden" type="button" id="connectBtn" title="Connect Claude account" data-i18n-title="hero.connect"><span class="long" data-i18n="hero.connect">Connect Claude account</span><span class="short" data-i18n="hero.connectShort">Connect</span></button>
       </div>
       <div class="ovmenu hidden" id="ovMenu" role="group" aria-label="More" data-i18n-aria="hd.more">
-        <!-- Type it in and Math: moved to the header from 1100px up, kept in this "..." menu below that (see placeOvKeys) -->
+        <!-- Type it in and Math: moved to the header from 1280px up, kept in this "..." menu below that (see placeOvKeys) -->
         <span class="pl-keys" id="ovKeys">
           <button class="key mb" type="button" id="typeBtn" aria-haspopup="dialog" data-i18n="hero.type">Type it in</button>
           <button class="key mb" type="button" data-math="week" aria-haspopup="dialog" data-i18n="math.key">Math</button>
@@ -128,13 +128,6 @@
         <div class="banner hidden" id="banner"></div>
 
         <div class="dash hidden" id="dash" data-extra="on">
-          <!-- Vertical format only: stays at the top while the page scrolls -->
-          <div class="sum" id="sum" role="group" aria-label="Summary" data-i18n-aria="sum.aria">
-            <span class="lv lv-none" id="sumLevel"><span class="shp"></span><span class="lvn"></span></span>
-            <span id="sumLeft"></span>
-            <span id="sumProj"></span>
-          </div>
-
           <!-- Week: the band (the verdict with the face and the pace on the left; the week, then the session, on the right), then the graph, then the optional Extra strip -->
           <article class="blk blk--week" id="blkWeek" aria-labelledby="tWeek">
             <h2 class="sr-only" id="tWeek" data-i18n="card.week">Week</h2>
@@ -207,24 +200,12 @@
               </div>
               <!-- Under the days: the legend on the left, how the week is planned and when it resets on the right -->
               <div class="ghead">
-                <!-- The past weeks: a legend entry you click (one setting; past-weeks.js draws them in the chart, or in their own block
-                     below in a tall vertical window) -->
+                <!-- The past weeks: a legend entry you click (one setting; the chart draws them, past-weeks.js) -->
                 <button class="pwk" type="button" id="pastKey" aria-pressed="false"><span class="bx" aria-hidden="true"></span><i aria-hidden="true"></i><span id="pastKeyText"></span></button>
                 <div class="leg" id="paceLeg"></div>
                 <span class="plan" id="planSum"></span>
                 <span class="rs" id="wResets"></span>
               </div>
-            </div>
-            <!-- Only in the vertical window, and only when there is room left once the chart has its full height (past-weeks.js) -->
-            <div class="crt xblk hidden" id="todayHrs">
-              <div class="xh"><h3 class="tl" data-i18n="todayHrs.title">Today, by hour</h3><span class="mu" id="todayHrsReset"></span></div>
-              <div class="xplot"><svg id="todayHrsSvg" role="img"></svg></div>
-              <p class="xcap" data-i18n="todayHrs.caption">Bars: use per hour, % of the week. Bands: 5-hour sessions, % of their limit.</p>
-            </div>
-            <div class="crt xblk hidden" id="pastBlk">
-              <div class="xh"><h3 class="tl" id="pastTitle"></h3><span class="mu" id="pastBlkUsual"></span></div>
-              <div class="xplot"><svg id="pastSvg" role="img"></svg></div>
-              <div class="pends" id="pastEnds"></div>
             </div>
             <!-- Only there when Extra usage is set up: with nothing to show, the graph takes the space -->
             <div class="foot hidden" id="foot">
@@ -300,16 +281,6 @@
       <section class="view hidden" id="view-settings">
         <h1 class="sr-only" data-i18n="settings.title">Settings</h1>
         <div class="doc">
-          <nav class="toc" aria-label="Settings sections" data-i18n-aria="set.toc.aria">
-            <span class="toc-h" data-i18n="set.toc">Sections</span>
-            <button class="key toc-k on" type="button" data-target="setSources" aria-current="true"><b>01</b><span data-i18n="set.sec.sources">Sources</span></button>
-            <button class="key toc-k" type="button" data-target="setGoal"><b>02</b><span data-i18n="goal.title">Reserve</span></button>
-            <button class="key toc-k" type="button" data-target="setAlerts"><b>03</b><span data-i18n="alerts.title">Alerts</span></button>
-            <button class="key toc-k" type="button" data-target="setDisplay"><b>04</b><span data-i18n="set.sec.display">Display</span></button>
-            <button class="key toc-k" type="button" data-target="setSystem"><b>05</b><span data-i18n="system.title">System</span></button>
-            <button class="key toc-k" type="button" data-target="setData"><b>06</b><span data-i18n="data.title">Data</span></button>
-          </nav>
-
           <div class="cols">
             <div class="col">
               <!-- 01 Sources -->
@@ -801,7 +772,6 @@
   <script src="js/math-drawer.js"></script>
   <script src="js/help-calc.js"></script>
   <script src="js/help-tiles.js"></script>
-  <script src="js/toc.js"></script>
   <script src="js/type-in.js"></script>
   <script src="js/plan-menu.js"></script>
   <script src="js/overview.js"></script>

@@ -1,16 +1,14 @@
 /* Overview: one panel with the screens set into it. A narrow gutter of panel shows around and between them, with a
    screw in each corner, so the theme (light or dark panel) reads around the data.
-     keys          Type it in, Math (in the header from 1100px up, in the "..." menu below that)
+     keys          Type it in, Math (in the header from 1280px up, in the "..." menu below that)
      band          the verdict on the left (the face, the answer and the chips), and on the right the week (its % and bar with
                    today's mark, then a line on today with the pace LEDs at its end) over the session (used and time, with the
-                   reset line under them). Under 720px the three stack.
+                   reset line under them).
      graph         a header row (legend, plan, reset time), the pace chart with its % scale in a gutter on the left, the HRS strip
                    (when in the week the usage happened) and the seven day columns, all on one grid
      extra         a slim strip, only when Extra usage is set up
 
-   Two window formats, chosen by width:
-     720px or wider  the graph takes the height that is left.
-     Under 720px     vertical: the same pieces packed tighter. Scrolls only when the window is too short.
+   The window is 960x640 to 1920x1080 (main.js), so there is one format: the graph takes the height that is left.
 
    Sizes are in rem (see tokens.css), so a bigger window shows more information, not bigger text.
    Tiles are containers and decide how much to show by their own size. */
@@ -121,10 +119,10 @@
 .band .wk { gap: .5rem; }
 /* A column: the level ruler, then the face's screen with the answer and its why next to it, then the readout (a row
    each, with dotted leaders). fitBand() and fitChips() in verdict.js make each part give way on its own. The verdict
-   takes the band's height from the week and the session (contain: size, from 720px), so the readout never makes the
+   takes the band's height from the week and the session (contain: size), so the readout never makes the
    band taller: its last rows go instead. */
 .band .vl { flex-direction: column; align-items: stretch; justify-content: center; gap: .55rem; padding-top: .55rem; padding-bottom: .55rem; container-type: inline-size; container-name: vband; }
-@media (min-width: 720px) { .band .vl { contain: size; } }
+.band .vl { contain: size; }
 .band .vmain { flex: none; display: flex; align-items: center; gap: .8rem; min-width: 0; }
 .band .vtxt { flex: 1 1 auto; display: flex; flex-direction: column; align-items: flex-start; gap: .3rem; min-width: 0; container-type: inline-size; container-name: verdict; }
 .band .vtop { display: flex; align-items: center; justify-content: flex-start; gap: .2rem .9rem; min-width: 0; max-width: 100%; }
@@ -350,7 +348,7 @@ html[data-screens="paper"]:not([data-theme="dark"]) .pleds i.at { box-shadow: no
 .todaybox { position: absolute; top: 0; bottom: 0; z-index: 0; box-sizing: border-box; pointer-events: none; background: color-mix(in srgb, var(--crt-accent) 9%, transparent);
   left: calc(var(--gut) + (100% - var(--gut)) * var(--tl, 0) / var(--ax, 7)); width: calc((100% - var(--gut)) * var(--tw, 1) / var(--ax, 7)); }
 
-/* ---- Past weeks key (in the graph's footer) and the blocks of a tall vertical window (past-weeks.js) ---- */
+/* ---- Past weeks key (in the graph's footer, past-weeks.js) ---- */
 /* A legend entry you click: a box that ticks when on, the dashed swatch of the lines it draws, and its name */
 .ghead .pwk { flex: none; display: inline-flex; align-items: center; gap: .45rem; min-height: 2rem; margin-left: -.4rem; padding: 0 .5rem 0 .4rem; background: none; border: 1px solid transparent; border-radius: var(--r-sm); color: var(--sm); font: 500 var(--fs-xs)/1.3 var(--mono); white-space: nowrap; cursor: pointer; }
 .ghead .pwk .bx { width: .8rem; height: .8rem; border: 1px solid currentColor; display: grid; place-items: center; }
@@ -360,20 +358,6 @@ html[data-screens="paper"]:not([data-theme="dark"]) .pleds i.at { box-shadow: no
 .ghead .pwk:hover:not(:disabled) { border-color: var(--sline); }
 .ghead .pwk:disabled { opacity: .45; cursor: default; }
 .ghead .pwk:focus-visible { outline: 2px solid var(--crt-accent); outline-offset: -1px; }
-.xblk { flex: none; display: flex; flex-direction: column; justify-content: flex-start; gap: .3rem; min-height: 0; padding: .4rem .6rem .45rem; }
-.xblk.grow { flex: 1 1 auto; max-height: 19rem; } /* the plot grows up to its 13rem; past that the room stays under the block */
-.xh { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; min-width: 0; }
-.xh .mu { min-width: 0; font: 500 var(--fs-xs)/1.3 var(--mono); white-space: nowrap; }
-.xplot { position: relative; flex: none; height: 5.4rem; }
-#pastBlk .xplot { flex: 1 1 auto; height: auto; min-height: 6.5rem; max-height: 13rem; }
-.xplot svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.xplot text { font-family: var(--mono); font-size: var(--fs-xs); }
-.xcap { margin: 0; font: 400 var(--fs-xs)/1.4 var(--mono); color: var(--sm); }
-.pends { display: flex; flex-wrap: wrap; gap: .1rem .9rem; font: 500 var(--fs-xs)/1.4 var(--mono); color: var(--sm); }
-.pends b { font-weight: 600; color: var(--st); }
-.pends b.out { color: var(--pause); }
-.pends > span { white-space: nowrap; }
-.pends .pnow b { color: var(--c, var(--free)); }
 
 /* ---- Extra usage: a slim strip, only when it is set up ---- */
 .foot { flex: none; display: flex; }
@@ -382,12 +366,6 @@ html[data-screens="paper"]:not([data-theme="dark"]) .pleds i.at { box-shadow: no
 .xcell .sbar { width: 5rem; flex: none; }
 .xcell .sbar .fill { background: var(--crt-accent); }
 .xcell #xInfo { display: none; }
-
-/* ---- Tall: fixed summary line ---- */
-.sum {
-  display: none; position: sticky; top: 0; z-index: 5; align-items: center; gap: .8rem; padding: .45rem .8rem; flex: none;
-  background: var(--scr); color: var(--st); border-bottom: 2px solid var(--ink); font: 500 var(--fs-sm)/1.3 var(--mono); white-space: nowrap; overflow: hidden;
-}
 
 /* ---- Motion kit (render.js, face.js, session.js, ui.js). Each plays once, when something changes; only the scan beam
    loops, while a reading runs. Settings > Display > Motion: Subtle keeps what explains a change, Off keeps nothing
@@ -451,54 +429,7 @@ html[data-screens="paper"]:not([data-theme="dark"]) .pleds i.at { box-shadow: no
 
 /* =================== Layouts =================== */
 
-/* Vertical: under 720px. The band stacks (the verdict as a row, the week with its bar and today, then the session), the
-   chart keeps between 9 and 17rem (it does not stretch to the window's height), and the seven days are rows under the
-   hours instead of columns: name and date, the % with its shape and tag, the state, the budget bar, where the week
-   should stand. The chart names the days on its own axis (pace-chart.js), since the rows no longer sit under them.
-   The page scrolls when the window is too short.
-   Type it in and Math live in the "..." menu in the header (as in every window under 1100px). */
-@media (max-width: 719px) {
-  #view-panel, .dash { flex: 1 0 auto; }
-  .dash { --gut: 2.4rem; --well-pad: .3rem; --well-gap: .3rem; }
-  .band { grid-template-columns: minmax(0, 1fr); }
-  .band :is(.vl, .wk, .blk--session) { grid-column: 1; grid-row: auto; }
-  /* The verdict packs tighter: the face's screen with the answer and its why next to it, then two readout rows at most.
-     The ruler is left to screen readers: the face, the answer and their color already show the level. */
-  .band .vl { gap: .45rem; padding-top: .4rem; padding-bottom: .4rem; }
-  .band .vface { width: 7rem; }
-  .band .vface { min-height: 3rem; }
-  .band .fc { font-size: var(--fs-2xl); }
-  .band .vwhy { max-height: 1.35em; }
-  .chips { padding-top: .35rem; }
-  .chips > .chip:nth-child(n + 3) { display: none; }
-  .graph, .gbody { flex: none; }
-  /* About 36rem is everything else in the window: the chart takes what is left, between 9 and 17rem */
-  .gbody { grid-template-rows: clamp(9rem, 100vh - 36rem, 17rem) auto auto; }
-  .osc { min-height: 0; }
-  .ghead { flex-wrap: wrap; gap: .1rem .6rem; padding-left: .6rem; padding-right: .6rem; }
-  /* The days as rows. The column tiers further down (@container days) are for the columns: the rows undo them. */
-  .dg, .todaybox, .dend { display: none; }
-  .days { grid-column: 1 / -1; display: flex; flex-direction: column; width: auto; }
-  .days .day { flex-direction: row; align-items: center; gap: .6rem; min-height: 2rem; padding: .3rem .6rem; border-left: 0; border-top: 1px solid var(--crt-grid-day); }
-  .days .day:first-child { border-top: 0; }
-  .days .day:last-child { border-right: 0; }
-  .days .day.today { background: color-mix(in srgb, var(--crt-accent) 9%, transparent); box-shadow: inset 2px 0 0 var(--crt-accent); }
-  .days .day .nm { flex: 0 0 7.6rem; /* "26 de out." in pt-BR */ justify-content: flex-start; gap: .5rem; }
-  .days .day .pr { flex: 0 0 7rem; min-height: 0; }
-  /* A day ahead has no %: its state ("Heavy", "Off", or nothing on a plain Normal day) takes the % column, so the budgets line up */
-  .days .day.ahead .pr { display: none; }
-  .days .day .sx { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .days .day.ahead .sx { flex: 0 0 7rem; display: revert !important; }
-  .days .day .bg { flex: 1 1 auto; min-width: 0; margin-top: 0; flex-wrap: nowrap; }
-  .days .day .bg .sbar { flex-basis: auto; }
-  .days .day .wt { flex: none; margin-left: auto; }
-  .days .day .nm .dt, .days .day .pr .tg, .days .day .bg .bd, .days .day .sx { display: revert; } /* one class more than the column tiers, :lang(pt-BR) included */
-  .ghead .plan { display: none; } /* each day row has its tag */
-  .ghead .rs { margin-left: auto; }
-  .xcell { flex-wrap: wrap; row-gap: .2rem; } /* Extra usage: the credits go to a second line when the half is too narrow */
-}
-
-/* The "..." menu (under 1100px): holds Type it in and Math */
+/* The "..." menu (under 1280px): holds Type it in and Math */
 .hd { position: relative; }
 #moreBtn { min-width: 0; padding-inline: .6rem; }
 #moreBtn .ico circle { fill: currentColor; stroke: none; }
@@ -506,17 +437,16 @@ html[data-screens="paper"]:not([data-theme="dark"]) .pleds i.at { box-shadow: no
 .ovmenu .pl-keys { flex-direction: column; align-items: stretch; }
 .ovmenu .mb { justify-content: flex-start; }
 
-/* Short windows (a small window with a message strip open): the legend gives way so the chart keeps its height */
-@media (min-width: 720px) and (max-height: 640px) {
+/* Short windows (640px and under): the legend gives way so the chart keeps its height */
+@media (max-height: 640px) {
   .ghead .leg { display: none; }
   .osc { min-height: 4.5rem; }
   .hrs { height: 1.6rem; }
 }
-/* Very short windows (down to 480px, the smallest the window goes): every row above and under the chart gets tighter,
+/* Very short windows (down to 520px, the smallest the window goes): every row above and under the chart gets tighter,
    so the chart keeps about 7rem with a message strip open. The keys keep their 32px. */
-@media (min-width: 720px) and (max-height: 560px) {
+@media (max-height: 560px) {
   .dash { --well-pad: .35rem; --well-gap: .3rem; }
-  .band .vl { padding-top: .25rem; padding-bottom: .25rem; }
   .band .vface { min-height: 3rem; }
   .band .vl { gap: .35rem; padding-top: .3rem; padding-bottom: .3rem; }
   .band .wk { row-gap: .4rem; padding-top: .3rem; padding-bottom: .3rem; }

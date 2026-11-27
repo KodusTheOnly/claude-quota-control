@@ -1,7 +1,6 @@
 /* Settings and Help: numbered console sections on a board, like the Overview blocks.
-   From 720px up there is no side menu: every section is on screen, in 2 columns (720 and up) or 3 (1280 and up).
-   Sections never grow past 36rem, so on a huge window the board stays centered. Under 720px it is one column that scrolls,
-   and a row of contents keys stays under the header to jump between sections. */
+   Every section is on screen, in 2 columns, or 3 from 1280px. Sections never grow past 36rem, so on a huge window the
+   board stays centered. */
 
 #view-settings, #view-help { container: doc / inline-size; padding-top: .8rem; }
 
@@ -10,24 +9,12 @@
 .doc-body, .cols { width: 100%; max-width: 110rem; margin-inline: auto; }
 .cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: .8rem; align-items: start; min-width: 0; }
 .cols > .col { display: contents; } /* the sections flow into the board in order: 01, 02, 03 ... */
-/* From 720px the board is newspaper columns, not grid rows: a short section no longer leaves a hole beside a long one */
-@media (min-width: 720px) {
-  .doc > .toc { display: none; }
-  .cols { display: block; columns: 2; column-gap: .8rem; max-width: 72.8rem; }
-  .cols .blk { break-inside: avoid; margin-bottom: .8rem; }
-}
+/* The board is newspaper columns, not grid rows: a short section no longer leaves a hole beside a long one */
+.cols { display: block; columns: 2; column-gap: .8rem; max-width: 72.8rem; }
+.cols .blk { break-inside: avoid; margin-bottom: .8rem; }
 @media (min-width: 1280px) {
   .cols { columns: 3; max-width: 109.6rem; }
 }
-
-/* Contents keys */
-.toc { position: sticky; top: .6rem; display: flex; flex-direction: column; gap: .4rem; }
-.toc-h { padding: 0 .3rem .2rem; font: 600 var(--fs-xs)/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink2); }
-.toc-k { justify-content: flex-start; gap: .6rem; min-height: 2.4rem; font-weight: 500; text-align: left; }
-.toc-k b { padding: 0 var(--sp-2); background: var(--ink); color: var(--card); font-weight: 600; }
-.toc-k.on b { background: var(--win); color: var(--ink); }
-.toc-about { margin-top: .6rem; }
-.doc .blk { scroll-margin-top: .6rem; }
 
 /* Groups inside a section */
 .grp { display: flex; flex-direction: column; gap: .25rem; padding-top: var(--sp-3); border-top: 1px dotted var(--edge); }
@@ -123,8 +110,7 @@
 .lead { display: flex; gap: 1rem; align-items: flex-start; padding: .7rem 1rem; background: var(--card); border-top: 2px solid var(--ink); clip-path: polygon(.9rem 0, 100% 0, 100% 100%, 0 100%, 0 .9rem); }
 .plate2 { flex: none; margin-top: .2rem; padding: .15rem var(--sp-3); background: var(--ink); color: var(--card); font: 600 var(--fs-xs)/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
 .lead p { max-width: 60rem; font-size: var(--fs-lg); line-height: 1.45; }
-.help-tiles { display: grid; grid-template-columns: minmax(0, 1fr); gap: .8rem; }
-@media (min-width: 720px) { .help-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.help-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
 @media (min-width: 1280px) { .help-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .tile { align-items: stretch; gap: .4rem; min-height: 5.4rem; padding: .6rem .8rem; background: var(--card); border: 0; border-top: 2px solid var(--ink); font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
 .tile:hover { background-color: color-mix(in srgb, var(--mod) 80%, var(--card)); }
@@ -167,27 +153,3 @@
 .rules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem 1.6rem; align-items: start; margin: .4rem 0 0; padding: .2rem .3rem; }
 .help-about { margin-left: auto; align-self: center; }
 .hero-cta { display: flex; justify-content: flex-end; padding: .2rem .3rem 0; }
-
-/* Under 720px: one column, and the contents keys become a row that stays under the header */
-@media (max-width: 719px) {
-  #view-settings, #view-help { padding-top: 0; }
-  .doc, #view-help .doc { grid-template-columns: minmax(0, 1fr); gap: .7rem; }
-  .toc { flex-direction: row; flex-wrap: wrap; gap: var(--sp-2); margin: 0 -1rem; padding: .6rem 1rem; background: var(--win); border-bottom: 1px solid var(--edge); }
-  .toc-h { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .toc-k { min-height: 2.2rem; padding-inline: .6rem; }
-  .toc-about { margin-top: 0; }
-  .doc .blk { scroll-margin-top: .6rem; }
-  .rules { grid-template-columns: minmax(0, 1fr); }
-  /* The lead: the plate and About on one row, the text under them at full width (it was squeezed between the two) */
-  .lead { flex-wrap: wrap; gap: .5rem 1rem; }
-  .lead p { order: 3; flex-basis: 100%; }
-  .calc-table tbody th { width: 6.2rem; }
-  .calc-table th, .calc-table td { font-size: var(--fs-sm); }
-  .set.sub { margin-left: .6rem; }
-}
-
-/* In a tall vertical window the row of keys stays under the header; in a short one it would take too much of the screen */
-@media (max-width: 719px) and (min-height: 700px) {
-  .toc { position: sticky; top: 0; z-index: 4; }
-  .doc .blk { scroll-margin-top: 5.6rem; }
-}

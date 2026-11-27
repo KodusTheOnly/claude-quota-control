@@ -234,6 +234,10 @@ function isWebLink(url) {
   }
 }
 
+// The main window's size limits: never narrower than the full header, and no bigger than a 1080p screen
+const WIN_MIN = { width: 1100, height: 520 };
+const WIN_MAX = { width: 1920, height: 1080 };
+
 // The main window opens where it was left, kept on a screen that still exists
 let pendingMaximize = false;
 
@@ -241,8 +245,8 @@ function savedWinPlace() {
   const s = loadSettings().winBounds;
   if (!s || ![s.x, s.y, s.width, s.height].every(Number.isFinite)) return null;
   const wa = screen.getDisplayNearestPoint({ x: Math.round(s.x + s.width / 2), y: Math.round(s.y + 20) }).workArea;
-  const width = Math.min(Math.max(Math.round(s.width), 420), wa.width);
-  const height = Math.min(Math.max(Math.round(s.height), 480), wa.height);
+  const width = Math.min(Math.max(Math.round(s.width), WIN_MIN.width), WIN_MAX.width, wa.width);
+  const height = Math.min(Math.max(Math.round(s.height), WIN_MIN.height), WIN_MAX.height, wa.height);
   const x = Math.min(Math.max(Math.round(s.x), wa.x), wa.x + wa.width - width);
   const y = Math.min(Math.max(Math.round(s.y), wa.y), wa.y + wa.height - height);
   return { bounds: { x, y, width, height }, maximized: s.maximized === true };
@@ -272,8 +276,10 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1100,
     height: 780,
-    minWidth: 420,
-    minHeight: 480,
+    minWidth: WIN_MIN.width,
+    minHeight: WIN_MIN.height,
+    maxWidth: WIN_MAX.width,
+    maxHeight: WIN_MAX.height,
     useContentSize: true,
     show: false,
     title: i18n.t("app.name"),

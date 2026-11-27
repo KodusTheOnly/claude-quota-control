@@ -22,7 +22,7 @@ function checkPage({ format, scrolls: formatScrolls, view = "panel" }) {
   const scope = [overview, ...dialogs, ...notices];
   const inScope = (e) => scope.some((s) => s.contains(e));
 
-  // 1. The page itself never moves; wide and medium windows never scroll at all
+  // 1. The page itself never moves, and the Overview never scrolls
   const content = document.querySelector(".content");
   const root = document.documentElement;
   if (root.scrollWidth > innerWidth + 1) problems.push(`page scrolls sideways (${root.scrollWidth} > ${innerWidth})`);
@@ -158,14 +158,9 @@ function checkPage({ format, scrolls: formatScrolls, view = "panel" }) {
   const dayCards = [...document.querySelectorAll(".day")];
   if (!firstRun && view === "panel" && (dayCards.length !== 7 || !dayCards.every(visible))) problems.push("the seven days are not all visible");
 
-  // Settings and Help: every contents key leads to a section that is there, and the parts of the screen never overlap
+  // Settings and Help: the parts of the screen never overlap
   if (view !== "panel") {
-    for (const k of document.querySelectorAll(`#view-${view} .toc-k[data-target]`)) {
-      if (!visible(k)) continue; // from 720px up the contents keys are gone: every section is on screen
-      const target = document.getElementById(k.dataset.target);
-      if (!target || !visible(target)) problems.push(`contents key ${k.dataset.target} has no visible section`);
-    }
-    const parts = [...document.querySelectorAll(`#view-${view} .toc, #view-${view} .lead, #view-${view} .blk`)].filter(visible);
+    const parts = [...document.querySelectorAll(`#view-${view} .lead, #view-${view} .blk`)].filter(visible);
     for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) if (overlap(parts[i], parts[j])) problems.push(`parts overlap: ${describe(parts[i])} and ${describe(parts[j])}`);
     const extent = [...parts].reduce((m, e) => Math.max(m, e.getBoundingClientRect().right), 0);
     if (extent > innerWidth + 1) problems.push(`a section is wider than the window (${Math.round(extent)} > ${innerWidth})`);
@@ -241,7 +236,7 @@ function checkPage({ format, scrolls: formatScrolls, view = "panel" }) {
   }
 
   // 6b. Nothing in the header may sit on top of the brand or another header item (a long status text pushed into the brand once)
-  // The brand's icon and name count on their own: the name can spill out of the brand's box (it did at 420px with Connect)
+  // The brand's icon and name count on their own: the name can spill out of the brand's box
   const headItems = [...document.querySelectorAll(".hd .brand, .hd .brand > *, .hd .sync > *")].filter(visible);
   for (let i = 0; i < headItems.length; i++) for (let j = i + 1; j < headItems.length; j++) {
     if (headItems[i].contains(headItems[j]) || headItems[j].contains(headItems[i])) continue;

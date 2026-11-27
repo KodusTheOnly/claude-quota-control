@@ -36,10 +36,8 @@ function drawPaceChart() {
   // start where the gutter ends, so the chart lines up with them. No margin on the right.
   const L = Math.max($("hcells").getBoundingClientRect().left - box.getBoundingClientRect().left, 0);
   const R = 0;
-  // In the vertical window the days are rows, not columns under the chart, so the chart names them on its own axis
-  const dayAxis = matchMedia("(max-width: 719px)").matches;
   const T = 0.75 * rem;
-  const B = dayAxis ? 1.35 * rem : 0.25 * rem;
+  const B = 0.25 * rem;
   // x is in days from the midnight that starts the first day. The axis runs from a0 (the reset, or 08:00 of the first day
   // when the reset is later: chartAxisStart) to the next reset: a narrower first column, six whole days, then the week's
   // last hours up to the reset (another narrow column). Hours before the reset that are on the axis are shaded.
@@ -107,14 +105,6 @@ function drawPaceChart() {
     if (i > A0 + 0.02) add("line", { x1: X(i), x2: X(i), y1: T, y2: H - B, stroke: PAL.gridDay });
   }
   if (AX > DAYS_SHOWN + 0.02) add("line", { x1: X(DAYS_SHOWN), x2: X(DAYS_SHOWN), y1: T, y2: H - B, stroke: PAL.gridDay });
-  if (dayAxis) {
-    for (let i = 0; i < DAYS_SHOWN; i++) {
-      const d = m.week[i];
-      const x0 = Math.max(i, A0);
-      if (!d || i + 1 - x0 < 0.3) continue; // a sliver of a first day has no room for its name
-      text((X(x0) + X(i + 1)) / 2, H - 0.3 * rem, shortWeekday(new Date(d.ms)), { "text-anchor": "middle", "font-weight": "600", fill: d.isToday ? accent : PAL.muted });
-    }
-  }
   // Outside the active hours (Settings > Plan) the plan stands still: those hours are shaded lightly
   for (const r of s.rest) add("rect", { x: X(r.x0), y: T, width: Math.max(X(r.x1) - X(r.x0), 0), height: H - T - B, fill: PAL.shade, opacity: ".5" });
   // The future is dimmed a little, so what already happened reads first
@@ -129,7 +119,7 @@ function drawPaceChart() {
   if (limitLine) add("line", { x1: tx0, x2: tx1, y1: Y(limit), y2: Y(limit), stroke: PAL.white, opacity: ".7", "stroke-width": 1.25, "stroke-dasharray": "4 3", class: "tdlim" });
 
   // The past weeks (the "4 wk" key, past-weeks.js), faint and dashed under every line of this week
-  const past = pastInChart() ? pastData : [];
+  const past = pastOn() ? pastData : [];
   for (const w of past) add("polyline", { points: fmt(w.pts), fill: "none", stroke: w.fullDay ? PAL.red : PAL.muted, opacity: w.fullDay ? ".8" : ".75", "stroke-width": 1.5, "stroke-dasharray": "5 3" });
 
   // The likely range at the reset: a faint fan from now, under every line of this week

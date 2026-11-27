@@ -1,7 +1,7 @@
 /* App shell: the frame, the header, the strips under it and the floating toast. */
 
 .app { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
-/* Only .content scrolls. The Overview in the wide and medium window formats never needs it. */
+/* Only .content scrolls. The Overview never needs it. */
 .content { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
 .content::-webkit-scrollbar { width: 12px; }
 .content::-webkit-scrollbar-thumb { background: var(--edge); border: 3px solid var(--win); }
@@ -11,7 +11,7 @@
 
 /* Header: brand, tabs, status lamp, time of the last reading, Refresh.
    The window buttons (minimize, maximize, close) are native and sit in the top-right corner, so the
-   header leaves --ctl of room there. In the vertical format it becomes two rows. */
+   header leaves --ctl of room there. */
 .hd {
   display: grid; align-items: center; column-gap: .8rem; min-height: 2.5rem; padding: 0 max(.8rem, var(--ctl)) 0 1rem;
   grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "brand sep keys sync";
@@ -70,44 +70,6 @@ button.lamp:focus-visible { outline: 2px solid var(--fc); outline-offset: 2px; }
 #connectBtn .short { display: none; }
 .rule { flex: none; height: .5rem; margin: .1rem 0 0; background: repeating-linear-gradient(0deg, var(--cobalt) 0 2px, transparent 2px 4px); }
 
-/* From 1100px the Overview's two keys (Type it in, Math) join the header, so the right side needs room the tabs
-   would otherwise lose (they slid under it, measured: up to 104px in Portuguese at 1100px). Under 1200px the time of
-   the reading gives way to the lamp; under 1280px the account key says only "Connect", as it does under 860px. */
-@media (max-width: 1199px) { .rd { display: none; } }
-@media (min-width: 1100px) and (max-width: 1279px) {
-  #connectBtn .long { display: none; }
-  #connectBtn .short { display: inline; }
-}
-
-/* Medium window under 1000px: the brand shrinks to its icon and Refresh to an icon, so one row still fits
-   (from 860 to 999px the tabs used to slide under the right side, measured: up to 127px in Portuguese) */
-@media (min-width: 720px) and (max-width: 999px) {
-  .brand-name, #syncLabel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .keys .key { padding-inline: .6rem; }
-  #syncBtn { min-width: 0; padding-inline: .6rem; }
-  #connectBtn .long { display: none; }
-  #connectBtn .short { display: inline; }
-}
-
-/* Vertical format: row 1 holds the brand, the lamp and Refresh (as an icon); row 2 holds the tabs */
-@media (max-width: 719px) {
-  .hd { grid-template-columns: minmax(1.4rem, 1fr) auto; grid-template-areas: "brand sync" "keys keys"; row-gap: .15rem; padding-top: .3rem; padding-bottom: .35rem; }
-  .sepv, .rd { display: none; }
-  .sync { min-height: 2.15rem; gap: .5rem; }
-  /* Row 1 is short at 420px (measured: up to 51px over with Connect and "Desatualizado"). What gives way, in order:
-     the brand's name (it wraps onto a second line that is cut off, so the icon stays), then the lamp's word
-     (cut with an ellipsis; the full word is its title). The keys keep their size. */
-  .brand { min-width: 0; height: 1.25rem; flex-wrap: wrap; align-content: flex-start; row-gap: 1rem; overflow: hidden; }
-  .sync > .key { flex: none; }
-  .lamp { min-width: 0; flex: 0 1 auto; padding-inline: .45em .4em; }
-  #lampText { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .keys { margin-right: calc(max(.8rem, var(--ctl)) * -1 + .8rem); }
-  .keys .key { flex: 1 1 auto; padding-inline: .5rem; }
-  #syncBtn { min-width: 0; padding-inline: .6rem; }
-  #syncLabel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  #connectBtn .long { display: none; }
-  #connectBtn .short { display: inline; }
-}
 
 /* Strips under the header: data-state message and the "week reset" notice */
 .prog { flex: none; position: relative; height: 4px; background: var(--mod); overflow: hidden; margin-top: .1rem; }
