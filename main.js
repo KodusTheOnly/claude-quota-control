@@ -235,8 +235,8 @@ function isWebLink(url) {
   }
 }
 
-// The main window's size limits: never narrower than the full header, and no bigger than a 1080p screen
-const WIN_MIN = { width: 1100, height: 520 };
+// The main window's size limits: narrow enough to fit a 1080p screen turned on its side, and no bigger than a 1080p screen
+const WIN_MIN = { width: 1040, height: 520 };
 const WIN_MAX = { width: 1920, height: 1080 };
 
 // The main window opens where it was left, kept on a screen that still exists

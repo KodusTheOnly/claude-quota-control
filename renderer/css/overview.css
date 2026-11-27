@@ -8,7 +8,7 @@
                    (when in the week the usage happened) and the seven day columns, all on one grid
      extra         a slim strip, only when Extra usage is set up
 
-   The window is 1100x520 to 1920x1080 (main.js). The graph always takes the height that is left; only the header
+   The window is 1040x520 to 1920x1080 (main.js). The graph always takes the height that is left; only the header
    changes with the width (the keys above).
 
    Sizes are in rem (see tokens.css), so a bigger window shows more information, not bigger text.
