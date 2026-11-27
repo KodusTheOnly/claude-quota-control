@@ -30,10 +30,9 @@ function buildDays() {
     nm.append(nameB, date);
     const pr = node("span", "pr");
     const num = node("span", "nu");
-    const tag = node("i", "tg");
     const lv = node("span", "lv lv-none");
     lv.append(node("span", "shp"), node("span", "lvn"));
-    pr.append(num, lv, tag);
+    pr.append(num, lv);
     const sx = node("span", "sx");
     const bg = node("span", "bg");
     const bar = node("span", "sbar");
@@ -49,7 +48,7 @@ function buildDays() {
       if (lastM && lastM.week[i].when !== "past") openPlanMenu(i, b);
     });
     box.appendChild(b);
-    DAYS.push({ b, nameB, date, num, tag, lv, sx, bg, bar, bud, wt });
+    DAYS.push({ b, nameB, date, num, lv, pr, sx, bg, bar, bud, wt });
   }
 }
 
@@ -208,8 +207,8 @@ function renderWeek(m) {
     r.nameB.textContent = nm;
     r.date.textContent = ahead ? dayNum : date; // the month is already on the days before it
     // The reset is the chart's left edge now, so the first day needs no tag for it (its title and label still say it)
-    r.tag.textContent = d.isToday ? t("day.today") : "";
-    r.tag.classList.toggle("hidden", !r.tag.textContent);
+    // Today has no tag (the column is lit from the chart down); its budget sits on the % line instead of under the bar
+    (d.isToday ? r.pr : r.bg).append(r.bud);
     // Today off: no ratio, so the number is what was used (a share of the week); other days off keep the dash
     const onReserve = d.isToday && m.reserveMode; // today on the reserve: what was used, as on an Off day
     const shownNum = known ? `${r0(d.ratio * 100)}%` : (d.kind === "off" || onReserve) && d.isToday ? offDayNumber(d.spent) : "–";

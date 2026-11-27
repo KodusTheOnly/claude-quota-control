@@ -353,21 +353,19 @@ html[data-screens="paper"]:not([data-theme="dark"]) .pleds i.at { box-shadow: no
   text-align: left; font: inherit; color: var(--st); background: transparent; border: 0; border-left: 1px solid var(--crt-grid-day); border-radius: 0; cursor: pointer;
 }
 .day:first-child { border-left: 0; container: day0 / inline-size; }
-/* The first column starts at the reset, so it can be narrow: there the date, then the tag ("Today") give way to the %
+/* The first column starts at the reset, so it can be narrow: there the date, then today's budget give way to the %
    (both stay in the button's title), and in the narrowest window the % gets smaller */
 @container day0 (max-width: 9rem) { .day .dt { display: none; } }
-@container day0 (max-width: 7.5rem) { .day .tg { display: none; } }
+@container day0 (max-width: 7.5rem) { .day .pr .bd { display: none; } }
 @container day0 (max-width: 3.5rem) { .days .day .nu { font-size: var(--fs-xs); } }
 .day .nm { display: flex; justify-content: space-between; align-items: baseline; gap: .4rem; min-width: 0; font: 600 var(--fs-xs)/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
 .day .nm b { font-weight: 600; }
 .day .dt { font-style: normal; font-weight: 400; letter-spacing: .02em; color: var(--sm); }
 .day .pr { display: flex; align-items: center; gap: .4rem; min-height: 1.5rem; }
-.day .pr .tg { margin-left: auto; }
+.day .pr .bd { margin-left: auto; }
 .day .nu { font: 500 var(--fs-lg)/1.2 var(--mono); white-space: nowrap; }
 .day.live .nu { color: var(--c); }
 .day.idle .nu { color: var(--sm); }
-.day .tg { padding: 0 .35rem; background: var(--sline); color: var(--st); font: 600 var(--fs-xs)/1.4 var(--mono); font-style: normal; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
-.day.today .tg { background: var(--crt-accent); color: var(--scr); }
 .day .lv { font-size: var(--fs-xs); }
 .day .lvn { display: none; } /* the shape is enough: the name is in the button's title */
 /* The state of a day without a reading ("No data", "Sem dados", a plan name) breaks at its space in a narrow column (it was cut at 600px in pt-BR) */
@@ -506,12 +504,11 @@ html[data-screens="paper"]:not([data-theme="dark"]) .pleds i.at { box-shadow: no
    The week: the band and the day columns give up their extras as they get narrow. A column needs about 110px for the
    tag and the level word, 100px for the date. The columns measure the row of days (the "days" container), which
    leaves room after the seventh day for the week's last hours, so its width changes with the time of the reset. */
-/* Cut order, widest first: the word "budget", then the tag (and the budget moves under the bar), then the date and the
-   legend, then the budget and the state word. */
+/* Cut order, widest first: the word "budget", then the budget moves under the bar, then the date and the legend, then
+   the budget and the state word. */
 .days { container: days / inline-size; }
 @container days (max-width: 73.25rem) { .day .bdw, .day .wtw { display: none; } }
 @container days (max-width: 49.25rem) {
-  .day .tg { display: none; }
   .day .bg { flex-wrap: wrap; row-gap: .15rem; }
   .day .bg .sbar { flex-basis: 100%; }
 }
