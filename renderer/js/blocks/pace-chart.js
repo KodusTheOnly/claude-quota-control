@@ -47,6 +47,8 @@ function drawPaceChart() {
   const AX = Math.max(s.span, A0 + 1);
   const X = (x) => L + ((Math.min(Math.max(x, A0), AX) - A0) / (AX - A0)) * (W - L - R);
   const Y = (v) => T + (1 - Math.min(Math.max(v, 0), 100) / 100) * (H - T - B);
+  // A short chart (a short window): the marks that sit on the lines get smaller and lighter, so the lines stay readable
+  const short = H - T - B < 9 * rem;
   const accent = cssVar("--crt-accent") || CHART_NOW;
   // The week's color: its level, or the accent on the last day with room to spend (the risk then is leaving it unused)
   const color = m.endRoom ? accent : cssVar(`--${["free", "moderate", "tight", "pause"][m.lv.week ?? 0]}`);
@@ -145,7 +147,7 @@ function drawPaceChart() {
         if (r < 0.04 + 0.5 * Math.sin(Math.PI * u) ** 1.4) shades[gapNoise(j, i) < 0.5 ? 0 : 1] += `M${x.toFixed(1)} ${y}h1.6v1.6h-1.6z`;
       }
     }
-    shades.forEach((d, k) => d && add("path", { d, fill: accent, opacity: k ? ".45" : ".25" }));
+    shades.forEach((d, k) => d && add("path", { d, fill: accent, opacity: short ? (k ? ".3" : ".15") : k ? ".45" : ".25" }));
     // The whole stretch says what it is on hover
     const hit = add("rect", { x: x0, y: T, width: x1 - x0, height: H - T - B, fill: "transparent" });
     el("title", {}, hit).textContent = t("chart.gapTip", { dur: fmtDur(g.to - g.from), from: gapWhen(g.from, m.now), to: gapWhen(g.to, m.now), pct: fmtNum(g.y1 - g.y0, 0, 1) });
@@ -304,10 +306,11 @@ function drawPaceChart() {
   for (const l of sLocks) {
     const current = l.until > m.now;
     const at = l === lockNow ? { x: nx, y: ny } : { x: X(l.x), y: Y(l.y) };
-    const g = lockIcon(at.x, at.y, (current ? 0.6 : 0.5) * rem, { hollow: !l.exact, extra: extraOn, red: PAL.red, amber: lockColor, ink: cssVar("--scr") || "#0A0F0C" });
+    const r = (current ? 0.6 : 0.5) * (short ? 0.8 : 1) * rem;
+    const g = lockIcon(at.x, at.y, r, { hollow: !l.exact, extra: extraOn, red: PAL.red, amber: lockColor, ink: cssVar("--scr") || "#0A0F0C" });
     svg.appendChild(g);
     el("title", {}, g).textContent = lockTip(l, extraOn, m.now);
-    lockSpots.push({ ...at, r: (current ? 0.6 : 0.5) * rem });
+    lockSpots.push({ ...at, r });
   }
 
   // The labels: "NOW", the room left, "out" when the limit is already reached, and the names of the lines.
