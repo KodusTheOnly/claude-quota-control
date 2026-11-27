@@ -285,7 +285,7 @@ $("uninstallBtn").addEventListener("click", async () => {
 function syncNotifyGroup() {
   const on = $("notifyAll").checked;
   // The two selects only matter for notifications too: with them off, nothing they set is ever shown
-  for (const id of ["notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "fiveHourThreshold", "remindEvery"]) {
+  for (const id of ["notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "notifyNoReading", "fiveHourThreshold", "remindEvery"]) {
     $(id).disabled = !on;
     $(id).closest(".set").classList.toggle("is-disabled", !on);
   }
@@ -377,6 +377,7 @@ function bindSettings() {
   $("notifyResets").checked = s.notifyResets !== false;
   $("notifySpikes").checked = s.notifySpikes !== false;
   $("notifyExtra").checked = s.notifyExtra !== false;
+  $("notifyNoReading").checked = s.notifyNoReading !== false;
   $("showExtra").checked = s.showExtra !== false;
   $("miniWindow").checked = Boolean(s.miniWindow);
   $("openAtLogin").checked = s.openAtLogin;
@@ -406,6 +407,7 @@ $("showExtra").addEventListener("change", (e) => saveSetting({ showExtra: e.targ
 $("miniWindow").addEventListener("change", (e) => saveSetting({ miniWindow: e.target.checked }));
 $("notifySpikes").addEventListener("change", (e) => saveSetting({ notifySpikes: e.target.checked }));
 $("notifyExtra").addEventListener("change", (e) => saveSetting({ notifyExtra: e.target.checked }));
+$("notifyNoReading").addEventListener("change", (e) => saveSetting({ notifyNoReading: e.target.checked }));
 
 $("openAtLogin").addEventListener("change", (e) => saveSetting({ openAtLogin: e.target.checked }));
 $("codeLogs").addEventListener("change", (e) => saveSetting({ codeLogs: e.target.checked }));

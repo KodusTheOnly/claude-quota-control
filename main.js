@@ -13,7 +13,7 @@ const claude = require("./claude-sync");
 const { readActivity } = require("./claude-activity");
 const i18n = require("./renderer/i18n.js");
 const { setupUpdates } = require("./updater");
-const { createRefreshPolicy, normalizeAccelerator, timerVerdict, MIN_GAP, AUTO_READ_CHOICES, autoReadEvery, autoReadDelay, autoReadSkip, inActiveHours, sessionLockedUntil } = require("./refresh-policy");
+const { createRefreshPolicy, normalizeAccelerator, timerVerdict, MIN_GAP, AUTO_READ_CHOICES, autoReadEvery, autoReadDelay, autoReadSkip, inActiveHours, sessionLockedUntil, noReadingReminderDue, NO_READING_CHECK } = require("./refresh-policy");
 
 const SLUG = "claude-quota-control";
 const BACKUP_SUFFIX = ".quota-control-backup";
@@ -39,6 +39,7 @@ const DEFAULT_SETTINGS = {
   fiveHourThreshold: 75,
   remindEvery: "smart",
   notifyResets: true,
+  notifyNoReading: true, // a reminder when Claude Code was used long after the last reading (refresh-policy.js)
   shortcutOn: false,
   shortcutKeys: "Ctrl+Alt+R",
   claudeConnected: false,
@@ -945,7 +946,7 @@ handle("app-info", () => ({ version: app.getVersion(), electron: process.version
 
 const BACKUP_KEYS = [
   "manual", "readings", "sessions", "weights", "activeHours", "extra",
-  "language", "theme", "screens", "motion", "notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "fiveHourThreshold", "remindEvery",
+  "language", "theme", "screens", "motion", "notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "notifyNoReading", "fiveHourThreshold", "remindEvery",
   "showExtra", "miniWindow", "codeLogs", "shortcutOn", "shortcutKeys", "reserve", "reserveRelease", "pastWeeks", "autoWeights",
 ];
 // Active hours (Settings > Plan): whole hours 0-23, start and end different, or null for the whole day.
@@ -954,7 +955,7 @@ function cleanActiveHours(a) {
   const isHour = (h) => Number.isInteger(h) && h >= 0 && h <= 23;
   return a && isHour(a.start) && isHour(a.end) && a.start !== a.end ? { start: a.start, end: a.end } : null;
 }
-const BOOLEAN_KEYS = ["notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "showExtra", "miniWindow", "codeLogs", "shortcutOn", "pastWeeks", "autoWeights"];
+const BOOLEAN_KEYS = ["notifyAll", "notifyLevel", "notifyResets", "notifySpikes", "notifyExtra", "notifyNoReading", "showExtra", "miniWindow", "codeLogs", "shortcutOn", "pastWeeks", "autoWeights"];
 const THRESHOLDS = [60, 70, 75, 80, 85]; // the choices in Settings
 const REMIND_HOURS = [0, 2, 4, 8];
 const RESERVE_CHOICES = [0, 5, 10, 15, 20]; // the choices in Settings, Reserve
@@ -1317,6 +1318,38 @@ function showNotification(title, body, onClick) {
   n.show();
 }
 
+// The app was forgotten: Claude Code was used after the last reading, and that was a while ago. A notification once per
+// gap offers to read now, so the chart knows when the use happened. Looks at the local logs only (timestamps), never at
+// Claude. Checked every NO_READING_CHECK while the app runs; nothing happens while the timer reads by itself.
+const noReadingCache = new Map(); // its own: the strip asks with another start, which would empty a shared one
+async function checkNoReading() {
+  const s = loadSettings();
+  const now = Date.now();
+  const last = (s.readings || [])[(s.readings || []).length - 1];
+  const lastAt = Math.max(last ? last.to || last.at : 0, (s.manual && s.manual.updatedAt) || 0) || null;
+  const base = { now, lastAt, autoEvery: autoReadEvery(s), settings: s };
+  if (!noReadingReminderDue({ ...base, usedSince: true }) || !Notification.isSupported()) return;
+  const key = `noread:${lastAt}`;
+  if (s.notified && s.notified[key]) return;
+  let usedSince = false;
+  try {
+    const hours = await readActivity({ dir: path.join(CLAUDE_DIR, "projects"), sinceMs: lastAt, cache: noReadingCache });
+    usedSince = [...hours.values()].some((v) => v > 0);
+  } catch {
+    return;
+  }
+  if (!noReadingReminderDue({ ...base, usedSince })) return;
+  saveSettings({ ...loadSettings(), notified: { ...(loadSettings().notified || {}), [key]: now } });
+  const d = new Date(lastAt);
+  const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const sameDay = new Date(now).toDateString() === d.toDateString();
+  const when = sameDay ? time : `${d.toLocaleDateString(i18n.locale(), { weekday: "short" }).replace(/.$/, "")} ${time}`;
+  showNotification(i18n.t("note.noReading.title", { when }), i18n.t("note.noReading.body"), () => {
+    showWindow();
+    requestSync("notification");
+  });
+}
+
 // Plain notice with no repeat control (the result of a user action)
 on("toast", (_e, { title, body } = {}) => {
   if (!Notification.isSupported() || loadSettings().notifyAll === false) return;
@@ -1367,6 +1400,7 @@ if (!app.requestSingleInstanceLock()) {
     watchData();
     applyShortcut();
     applyAutoRead();
+    setInterval(() => checkNoReading().catch(() => {}), NO_READING_CHECK).unref(); // never what keeps the app alive
     if (loadSettings().miniWindow) startStrip();
     setupUpdates({
       handle,

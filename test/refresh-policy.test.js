@@ -165,3 +165,18 @@ test("the main process and the window agree on when extra usage covers the limit
   const cases = [null, {}, { balance: 5 }, { balance: 0 }, { limit: 10, spent: 3 }, { limit: 10, spent: 10 }, { limit: 0, spent: 0 }, { balance: null, limit: 10, spent: null }];
   for (const e of cases) assert.equal(extraCoversLimit(e), sandbox.extraCoversLimit(e), JSON.stringify(e));
 });
+
+test("the no-reading reminder: Claude Code used since a reading at least 2 hours old, timer off, notifications on", () => {
+  const { noReadingReminderDue, NO_READING_AFTER } = require("../refresh-policy");
+  const now = 10 * NO_READING_AFTER;
+  const base = { now, lastAt: now - NO_READING_AFTER, usedSince: true, autoEvery: 0, settings: {} };
+  assert.equal(noReadingReminderDue(base), true);
+  assert.equal(noReadingReminderDue({ ...base, lastAt: now - NO_READING_AFTER + 1 }), false); // not 2 hours yet
+  assert.equal(noReadingReminderDue({ ...base, usedSince: false }), false); // nothing used since
+  assert.equal(noReadingReminderDue({ ...base, autoEvery: 5 }), false); // the timer reads by itself
+  assert.equal(noReadingReminderDue({ ...base, settings: { notifyAll: false } }), false);
+  assert.equal(noReadingReminderDue({ ...base, settings: { notifyNoReading: false } }), false);
+  assert.equal(noReadingReminderDue({ ...base, settings: { codeLogs: false } }), false);
+  assert.equal(noReadingReminderDue({ ...base, settings: { claudeConnected: false } }), false);
+  assert.equal(noReadingReminderDue({ ...base, lastAt: null }), false); // never read: nothing to remind of
+});

@@ -50,6 +50,18 @@ function sessionLockedUntil({ fiveHour, extra } = {}, now = Date.now()) {
   return fiveHour.resetsAt + LOCK_RESUME_AFTER;
 }
 
+// A reminder when the app was forgotten: Claude Code has been used since the last reading and that reading is at least
+// NO_READING_AFTER old. Never while the timer reads by itself, and never without the local logs (codeLogs) or with
+// notifications off. It only looks at the local logs: nothing here reads Claude. Once per gap (keyed by lastAt).
+const NO_READING_AFTER = 2 * 60 * 60 * 1000;
+const NO_READING_CHECK = 15 * 60 * 1000; // how often main.js looks
+function noReadingReminderDue({ now, lastAt, usedSince, autoEvery, settings = {} }) {
+  if (!Number.isFinite(lastAt) || now - lastAt < NO_READING_AFTER) return false;
+  if (autoEvery || settings.notifyAll === false || settings.notifyNoReading === false || settings.codeLogs === false) return false;
+  if (settings.claudeConnected === false) return false;
+  return Boolean(usedSince);
+}
+
 // Inside the active hours { start, end } (whole hours, the window may cross midnight), or always when there are none.
 // Same rule as activeSpans() in renderer/js/core.js.
 function inActiveHours(date, a) {
@@ -128,4 +140,4 @@ function normalizeAccelerator(input) {
   return ["Ctrl", "Alt", "Shift"].filter((m) => mods.has(m)).concat(key).join("+");
 }
 
-module.exports = { MIN_GAP, FOCUS_GAP, TIMER_EVERY, TIMER_MAX_FAILS, timerVerdict, AUTO_READ_CHOICES, SMART_MIN, autoReadEvery, autoReadDelay, autoReadSkip, inActiveHours, LOCK_RESUME_AFTER, extraCoversLimit, sessionLockedUntil, MANUAL_REASONS, AUTO_REASONS, decide, createRefreshPolicy, normalizeAccelerator };
+module.exports = { MIN_GAP, FOCUS_GAP, TIMER_EVERY, TIMER_MAX_FAILS, timerVerdict, AUTO_READ_CHOICES, SMART_MIN, autoReadEvery, autoReadDelay, autoReadSkip, inActiveHours, LOCK_RESUME_AFTER, extraCoversLimit, sessionLockedUntil, NO_READING_AFTER, NO_READING_CHECK, noReadingReminderDue, MANUAL_REASONS, AUTO_REASONS, decide, createRefreshPolicy, normalizeAccelerator };
