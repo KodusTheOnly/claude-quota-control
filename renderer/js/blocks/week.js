@@ -154,7 +154,13 @@ function renderWeek(m) {
   const weekColor = m.endRoom ? cssVar("--crt-accent") : cssVar(`--${["free", "moderate", "tight", "pause"][m.lv.week ?? 0]}`);
   const legMuted = cssVar("--sm") || CHART_MUTED;
   const legRed = cssVar("--pause") || CHART_RED;
+  const lockLeg = (s.sessionLocks || []).length
+    ? extraCoversLimit(state.settings.extra)
+      ? [["chart.legLimitExtra", cssVar("--moderate"), "dot"]]
+      : [["chart.legLimit", legRed, "dot"], ["chart.legLocked", legRed, "hatch"]]
+    : [];
   const legend = [
+    ...lockLeg,
     ...(s.over.length ? [["chart.legOver", legRed, ""]] : []),
     ...(s.used.some((p) => p.est) ? [["chart.legEst", weekColor, "dotted"]] : []),
     ...(s.band ? [["chart.legRange", weekColor, "range"]] : []),
@@ -170,6 +176,8 @@ function renderWeek(m) {
       if (style === "tick") Object.assign(line.style, { width: "0", height: "1em", borderTop: "0", borderLeft: `2px solid ${legMuted}`, marginRight: ".7em" }); // a short vertical tick, as on the chart
       else if (style === "range") Object.assign(line.style, { borderTopWidth: "7px", opacity: ".35" }); // the fan's fill
       else if (style === "active") Object.assign(line.style, { borderTopWidth: "3px", opacity: ".75" }); // the bar under the HRS strip
+      else if (style === "dot") Object.assign(line.style, { width: ".8em", height: ".8em", borderTop: "0", borderRadius: "50%", background: color }); // the padlock's circle
+      else if (style === "hatch") Object.assign(line.style, { height: ".8em", borderTop: "0", background: `repeating-linear-gradient(45deg, ${color} 0 2px, transparent 2px 5px)`, opacity: ".75" }); // the locked band
       else if (style) line.style.borderTopStyle = style;
       item.append(line, t(key));
       return item;

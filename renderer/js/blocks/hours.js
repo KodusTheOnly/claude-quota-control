@@ -72,6 +72,10 @@ function drawHours() {
   // Each hour takes the color of its day's level, as the day's card under it (Free when the day is not rated)
   const dayLevel = new Map((m.week || []).map((d) => [dayKey(d.ms), d.level]));
   const nowBlock = hourBlockStart(m.now, step);
+  // The hours a 5-hour limit kept you out of (red hatch, as the chart's band), the rest of the current lock included.
+  // With extra usage on nothing stopped you, so none.
+  const locks = extraCoversLimit(state.settings.extra) ? [] : sessionLocks(state.settings.readings, weekStart, m.now);
+  const lockedAt = (mid) => locks.some((l) => mid > l.at && mid < l.until);
 
   box.replaceChildren(
     ...blocks.map((b) => {
@@ -87,7 +91,10 @@ function drawHours() {
       // The day is the column right under it, so the tip only gives the hour: "14:00 · 2%"
       const when = fmtTime(b.t0);
       const shown = b.v >= 0.05 ? Math.round(b.v * 10) / 10 : 0;
-      if (shown > 0) {
+      if (lockedAt((from + to) / 2)) {
+        c.classList.add("lk");
+        setTip(c, "plain", t("hrs.tipLocked", { when }));
+      } else if (shown > 0) {
         c.classList.add(b.exact ? "m" : "e", `lv-${lvKey(dayLevel.get(dayKey(b.t0)) ?? 0)}`);
         c.style.setProperty("--a", (0.18 + 0.82 * (b.v / max)).toFixed(2));
         setTip(c, "plain", t(b.exact ? "hrs.tipMeasured" : "hrs.tipEst", { when, pct: fmtNum(shown, 0, 1) }));

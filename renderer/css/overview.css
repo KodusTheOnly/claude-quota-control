@@ -8,7 +8,8 @@
                    (when in the week the usage happened) and the seven day columns, all on one grid
      extra         a slim strip, only when Extra usage is set up
 
-   The window is 960x640 to 1920x1080 (main.js), so there is one format: the graph takes the height that is left.
+   The window is 1100x520 to 1920x1080 (main.js). The graph always takes the height that is left; only the header
+   changes with the width (the keys above).
 
    Sizes are in rem (see tokens.css), so a bigger window shows more information, not bigger text.
    Tiles are containers and decide how much to show by their own size. */
@@ -288,6 +289,9 @@ html[data-screens="paper"]:not([data-theme="dark"]) .pleds i.at { box-shadow: no
 .hact { position: absolute; bottom: 0; height: 3px; z-index: 3; background: var(--crt-accent); opacity: .75; }
 .hc.m { background: color-mix(in srgb, var(--c, var(--free)) calc(var(--a, 1) * 100%), transparent); }
 .hc.e { background: color-mix(in srgb, var(--c, var(--free)) calc(var(--a, 1) * 45%), transparent); }
+/* An hour a 5-hour limit kept you out of: the red hatch of the chart's locked band (dimmer when it is still ahead) */
+.hc.lk { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--pause) 70%, transparent) 0 2px, color-mix(in srgb, var(--pause) 14%, transparent) 2px 5px); }
+.hc.lk.fut { opacity: .55; }
 .hc.t0::before, .hc.t6::before { content: ""; position: absolute; left: 0; width: 1px; z-index: 2; pointer-events: none; }
 .hc.t0::before { top: -4px; bottom: -4px; background: var(--sline); }
 .hc.t6::before { top: 0; bottom: 0; background: var(--crt-cell-mark); }

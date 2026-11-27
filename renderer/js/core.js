@@ -558,6 +558,45 @@ function sessionStartsFrom(readings, from, to) {
   return list.map((x) => x.sr - 5 * HOUR).filter((ms) => ms >= from && ms <= to);
 }
 
+// When the 5-hour limit was hit inside from..to (ms): one entry per window that reached 100% (as shown), oldest first.
+//   at     the first reading of the window at 100%
+//   from   the last moment it was seen under 100% (the reading before, or the window's start when there is none):
+//          the limit was hit somewhere between from and at
+//   until  the window's reset, when Claude is back
+//   exact  from and at are close enough (LOCK_EXACT_SPAN) for at to be the time it happened
+// Windows are grouped as in upsertSession (resets less than 10 min apart are one window).
+const LOCK_EXACT_SPAN = 20 * MIN; // the same span hourly.js calls exact
+function sessionLocks(readings, from, to) {
+  const windows = [];
+  const pts = (readings || []).filter((r) => r && Number.isFinite(r.at) && Number.isFinite(r.sr)).sort((a, b) => a.at - b.at);
+  for (const r of pts) {
+    let w = windows.find((x) => Math.abs(x.sr - r.sr) < 10 * MIN);
+    if (!w) windows.push((w = { sr: r.sr, list: [] }));
+    w.list.push(r);
+  }
+  const out = [];
+  for (const w of windows) {
+    const i = w.list.findIndex((r) => Number.isFinite(r.s) && asShownPct(r.s) >= 100);
+    if (i < 0) continue;
+    const hit = w.list[i];
+    const before = w.list.slice(0, i).reverse().find((r) => Number.isFinite(r.s));
+    const start = w.sr - 5 * HOUR;
+    const seen = before ? Math.max(before.to || before.at, start) : start;
+    const lock = { at: hit.at, from: Math.min(seen, hit.at), until: w.sr };
+    lock.exact = lock.at - lock.from <= LOCK_EXACT_SPAN;
+    if (lock.until > from && lock.at <= to) out.push(lock);
+  }
+  return out.sort((a, b) => a.at - b.at);
+}
+
+// Extra usage carries on past the session's limit when there is money to spend: credits left, or a monthly limit not
+// reached yet. Then 100% of the session does not stop you.
+function extraCoversLimit(extra) {
+  if (!extra) return false;
+  if (extra.balance > 0) return true;
+  return extra.limit > 0 && Number.isFinite(extra.spent) && extra.spent < extra.limit;
+}
+
 // Once: rebuild the windows from the readings that already exist
 async function backfillSessions() {
   const s = state.settings;

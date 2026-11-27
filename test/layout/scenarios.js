@@ -189,6 +189,30 @@ const SCENARIOS = {
       .map(([h, w, sr]) => ({ at: NOW + h * HOUR, w, s: 40, sr }));
     return s;
   },
+  // The 5-hour limit was hit at 16:35 today (readings a few minutes apart: an exact padlock) and Claude is back at 19:10,
+  // and yesterday's at 15:30 came after a long gap (a hollow padlock). No extra usage, so both lock their hours.
+  sessionlock: (s) => {
+    delete s.extra;
+    const sr = NOW + 1 * HOUR + 10 * 60000;
+    const srY = TODAY - DAY + 17 * HOUR;
+    s.manual.fiveHour = { used: 100, resetsAt: sr, at: NOW - 2 * 60000 };
+    s.readings = [
+      { at: srY - 4 * HOUR, w: 12, s: 50, sr: srY },
+      { at: srY - 1.5 * HOUR, w: 15, s: 100, sr: srY },
+      { at: NOW - 3 * HOUR, w: 22, s: 30, sr },
+      { at: NOW - 1.5 * HOUR, w: 29, s: 96, sr },
+      { at: NOW - 85 * 60000, w: 31, s: 100, sr },
+      { at: NOW - 2 * 60000, w: 31, s: 100, sr },
+    ];
+    return s;
+  },
+  // The same limits with extra usage set up: nothing was blocked, so amber marks and no locked band
+  lockextra: (s) => {
+    const extra = s.extra;
+    s = SCENARIOS.sessionlock(s);
+    s.extra = extra;
+    return s;
+  },
   // The past weeks of "pastweeks" with "Follow my usual week" on (Settings > Plan): the plan takes the suggested weights
   autoplan: (s) => {
     s = SCENARIOS.pastweeks(s);

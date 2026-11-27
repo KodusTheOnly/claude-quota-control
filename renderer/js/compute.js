@@ -437,6 +437,8 @@ function limitsFirst(m) {
 //   used      what was used: the end of each past day (recorded), then now. With the hours' cells (hourly.js) each day is a
 //             set of steps instead of a straight piece; a point with est: true ends a piece placed by estimated cells
 //   starts    when 5-hour sessions started so far this week: [{ ms, x }]
+//   sessionLocks  the 5-hour limits hit so far this week (sessionLocks in core.js), each with x (when), xFrom (the
+//             last moment seen under the limit), xUntil (the session's reset, at most the week's) and y (the used line then)
 //   over      the parts of the used line that went past the day's budget (that spend is "borrowed" from other days)
 //   proj      where the pace so far leads: until the reset, or until T when the level counts hours locked out (it reaches 100%)
 //   lock      from T to the reset along the 100% line, the time without Claude (null when there is none)
@@ -447,7 +449,7 @@ function limitsFirst(m) {
 //             ends inside it, mid is where it ends (the pace so far uses the box up to there) and spend is what is left
 //             above it, the same number as the band's "to spend" chip; otherwise (no projection yet, or a pace that reaches the
 //             goal) mid is null and spend is 0: nothing extra to spend
-function paceSeries(m, cells = null, starts = []) {
+function paceSeries(m, cells = null, starts = [], locks = []) {
   const w = weights();
   const first = startOfDay(m.w.resetsAt - WEEK);
   const dayIdx = (ms) => Math.round((startOfDay(ms) - first) / DAY);
@@ -639,6 +641,19 @@ function paceSeries(m, cells = null, starts = []) {
     }
   }
   const startsOut = starts.filter((ms) => ms >= weekStart && ms <= m.now && toX(ms) <= span).map((ms) => ({ ms, x: toX(ms) }));
+  // The 5-hour limits hit this week, where the used line stood then (sessionLocks in core.js)
+  const usedAt = (x) => {
+    for (let i = 1; i < used.length; i++) {
+      if (x <= used[i].x) return used[i].x === used[i - 1].x ? used[i].y : used[i - 1].y + ((x - used[i - 1].x) / (used[i].x - used[i - 1].x)) * (used[i].y - used[i - 1].y);
+    }
+    return used[used.length - 1].y;
+  };
+  const sessionLocksOut = locks
+    .filter((l) => l.at >= weekStart && l.at <= m.now)
+    .map((l) => {
+      const x = toX(l.at);
+      return { ...l, x, xFrom: toX(Math.max(l.from, weekStart)), xUntil: l.until >= m.w.resetsAt ? span : toX(l.until), y: usedAt(Math.min(x, nowX)) };
+    });
   if (proj && proj.length < 2) proj = null; // already past 100%: nothing left to project
   const top = planCeiling(m.w.resetsAt, m.w.resetsAt, m.g);
   let room = null;
@@ -655,7 +670,7 @@ function paceSeries(m, cells = null, starts = []) {
     const high = Math.min(m.lv.proj.high, 100);
     if (high - low >= 1) band = { x0: nowX, x1: span, y0: m.w.used, low, high };
   }
-  return { a0: toX(chartAxisStart(weekStart)), s0, span, nowX, todayIdx, rest, expected, used, over, proj, lock, band, reserve, room, goal: m.g.goal, end: endLabel, usedNow: m.w.used, starts: startsOut };
+  return { a0: toX(chartAxisStart(weekStart)), s0, span, nowX, todayIdx, rest, expected, used, over, proj, lock, band, reserve, room, goal: m.g.goal, end: endLabel, usedNow: m.w.used, starts: startsOut, sessionLocks: sessionLocksOut };
 }
 
 // Saving a reading (typed in or read from Claude)

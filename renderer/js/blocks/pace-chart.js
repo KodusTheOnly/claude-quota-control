@@ -111,6 +111,24 @@ function drawPaceChart() {
   const nx = X(s.nowX);
   if (nx < W - R) add("rect", { x: nx, y: T, width: W - R - nx, height: H - T - B, fill: PAL.shade, opacity: ".6" });
 
+  // 5-hour limits hit this week: from the limit to the session's reset Claude is locked, a red hatched band over the whole
+  // height (the same hatch as the session's LOCKED strip). With extra usage on nothing stops you, so there is no band.
+  const extraOn = extraCoversLimit(state.settings && state.settings.extra);
+  const sLocks = s.sessionLocks || [];
+  if (sLocks.length && !extraOn) {
+    const defs = add("defs", {});
+    const pat = el("pattern", { id: "lkHatch", width: 8, height: 8, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, defs);
+    el("rect", { width: 8, height: 8, fill: PAL.red, opacity: ".07" }, pat);
+    el("rect", { width: 3, height: 8, fill: PAL.red, opacity: ".42" }, pat);
+    for (const l of sLocks) {
+      const x0 = X(l.x);
+      const x1 = X(l.xUntil);
+      if (x1 - x0 < 1) continue;
+      add("rect", { x: x0, y: T, width: x1 - x0, height: H - T - B, fill: "url(#lkHatch)" });
+      if (l.xUntil < AX) add("line", { x1, x2: x1, y1: T, y2: H - B, stroke: PAL.red, opacity: ".7", "stroke-dasharray": "4 3" });
+    }
+  }
+
   // Where the week can go today (today.js): a dashed line across today's column, the white mark of the week bar
   const limit = todayLimit(m);
   const tx0 = X(Math.max(s.todayIdx, s.s0));
@@ -141,7 +159,13 @@ function drawPaceChart() {
   // Each day's piece of the used line, and the area under it, takes the color of that day's level, as its card and its
   // hours (Free when the day is not rated)
   const dayColor = (k) => cssVar(`--${["free", "moderate", "tight", "pause"][(m.week[k] && m.week[k].level) ?? 0]}`);
-  const segColor = (i) => dayColor(Math.floor((s.used[i - 1].x + s.used[i].x) / 2));
+  // While a session was locked the line is red (amber when extra usage kept you going)
+  const lockColor = extraOn ? cssVar("--moderate") : PAL.red;
+  const segColor = (i) => {
+    const mid = (s.used[i - 1].x + s.used[i].x) / 2;
+    if (sLocks.some((l) => mid > l.x && mid < l.xUntil)) return lockColor;
+    return dayColor(Math.floor(mid));
+  };
   const areas = [];
   for (let i = 1; i < s.used.length; i++) {
     const c = segColor(i);
@@ -189,9 +213,24 @@ function drawPaceChart() {
   const nowColor = cssVar("--crt-accent") || CHART_NOW;
   const ny = Y(s.usedNow);
   add("line", { x1: nx, x2: nx, y1: T, y2: H - B, stroke: nowColor, "stroke-width": 1.5 });
-  add("circle", { cx: nx, cy: ny, r: 5, fill: color });
+  // A limit hit just before now would sit on the NOW dot: the padlock takes the dot's place instead
+  const lockNow = sLocks.find((l) => l.until > m.now && nx - X(l.x) < rem);
+  if (!lockNow) add("circle", { cx: nx, cy: ny, r: 5, fill: color });
   // A ring that pings when the verdict's face glances at the chart (verdict.js puts .glance on the plot)
   add("circle", { cx: nx, cy: ny, r: 13, fill: "none", stroke: color, "stroke-width": 2, class: "nowping" });
+
+  // Each limit: a padlock in a red circle where it was hit (amber with "$" when extra usage kept you going). Hollow when
+  // no reading came close before it: it was hit somewhere between the last one under the limit and this one. The ones
+  // already over are a little smaller.
+  const lockSpots = [];
+  for (const l of sLocks) {
+    const current = l.until > m.now;
+    const at = l === lockNow ? { x: nx, y: ny } : { x: X(l.x), y: Y(l.y) };
+    const g = lockIcon(at.x, at.y, (current ? 0.6 : 0.5) * rem, { hollow: !l.exact, extra: extraOn, red: PAL.red, amber: lockColor, ink: cssVar("--scr") || "#0A0F0C" });
+    svg.appendChild(g);
+    el("title", {}, g).textContent = lockTip(l, extraOn, m.now);
+    lockSpots.push({ ...at, r: (current ? 0.6 : 0.5) * rem });
+  }
 
   // The labels: "NOW", the room left, "out" when the limit is already reached, and the names of the lines.
   // Each one tries a handful of spots, and the set that touches the fewest lines, and each other, wins.
@@ -244,7 +283,17 @@ function drawPaceChart() {
     lineLabel(onPlan ? "chart.legProjPlan" : "chart.legProj", color, s.proj, [s.nowX + (end - s.nowX) * 0.55, s.nowX + (end - s.nowX) * 0.8, s.nowX + (end - s.nowX) * 0.3], 2);
   }
 
+  // While locked: when Claude is back, at the top of the band, right after it
+  const lockOpen = extraOn ? null : sLocks.find((l) => l.until > m.now);
+  if (lockOpen) {
+    const ux = X(lockOpen.xUntil);
+    const backText = text(0, 0, upper(t("chart.lockBack", { time: fmtTime(lockOpen.until) })), { fill: PAL.red, "font-weight": "600", class: "lbl" });
+    const rows = [T + 0.85 * rem, T + 2 * rem];
+    items.push({ node: backText, optional: true, cands: rows.flatMap((y, i) => [{ x: ux + 5, y, anchor: "start", pen: i * 2 }, { x: ux - 5, y, anchor: "end", pen: i * 2 + 1 }]) });
+  }
+
   const obstacles = [
+    ...lockSpots.map((p) => ({ pts: [{ x: p.x - p.r, y: p.y }, { x: p.x + p.r, y: p.y }], w: 14 })),
     { pts: px(expShown), w: 14 },
     { pts: px(s.used), w: 14 },
     ...s.over.map((seg) => ({ pts: px(seg), w: 14 })),
@@ -260,6 +309,36 @@ function drawPaceChart() {
     { pts: [{ x: nx - 6, y: ny }, { x: nx + 6, y: ny }], w: 14 },
   ];
   placeLabels(items, obstacles, { x0: L + 2, x1: W - 3, y0: 2, y1: H - B });
+}
+
+// A padlock in a circle of radius r, centered on x,y. The shape is drawn for r = 11 and scaled.
+// hollow: the circle is the screen's color with a colored ring and padlock. extra: amber with "$" instead of the padlock.
+function lockIcon(x, y, r, { hollow = false, extra = false, red, amber, ink }) {
+  const col = extra ? amber : red;
+  const g = el("g", { transform: `translate(${x.toFixed(1)},${y.toFixed(1)}) scale(${(r / 11).toFixed(3)})`, class: "lockmark" });
+  el("circle", { r: 15, fill: col, opacity: ".18" }, g);
+  el("circle", { r: 11, fill: hollow ? ink : col, stroke: col, "stroke-width": 2 }, g);
+  const fg = hollow ? col : ink;
+  if (extra) {
+    const d = el("text", { x: 0, y: 5, "text-anchor": "middle", fill: fg, "font-weight": "600", "font-size": 14 }, g);
+    d.textContent = "$";
+  } else {
+    el("path", { d: "M-3.6,-1.5 v-2.4 a3.6,3.6 0 0 1 7.2,0 v2.4", fill: "none", stroke: fg, "stroke-width": 1.9 }, g);
+    el("rect", { x: -5.2, y: -1.8, width: 10.4, height: 7.6, rx: 1.2, fill: fg }, g);
+  }
+  return g;
+}
+
+// The padlock's tip: when the limit was hit (or between which readings), when Claude is back and for how long it was locked
+function lockTip(l, extraOn, now) {
+  // "15:08" today, "Tue 17:40" on another day of the week (fmtWhen only names the days ahead)
+  const when = (ms) => (Math.abs(startOfDay(ms) - startOfDay(now)) < DAY / 2 ? fmtTime(ms) : `${shortWeekday(new Date(ms))} ${fmtTime(ms)}`);
+  if (extraOn) return t("chart.lockTipExtra", { when: when(l.at) });
+  const back = when(l.until);
+  const dur = fmtDur(l.until - l.at);
+  return l.exact
+    ? t("chart.lockTip", { when: when(l.at), back, dur })
+    : t("chart.lockTipRange", { from: when(l.from), to: when(l.at), back, dur });
 }
 
 // ---- Label placement ----
@@ -377,7 +456,8 @@ function placeLabels(items, obstacles, bounds) {
 // Called with every render; the chart also redraws when its box is resized
 function renderPaceChart(m) {
   const starts = sessionStartsFrom(state.settings.readings, m.w.resetsAt - WEEK, m.now);
-  chartInput = { m, series: paceSeries(m, hoursUsageFor(m).cells, starts) };
+  const locks = sessionLocks(state.settings.readings, m.w.resetsAt - WEEK, m.now);
+  chartInput = { m, series: paceSeries(m, hoursUsageFor(m).cells, starts, locks) };
   drawPaceChart();
 }
 
