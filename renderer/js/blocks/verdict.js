@@ -181,10 +181,11 @@ function renderVerdict(m, fresh = false) {
 }
 
 // The answer gives way on its own when it is too wide for the room next to the face: first the blinking cursor goes, then
-// the answer moves under the face (centered, as a column), then the cursor goes there too. The why under the answer is
+// the face gets smaller (the cursor back, then gone again), then the answer moves under the full face (centered, as a
+// column), then the cursor goes there too. The why under the answer is
 // whole or not there at all. Measured, since the room changes with the level, the language and the window. (The ruler
 // drops the names of the levels that are not lit in a narrow verdict, in the CSS.) Then the readout fits what is left.
-const TOP_STEPS = [[], ["snug"], ["stack"], ["stack", "snug"]];
+const TOP_STEPS = [[], ["snug"], ["small"], ["small", "snug"], ["stack"], ["stack", "snug"]];
 function fitBand() {
   const top = $("vTop");
   const vl = $("vCard");
@@ -192,6 +193,7 @@ function fitBand() {
   why.classList.remove("hidden");
   for (const step of TOP_STEPS) {
     top.classList.toggle("snug", step.includes("snug"));
+    vl.classList.toggle("small", step.includes("small"));
     vl.classList.toggle("stack", step.includes("stack"));
     if (top.scrollWidth <= top.clientWidth + 1) break;
   }

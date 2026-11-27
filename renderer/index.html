@@ -133,14 +133,6 @@
             <h2 class="sr-only" id="tWeek" data-i18n="card.week">Week</h2>
             <div class="band crt" id="vScr">
               <div class="vl" id="vCard">
-                <!-- The level ruler: Room and the four levels, the one that applies lit with its name -->
-                <div class="ruler" id="vRuler" role="img">
-                  <span class="lv-room"><span class="shp"></span><span data-i18n="level.room.name">Room</span></span>
-                  <span class="lv-free"><span class="shp"></span><span data-i18n="level.free.name">Free</span></span>
-                  <span class="lv-moderate"><span class="shp"></span><span data-i18n="level.moderate.name">Moderate</span></span>
-                  <span class="lv-tight"><span class="shp"></span><span data-i18n="level.tight.name">Tight</span></span>
-                  <span class="lv-pause"><span class="shp"></span><span data-i18n="level.pause.name">Pause</span></span>
-                </div>
                 <div class="vmain">
                   <!-- The face's own small screen: verdict.js plays it (decoration only, the level is in the words and the ruler) -->
                   <div class="vface" id="vSlot" aria-hidden="true"><span class="fcg" id="vGhost"></span><span class="fc" id="vFace"></span></div>
@@ -148,6 +140,14 @@
                     <div class="vtop" id="vTop"><p class="ans"><span id="vAns"></span><span class="cur" aria-hidden="true"></span></p></div>
                     <p class="vwhy" id="vWhy"></p>
                   </div>
+                </div>
+                <!-- The level ruler: Room and the four levels, the one that applies lit with its name -->
+                <div class="ruler" id="vRuler" role="img">
+                  <span class="lv-room"><span class="shp"></span><span data-i18n="level.room.name">Room</span></span>
+                  <span class="lv-free"><span class="shp"></span><span data-i18n="level.free.name">Free</span></span>
+                  <span class="lv-moderate"><span class="shp"></span><span data-i18n="level.moderate.name">Moderate</span></span>
+                  <span class="lv-tight"><span class="shp"></span><span data-i18n="level.tight.name">Tight</span></span>
+                  <span class="lv-pause"><span class="shp"></span><span data-i18n="level.pause.name">Pause</span></span>
                 </div>
                 <!-- The readout: a row each, an icon, a word or two, a dotted leader and the value (the full sentence is its title) -->
                 <div class="chips" id="vChips"></div>

@@ -118,7 +118,7 @@
 .band .wk, .band .blk--session { grid-column: 2; }
 .band .vl, .band .wk { display: flex; align-items: center; gap: .2rem .9rem; min-width: 0; padding: .4rem .8rem; }
 .band .wk { gap: .5rem; }
-/* A column: the level ruler, then the face's screen with the answer and its why next to it, then the readout (a row
+/* A column: the face's screen with the answer and its why next to it, then the level ruler, then the readout (a row
    each, with dotted leaders). fitBand() and fitChips() in verdict.js make each part give way on its own. The verdict
    takes the band's height from the week and the session (contain: size), so the readout never makes the
    band taller: its last rows go instead. */
@@ -129,7 +129,10 @@
 .band .vtop { display: flex; align-items: center; justify-content: flex-start; gap: .2rem .9rem; min-width: 0; max-width: 100%; }
 /* The why: two lines at most, whole or hidden (fitBand) */
 .band .vwhy { margin: 0; max-height: calc(2 * 1.35em); overflow: hidden; font: 400 var(--fs-xs)/1.35 var(--mono); color: var(--sm); }
-/* A narrow verdict: the answer and its why go under the face, centered */
+/* A narrow verdict: first a smaller face keeps the answer next to it (faceFit shrinks the face's text to fit) */
+.band .vl.small .vface { width: 6rem; min-height: 3.4rem; }
+.band .vl.small :is(.fc, .fcg) { font-size: var(--fs-3xl); }
+/* Narrower still: the answer and its why go under the face, centered */
 .band .vl.stack .vmain { flex-direction: column; gap: .45rem; }
 .band .vl.stack .vtxt { align-self: stretch; align-items: center; text-align: center; }
 .band .vl.stack .vtop { justify-content: center; }
