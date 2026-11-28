@@ -81,15 +81,44 @@ function paintLevel(elem, level, label) {
 }
 
 // Segmented bar. Values are percentages of the bar: how far it is filled, how much of that fill is
-// over the limit (drawn red at the end), and where the white tick sits.
-function setBar(bar, { fill, over = 0, tick = null }) {
-  bar.style.setProperty("--fill", `${clamp100(fill)}%`);
+// over the limit (drawn red at the end), and where the white tick sits. grow: false for a bar that moves with the
+// clock, not with use (the session's time).
+function setBar(bar, { fill, over = 0, tick = null, grow = true }) {
+  const to = clamp100(fill);
+  const from = parseFloat(bar.style.getPropertyValue("--fill"));
+  if (grow && barGrow && Number.isFinite(from) && to - from >= 0.5) growBar(bar, from, to);
+  bar.style.setProperty("--fill", `${to}%`);
   bar.style.setProperty("--ov", `${clamp100(over)}%`);
   const mark = bar.querySelector(".tick");
   if (mark) {
     mark.classList.toggle("hidden", tick === null);
     if (tick !== null) bar.style.setProperty("--tx", `${clamp100(tick)}%`);
   }
+}
+
+// A reading close to the last one (render.js sets barGrow while it draws): what was there stays still and only the
+// part it added lights up, segment by segment, then takes the bar's color (.nw in crt.css)
+let barGrow = false;
+const BAR_SEG = 5; // a bar has 20 segments
+function growBar(bar, from, to) {
+  const tr = bar.querySelector(".tr");
+  if (!tr || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const k = Math.max(1, Math.ceil(to / BAR_SEG) - Math.floor(from / BAR_SEG));
+  const ms = Math.min(700, 140 * k);
+  clearTimeout(bar._growT);
+  tr.querySelectorAll(".nw").forEach((n) => n.remove());
+  bar.style.setProperty("--g0", `${from}%`);
+  bar.style.setProperty("--gw", `${to - from}%`);
+  bar.style.setProperty("--gk", String(k));
+  bar.style.setProperty("--gd", `${ms}ms`);
+  bar.classList.add("grow");
+  const nw = node("i", "nw");
+  nw.setAttribute("aria-hidden", "true");
+  tr.append(nw);
+  bar._growT = setTimeout(() => {
+    nw.remove();
+    bar.classList.remove("grow");
+  }, ms + 800);
 }
 
 // Bars that can pass their limit (today, the days of the week) use a 125% scale, with the limit at 80% of the bar

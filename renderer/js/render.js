@@ -31,7 +31,10 @@ function render(opts = {}) {
   $("dash").classList.toggle("is-stale", st === "stale");
   $("dash").classList.toggle("is-offline", st === "offline");
   $("dash").classList.toggle("is-reading", st === "updating");
+  const motion = dashMotionPlan(Boolean(opts.fresh));
+  barGrow = motion === "grow";
   renderOverview(m, Boolean(opts.fresh));
+  barGrow = false;
   tipRefresh();
   placeOvKeys();
   if (state.view === "history") renderHistory();
@@ -39,12 +42,24 @@ function render(opts = {}) {
   publishSummary(m, src);
   checkAlerts(m, opts.fresh, src);
   sendAutoReadHint(m);
-  dashMotion(Boolean(opts.fresh));
+  dashMotion(motion);
 }
 
-// The Overview's own motion (overview.css, "Motion kit"): the screens power on the first time it shows, and the bars
-// light up again, segment by segment, after a new reading. Settings > Display > Motion decides how much plays.
+// The Overview's own motion (overview.css, "Motion kit"): the screens power on the first time it shows. After a new
+// reading, the bars light up again from zero only when the one before it is old (CASCADE_GAP); a reading close to the
+// last one keeps the bars still and lights only the part it added (setBar in ui.js). Settings > Display > Motion
+// decides how much plays.
+const CASCADE_GAP = 30 * MIN;
 let dashPowered = false;
+let dashSeenAt = 0; // the reading time the Overview last drew
+function dashMotionPlan(fresh) {
+  const at = lastUpdate();
+  const gap = at - dashSeenAt;
+  dashSeenAt = at;
+  if (!dashPowered) return document.hidden || state.view !== "panel" ? null : "power-on";
+  if (!fresh || motionLevel() === "off") return null;
+  return gap >= CASCADE_GAP ? "cascade" : "grow";
+}
 const dashTimers = {};
 function dashPlay(cls, ms) {
   if (motionLevel() === "off") return;
@@ -55,16 +70,13 @@ function dashPlay(cls, ms) {
   clearTimeout(dashTimers[cls]);
   dashTimers[cls] = setTimeout(() => d.classList.remove(cls), ms);
 }
-function dashMotion(fresh) {
-  if (!dashPowered) {
-    if (document.hidden || state.view !== "panel") return; // waits until it is seen
+function dashMotion(plan) {
+  if (plan === "power-on") {
     dashPowered = true;
     dashPlay("power-on", 2200);
-    return;
-  }
-  if (fresh) dashPlay("cascade", 1200);
+  } else if (plan === "cascade") dashPlay("cascade", 1200);
 }
-document.addEventListener("visibilitychange", () => !document.hidden && !dashPowered && pickSource() && dashMotion(false));
+document.addEventListener("visibilitychange", () => !document.hidden && !dashPowered && pickSource() && dashMotion(dashMotionPlan(false)));
 
 // Smart auto read (Settings, Danger zone) reads more often while a session runs or the week is Tight or Pause.
 // The main process does not compute levels, so the window tells it, only when it changes.
@@ -87,7 +99,7 @@ function go(view) {
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("hidden", v.id !== `view-${view}`));
   renderChrome(pickSource());
   placeOvKeys();
-  if (view === "panel" && !dashPowered && pickSource()) dashMotion(false); // the power on waits for the Overview
+  if (view === "panel" && !dashPowered && pickSource()) dashMotion(dashMotionPlan(false)); // the power on waits for the Overview
   if (view === "history") renderHistory();
   if (view === "about") renderAbout();
   if (view === "help") {

@@ -37,6 +37,15 @@
   .sbar .tick { transition: left .22s ease-out; }
   .glow { animation: num-glow .6s ease-out; }
 }
+/* A reading close to the last one: the part it added lights up segment by segment, then fades to the bar's color
+   (growBar in ui.js). The fill steps with it, so nothing before the old value moves. */
+.sbar .nw { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .sbar.grow .fill { transition: width var(--gd, .22s) steps(var(--gk, 1), end); }
+  .sbar .nw { display: block; position: absolute; top: 0; bottom: 0; left: var(--g0, 0%); width: var(--gw, 0%); background: var(--num-flash); box-shadow: 0 0 .5rem var(--num-halo); animation: seg-light var(--gd, .22s) steps(var(--gk, 1), end) both, seg-fade .7s ease-out var(--gd, .22s) forwards; }
+}
+@keyframes seg-light { from { clip-path: inset(0 100% 0 0); } }
+@keyframes seg-fade { to { opacity: 0; } }
 @keyframes num-glow { from { color: var(--num-flash); text-shadow: 0 0 .45em var(--num-halo); } }
 .cap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 .6rem; font: 500 var(--fs-xs)/1.3 var(--mono); color: var(--sm); }
 .cap span { white-space: nowrap; }

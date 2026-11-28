@@ -59,7 +59,10 @@
   width: 100%; clip-path: inset(0 calc(100% - var(--fill, 0%)) 0 0);
   background: linear-gradient(90deg, var(--free) 0 var(--z1, 50%), var(--moderate) 0 var(--z2, 75%), var(--tight) 0 var(--z3, 90%), var(--pause) 0);
 }
-@media (prefers-reduced-motion: no-preference) { #sBar .fill { transition: clip-path .22s ease-out; } }
+@media (prefers-reduced-motion: no-preference) {
+  #sBar .fill { transition: clip-path .22s ease-out; }
+  #sBar.grow .fill { transition: clip-path var(--gd, .22s) steps(var(--gk, 1), end); }
+}
 #sTime { --c: color-mix(in srgb, var(--sm) 70%, transparent); }
 /* The time bar has 5 segments, one per hour of the session (the used bar keeps 20) */
 #sTime .tr { -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(20% - 2px), transparent calc(20% - 2px) 20%); mask: repeating-linear-gradient(90deg, #000 0 calc(20% - 2px), transparent calc(20% - 2px) 20%); }

@@ -27,7 +27,7 @@ function renderSession(m) {
   const timed = left !== null && left > 0;
   const passed = timed ? clamp100(100 - (left / (5 * HOUR)) * 100) : 0;
   const time = $("sTime");
-  setBar(time, { fill: passed, tick: null });
+  setBar(time, { fill: passed, tick: null, grow: false });
   time.setAttribute("aria-label", t("session.timeAria", { pct: r0(passed) }));
   time.classList.toggle("hidden", !timed);
   setTip(time, "stime", timed ? `${fmtDur(5 * HOUR - left)} / 5 h` : "");
