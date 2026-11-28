@@ -18,10 +18,15 @@ function renderExtra() {
   $("xBar").classList.toggle("hidden", !hasLimit);
   setBar($("xBar"), { fill: ratio * 100 });
   $("xBar").setAttribute("aria-label", t("extra.barAria", { pct: r0(ratio * 100) }));
+  const spentTip = hasLimit ? `${money(e.spent)} / ${money(e.limit)} · ${r0(ratio * 100)}%` : "";
+  for (const el of [$("xSpent"), $("xBar")]) setTip(el, hasLimit ? "xspent" : "plain", spentTip);
 
   $("xCredits").textContent = e.balance !== null ? `${t("extra.balance")} ${money(e.balance)}` : "";
+  setTip($("xCredits"), "xcredits", e.balance !== null ? money(e.balance) : "");
   const bits = [];
   if (e.autoReload !== null) bits.push(`${t("extra.auto")} ${t(e.autoReload ? "extra.on" : "extra.off")}`);
   bits.push(t("extra.read", { ago: ago(e.at) }));
   $("xInfo").textContent = bits.join(" · ");
+  if (e.autoReload !== null) setTip($("xInfo"), "xauto", bits.join("\n"));
+  else setTip($("xInfo"), "plain");
 }

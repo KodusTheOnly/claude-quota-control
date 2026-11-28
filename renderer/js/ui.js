@@ -72,8 +72,9 @@ function shownStep(m) {
 
 // What the last reading added, on a bar: that stretch lighter, with an edge, until the next reading (.ad inside the
 // segments, the edge on .adh), and a
-// small box over it with "+3%". The box shows for STEP_SHOW after a fresh reading, and again while the pointer is on the
-// stretch, then with when the reading before it was. The box lives on the body, so the well around the bar does not cut it.
+// small box over it with "+3%" for STEP_SHOW after a fresh reading. With the pointer on the stretch the box gives way to
+// its tooltip, which also says when the reading before it was. The box lives on the body, so the well around the bar does
+// not cut it.
 const STEP_SHOW = 10000;
 const STEP_MIN_W = 1.5; // % of the bar: a rise of a fraction of a point still shows
 const steps = [];
@@ -81,19 +82,23 @@ function paintStep(bar, step, fresh) {
   const st = bar._step || (bar._step = makeStep(bar));
   st.step = step;
   bar.classList.toggle("has-ad", Boolean(step));
-  if (!step) return stepHide(st);
+  if (!step) {
+    setTip(st.hit, "plain");
+    return stepHide(st);
+  }
   const b = clamp100(step.b);
   const w = Math.min(b, Math.max(b - clamp100(step.a), STEP_MIN_W));
   bar.style.setProperty("--ad-l", `${b - w}%`);
   bar.style.setProperty("--ad-w", `${w}%`);
-  if (fresh) stepShow(st, false);
-  else if (st.pop.classList.contains("on")) stepShow(st, st.hover);
+  setTip(st.hit, "step", `+${step.d}% · ${t("step.since", { time: fmtTime(step.since) })}`);
+  if (fresh && !st.hover) stepShow(st);
+  else if (st.pop.classList.contains("on")) stepShow(st);
 }
 function makeStep(bar) {
   const ad = node("i", "ad");
   ad.setAttribute("aria-hidden", "true");
   bar.querySelector(".tr").append(ad);
-  // The pointer's target over the stretch. "plain" with no value: the bar's own tip stays closed while on it.
+  // The pointer's target over the stretch: it carries the stretch's tooltip (paintStep)
   const hit = node("i", "adh");
   hit.dataset.tip = "plain";
   bar.append(hit);
@@ -102,19 +107,19 @@ function makeStep(bar) {
   pop.append(node("b"), node("span"));
   document.body.append(pop);
   const st = { bar, hit, pop, step: null, timer: 0, hover: false };
-  hit.addEventListener("pointerenter", () => { st.hover = true; stepShow(st, true); });
-  hit.addEventListener("pointerleave", () => { st.hover = false; stepHide(st); });
+  hit.addEventListener("pointerenter", () => { st.hover = true; stepHide(st); });
+  hit.addEventListener("pointerleave", () => { st.hover = false; });
   steps.push(st);
   return st;
 }
-function stepShow(st, hover) {
+function stepShow(st) {
   clearTimeout(st.timer);
   if (!st.step || state.view !== "panel" || !st.hit.getClientRects().length) return stepHide(st);
   st.pop.firstChild.textContent = `+${st.step.d}%`;
-  st.pop.lastChild.textContent = hover ? ` · ${t("step.since", { time: fmtTime(st.step.since) })}` : "";
+  st.pop.lastChild.textContent = "";
   st.pop.classList.add("on");
   stepPlace(st);
-  if (!hover) st.timer = setTimeout(() => stepHide(st), STEP_SHOW);
+  st.timer = setTimeout(() => stepHide(st), STEP_SHOW);
 }
 function stepHide(st) {
   clearTimeout(st.timer);

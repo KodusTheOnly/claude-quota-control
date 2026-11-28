@@ -98,7 +98,6 @@ function paintWeekEnd(bar, m) {
   $("wGhostTx").textContent = `+${spare}%`;
   setTip(gh, "ghost", `+${spare}%`);
   setTip(bar.querySelector(".pj"), "pj", end === null ? "" : `+${r0(Math.max(Math.min(end, 100) - used, 0))}% → ~${r0(Math.min(proj, 100))}%`, over);
-  setTip(bar, "wused", `${r0(m.w.used)}%`);
 
   const bu = $("wBurst");
   bu.classList.toggle("hidden", !over);

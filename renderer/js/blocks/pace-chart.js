@@ -150,7 +150,7 @@ function drawPaceChart() {
     shades.forEach((d, k) => d && add("path", { d, fill: accent, opacity: short ? (k ? ".3" : ".15") : k ? ".45" : ".25" }));
     // The whole stretch says what it is on hover
     const hit = add("rect", { x: x0, y: T, width: x1 - x0, height: H - T - B, fill: "transparent" });
-    el("title", {}, hit).textContent = t("chart.gapTip", { dur: fmtDur(g.to - g.from), from: gapWhen(g.from, m.now), to: gapWhen(g.to, m.now), pct: fmtNum(g.y1 - g.y0, 0, 1) });
+    setTip(hit, "plain", t("chart.gapTip", { dur: fmtDur(g.to - g.from), from: gapWhen(g.from, m.now), to: gapWhen(g.to, m.now), pct: fmtNum(g.y1 - g.y0, 0, 1) }));
   }
 
   // Where the week can go today (today.js): a dashed line across today's column, the white mark of the week bar
@@ -246,7 +246,7 @@ function drawPaceChart() {
   const TICK = 16;
   for (const st of s.starts) {
     const tick = add("line", { x1: X(st.x), x2: X(st.x), y1: H - B - TICK, y2: H - B, stroke: PAL.muted, "stroke-width": 2 });
-    el("title", {}, tick).textContent = t("chart.sessionStart", { time: fmtTime(st.ms) });
+    setTip(tick, "plain", t("chart.sessionStart", { time: fmtTime(st.ms) }));
   }
   if (showProj) {
     // While the session is at its limit the projection waits for its reset: that flat start is red dots, not a forecast
@@ -309,7 +309,7 @@ function drawPaceChart() {
     const r = (current ? 0.6 : 0.5) * (short ? 0.8 : 1) * rem;
     const g = lockIcon(at.x, at.y, r, { hollow: !l.exact, extra: extraOn, red: PAL.red, amber: lockColor, ink: cssVar("--scr") || "#0A0F0C" });
     svg.appendChild(g);
-    el("title", {}, g).textContent = lockTip(l, extraOn, m.now);
+    setTip(g, "plain", lockTip(l, extraOn, m.now));
     lockSpots.push({ ...at, r });
   }
 

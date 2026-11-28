@@ -108,7 +108,11 @@ function renderAutoMenu() {
   const log = Array.isArray(autoLive.log) ? autoLive.log : [];
   const ok = log.filter((r) => r.ok).length;
   const fail = log.length - ok;
-  $("amLog").replaceChildren(...log.map((r) => node("i", r.ok ? "ok" : "bad")));
+  $("amLog").replaceChildren(...log.map((r) => {
+    const cell = node("i", r.ok ? "ok" : "bad");
+    setTip(cell, "plain", `${fmtTime(r.at)} · ${t(r.ok ? "am.logOk" : "am.logFail")}`, !r.ok);
+    return cell;
+  }));
   $("amLog").setAttribute("aria-label", log.length ? t("am.logAria", { n: log.length, ok, fail }) : t("am.logNone"));
   $("amLog").classList.toggle("hidden", !log.length);
   $("amLogSum").textContent = log.length ? t("am.logSum", { ok, fail }) : "";
