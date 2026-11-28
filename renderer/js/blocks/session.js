@@ -6,7 +6,7 @@ const SESSION_SOON = 50 * MIN; // how long before the reset the warning shows
 const SESSION_NEAR = 30 * MIN; // the warning turns yellow
 const SESSION_LAST = 10 * MIN; // the warning turns red
 
-function renderSession(m) {
+function renderSession(m, fresh = false) {
   const f = m.five;
   const level = f ? m.lv.session : null;
 
@@ -21,6 +21,7 @@ function renderSession(m) {
   setBar(bar, { fill: f ? f.used : 0, tick: null });
   bar.setAttribute("aria-label", f ? t("mod.aria.session", { used: r0(f.used) }) : t("session.noReading"));
   for (const el of [bar, $("sPct")]) setTip(el, "sused", f ? `${r0(f.used)}%` : "");
+  paintStep(bar, f ? shownStep(m).session : null, fresh);
 
   // The time bar needs the reset time; a reading without one (typed in without it) has no clock to show
   const left = f && f.resetsAt ? f.resetsAt - m.now : null;

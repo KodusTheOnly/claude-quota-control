@@ -621,6 +621,28 @@ function weekPaceRecent(now, readings = (state.settings && state.settings.readin
   return rate > 0 ? rate : null;
 }
 
+// What the last reading added to the week and to the session, against the reading before it, as the whole numbers
+// shown. Each is { a, b, d, since }: the raw values before and now, the shown rise, and when the reading before was.
+// null when it did not rise by a shown point, across a reset (the week's start, another 5-hour window), and once a
+// later reading saw no change (it only moved the last entry's "to"): the stretch stays until the next reading.
+function lastStep(readings, weekStart) {
+  const list = readings || [];
+  const b = list[list.length - 1];
+  const a = list[list.length - 2];
+  if (!a || !b || b.to) return { week: null, session: null };
+  const since = a.to || a.at;
+  const rise = (x, y) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    const d = Math.round(y) - Math.round(x);
+    return d >= 1 ? { a: x, b: y, d, since } : null;
+  };
+  const sameWindow = Number.isFinite(a.sr) && Number.isFinite(b.sr) && Math.abs(a.sr - b.sr) < 10 * MIN;
+  return {
+    week: Number.isFinite(weekStart) && a.at >= weekStart ? rise(a.w, b.w) : null,
+    session: sameWindow ? rise(a.s, b.s) : null,
+  };
+}
+
 // Session pace: compares readings from the same 5-hour window, over its last 90 minutes.
 // In its first SESSION_PACE_AFTER minutes it says nothing, like the session's level. The window opens at 0% (its first
 // message starts it), so its start is a point too: while it is inside those 90 minutes, the pace counts from there and a

@@ -72,10 +72,10 @@ function paintWeekZones(bar, m) {
   bar.style.setProperty("--rf-w", `${clamp100(fromReserve)}%`);
 }
 
-// Where the week ends, on its bar. The projection is hatched like the chart's dashed line, from what is used to where the
+// Where the week ends, on its bar. The projection is a dashed line like the chart's, from what is used to a dot where the
 // week ends. Under the plan's ceiling, what would be left over is a dashed box at the end ("+9%"). Past the limit the bar
-// makes room on its right and the hatch runs out of it in red, with the time the limit comes. On the reserve, or with no
-// projection yet, only the use shows.
+// makes room on its right and the line runs out of it in red to the dot, with the time the limit comes. On the reserve,
+// or with no projection yet, only the use shows.
 const WEEK_OVER_MAX = 150; // the red stub stops growing here, so the bar never gets too short
 function paintWeekEnd(bar, m) {
   const proj = m.lv.proj && !m.reserveMode ? m.lv.proj.projected : null;
@@ -85,6 +85,8 @@ function paintWeekEnd(bar, m) {
   bar.parentElement.style.setProperty("--bw", over ? `${(100 / end) * 100}%` : "100%");
   bar.style.setProperty("--pj-l", `${used}%`);
   bar.style.setProperty("--pj-w", end === null ? "0%" : `${Math.max(Math.min(end, 100) - used, 0)}%`);
+  bar.classList.toggle("has-pj", end !== null);
+  bar.classList.toggle("pj-over", over);
 
   const shown = proj === null ? null : asShownPct(proj);
   const ceil = asShownPct(m.ceiling);
@@ -118,7 +120,7 @@ function fitWeekEnd() {
   }
 }
 
-function renderWeek(m) {
+function renderWeek(m, fresh = false) {
   buildDays();
   const level = verdictLevel(m);
   setNum($("wUsed"), `${r0(m.w.used)}%`);
@@ -134,6 +136,7 @@ function renderWeek(m) {
   paintWeekZones(wBar, m);
   setBar(wBar, { fill: m.w.used });
   paintTodayMark(wBar, m);
+  paintStep(wBar, shownStep(m).week, fresh);
   wBar.setAttribute("aria-label", m.reserveMode
     ? t("week.barAriaReserve", { used: r0(m.w.used), left: r0(reserveLeft(m.w.used, m.g)) })
     : t("week.barAria", { used: r0(m.w.used), expected: r0(m.lv.expected) }));

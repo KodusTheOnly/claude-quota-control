@@ -61,6 +61,83 @@ function floatDelta(elem, diff, suffix) {
   elem.parentElement.append(f);
 }
 
+// lastStep for the numbers on screen: only when the last reading is what the bars show (a number typed in, or another
+// source, is not in the log the same way)
+function shownStep(m) {
+  const list = (state.settings && state.settings.readings) || [];
+  const step = lastStep(list, m.w && m.w.resetsAt ? m.w.resetsAt - WEEK : NaN);
+  const same = (s, v) => (s && Number.isFinite(v) && Math.round(s.b) === Math.round(v) ? s : null);
+  return { week: same(step.week, m.w && m.w.used), session: same(step.session, m.five && m.five.used) };
+}
+
+// What the last reading added, on a bar: that stretch lighter, with an edge, until the next reading (.ad inside the
+// segments, the edge on .adh), and a
+// small box over it with "+3%". The box shows for STEP_SHOW after a fresh reading, and again while the pointer is on the
+// stretch, then with when the reading before it was. The box lives on the body, so the well around the bar does not cut it.
+const STEP_SHOW = 10000;
+const STEP_MIN_W = 1.5; // % of the bar: a rise of a fraction of a point still shows
+const steps = [];
+function paintStep(bar, step, fresh) {
+  const st = bar._step || (bar._step = makeStep(bar));
+  st.step = step;
+  bar.classList.toggle("has-ad", Boolean(step));
+  if (!step) return stepHide(st);
+  const b = clamp100(step.b);
+  const w = Math.min(b, Math.max(b - clamp100(step.a), STEP_MIN_W));
+  bar.style.setProperty("--ad-l", `${b - w}%`);
+  bar.style.setProperty("--ad-w", `${w}%`);
+  if (fresh) stepShow(st, false);
+  else if (st.pop.classList.contains("on")) stepShow(st, st.hover);
+}
+function makeStep(bar) {
+  const ad = node("i", "ad");
+  ad.setAttribute("aria-hidden", "true");
+  bar.querySelector(".tr").append(ad);
+  // The pointer's target over the stretch. "plain" with no value: the bar's own tip stays closed while on it.
+  const hit = node("i", "adh");
+  hit.dataset.tip = "plain";
+  bar.append(hit);
+  const pop = node("div", "dpop");
+  pop.setAttribute("aria-hidden", "true");
+  pop.append(node("b"), node("span"));
+  document.body.append(pop);
+  const st = { bar, hit, pop, step: null, timer: 0, hover: false };
+  hit.addEventListener("pointerenter", () => { st.hover = true; stepShow(st, true); });
+  hit.addEventListener("pointerleave", () => { st.hover = false; stepHide(st); });
+  steps.push(st);
+  return st;
+}
+function stepShow(st, hover) {
+  clearTimeout(st.timer);
+  if (!st.step || state.view !== "panel" || !st.hit.getClientRects().length) return stepHide(st);
+  st.pop.firstChild.textContent = `+${st.step.d}%`;
+  st.pop.lastChild.textContent = hover ? ` · ${t("step.since", { time: fmtTime(st.step.since) })}` : "";
+  st.pop.classList.add("on");
+  stepPlace(st);
+  if (!hover) st.timer = setTimeout(() => stepHide(st), STEP_SHOW);
+}
+function stepHide(st) {
+  clearTimeout(st.timer);
+  st.timer = 0;
+  st.pop.classList.remove("on");
+}
+// Centered over the stretch, or under it when there is no room above; kept inside the window, the arrow on the stretch
+function stepPlace(st) {
+  const r = st.hit.getBoundingClientRect();
+  const w = st.pop.offsetWidth;
+  const h = st.pop.offsetHeight;
+  const cx = r.left + r.width / 2;
+  const left = Math.min(Math.max(cx - w / 2, 4), innerWidth - w - 4);
+  let top = r.top - h - 5;
+  const above = top >= 4;
+  if (!above) top = r.bottom + 5;
+  st.pop.classList.toggle("below", !above);
+  st.pop.style.left = `${left}px`;
+  st.pop.style.top = `${top}px`;
+  st.pop.style.setProperty("--ax", `${Math.min(Math.max(cx - left, 6), w - 6)}px`);
+}
+if (typeof addEventListener === "function") addEventListener("resize", () => steps.forEach((st) => st.pop.classList.contains("on") && stepPlace(st)));
+
 function node(tag, cls, text) {
   const n = document.createElement(tag);
   if (cls) n.className = cls;

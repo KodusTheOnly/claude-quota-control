@@ -79,3 +79,34 @@ test("a reading older than the last one saved is left out", async () => {
   await log({ at: T + 10 * MIN, weekly: 11, session: null, sessionResetsAt: null });
   assert.deepEqual(JSON.parse(JSON.stringify(store.readings.map((r) => r.at))), [T, T + 30 * MIN]);
 });
+
+test("lastStep: what the last reading added, as the shown whole numbers", () => {
+  const { sandbox } = loadStep();
+  const step = (list, ws = 0) => JSON.parse(JSON.stringify(vm.runInContext(`lastStep(${JSON.stringify(list)}, ${ws})`, sandbox)));
+  const sr = T + 3 * 3600000;
+  // both rose: week 31 -> 32, session 42 -> 45, since the end of the reading before
+  assert.deepEqual(step([{ at: T, to: T + 5 * MIN, w: 31.2, s: 42, sr }, { at: T + 20 * MIN, w: 31.6, s: 45, sr }]), {
+    week: { a: 31.2, b: 31.6, d: 1, since: T + 5 * MIN },
+    session: { a: 42, b: 45, d: 3, since: T + 5 * MIN },
+  });
+  // a rise that does not change the shown number
+  assert.equal(step([{ at: T, w: 31.1, s: 42, sr }, { at: T + MIN, w: 31.4, s: 42.2, sr }]).week, null);
+  // a later reading saw no change: nothing to mark
+  assert.deepEqual(step([{ at: T, w: 31, s: 42, sr }, { at: T + MIN, to: T + 2 * MIN, w: 33, s: 44, sr }]), { week: null, session: null });
+  // another 5-hour window, and a reading from before the week's start
+  const other = step([{ at: T, w: 31, s: 90, sr }, { at: T + MIN, w: 33, s: 4, sr: sr + 5 * 3600000 }], T + 1);
+  assert.deepEqual(other, { week: null, session: null });
+  // a single reading
+  assert.deepEqual(step([{ at: T, w: 31, s: 42, sr }]), { week: null, session: null });
+});
+
+function loadStep() {
+  const sandbox = {
+    document: { getElementById: () => ({}) },
+    window: { quota: {} },
+    I18N: { t: (k) => k, getLang: () => "en", locale: () => "en-US" },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "renderer", "js", "core.js"), "utf8"), sandbox);
+  return { sandbox };
+}

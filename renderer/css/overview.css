@@ -63,6 +63,24 @@
   #sBar .fill { transition: clip-path .22s ease-out; }
   #sBar.grow .fill { transition: clip-path var(--gd, .22s) steps(var(--gk, 1), end); }
 }
+/* What the last reading added (paintStep in ui.js): that stretch of the used bars in a lighter tone with a thin edge
+   around it until the next reading (the hatch is the projection's), and a small box over it with the rise, for a few
+   seconds after the reading and again while the pointer is on the stretch */
+:is(#sBar, #wBar) .ad { display: none; position: absolute; top: 0; bottom: 0; left: var(--ad-l, 0%); width: var(--ad-w, 0%); z-index: 1; background: rgba(255, 255, 255, .45); }
+:is(#sBar, #wBar) .adh { display: none; position: absolute; top: -.3rem; bottom: -.3rem; left: var(--ad-l, 0%); width: var(--ad-w, 0%); z-index: 4; }
+:is(#sBar, #wBar) .adh::before { content: ""; position: absolute; inset: calc(.3rem - 1px) 0; border: 1.5px solid color-mix(in srgb, var(--st) 80%, transparent); box-sizing: border-box; }
+:is(#sBar, #wBar).has-ad :is(.ad, .adh) { display: block; }
+.dpop {
+  position: fixed; z-index: 90; left: 0; top: 0; padding: .15rem .4rem; border-radius: var(--r-sm); pointer-events: none; white-space: nowrap;
+  background: var(--scr); color: var(--crt-accent); border: 1px solid color-mix(in srgb, var(--crt-accent) 65%, transparent);
+  box-shadow: 0 .25rem .7rem rgba(0, 0, 0, .3); font: 600 var(--fs-xs)/1.2 var(--mono); font-variant-numeric: tabular-nums;
+  opacity: 0; visibility: hidden; transform: translateY(.2rem); transition: opacity .35s ease-out, transform .35s ease-out, visibility 0s linear .35s;
+}
+.dpop.below { transform: translateY(-.2rem); }
+.dpop.on { opacity: 1; visibility: visible; transform: none; transition: opacity .18s ease-out, transform .18s ease-out; }
+.dpop span { font-weight: 500; color: var(--sm); }
+.dpop::after { content: ""; position: absolute; left: calc(var(--ax, 50%) - 4px); bottom: -4px; width: 7px; height: 7px; background: var(--scr); border: 1px solid color-mix(in srgb, var(--crt-accent) 65%, transparent); border-left: 0; border-top: 0; transform: rotate(45deg); }
+.dpop.below::after { bottom: auto; top: -4px; border: 1px solid color-mix(in srgb, var(--crt-accent) 65%, transparent); border-right: 0; border-bottom: 0; }
 #sTime { --c: color-mix(in srgb, var(--sm) 70%, transparent); }
 /* The time bar has 5 segments, one per hour of the session (the used bar keeps 20) */
 #sTime .tr { -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(20% - 2px), transparent calc(20% - 2px) 20%); mask: repeating-linear-gradient(90deg, #000 0 calc(20% - 2px), transparent calc(20% - 2px) 20%); }
@@ -243,13 +261,21 @@ html[data-screens="paper"]:not([data-theme="dark"]) .band .fc { text-shadow: non
 /* Today's mark: the use before today is dimmer than today's, and a white mark stands where the week can go today */
 #wBar .pd { position: absolute; top: 0; bottom: 0; left: 0; width: var(--pd, 0%); background: color-mix(in srgb, var(--scr) 45%, transparent); }
 #wBar .tick { top: -.3rem; bottom: -.3rem; width: 3px; margin-left: -1.5px; z-index: 3; box-shadow: 0 0 0 1px var(--scr); }
-/* What this pace will still use: hatched like the chart's dashed line, from what is used to where the week ends */
-#wBar .pj { position: absolute; top: 0; bottom: 0; left: var(--pj-l, 0%); width: var(--pj-w, 0%); box-sizing: border-box; background: repeating-linear-gradient(135deg, var(--c) 0 2px, transparent 2px 5px); border-right: 2px solid var(--c); opacity: .85; }
+/* What this pace will still use: a dashed line like the chart's projection, from what is used to where the week ends,
+   and a dot there. Past the limit the line runs on into the red stub, which has the dot instead. */
+#wBar .pj { display: none; position: absolute; top: 0; bottom: 0; left: var(--pj-l, 0%); width: var(--pj-w, 0%); z-index: 2; }
+#wBar.has-pj .pj { display: block; }
+#wBar .pj::before, #wBar .bu::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; background: repeating-linear-gradient(90deg, var(--c) 0 6px, transparent 6px 11px); }
+#wBar .pj::after, #wBar .bu::after { content: ""; position: absolute; top: 50%; right: -.3rem; width: .6rem; height: .6rem; margin-top: -.3rem; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px var(--scr); }
+#wBar.pj-over .pj::after { display: none; }
 /* What would be left over at the reset: a dashed box in the accent up to the plan's ceiling, with how much */
 #wBar .gh { position: absolute; top: 0; bottom: 0; left: var(--gh-l, 0%); width: var(--gh-w, 0%); box-sizing: border-box; display: grid; place-items: center; border: 1.5px dashed var(--crt-accent); background: color-mix(in srgb, var(--crt-accent) 7%, transparent); }
-/* Past the limit: the bar makes room on its right and the hatch runs out of it in red, with the time the limit comes */
-#wBar .bu { position: absolute; top: -1px; bottom: -1px; left: 100%; width: var(--bu-w, 0%); box-sizing: border-box; display: grid; place-items: center; border: 1px solid var(--pause); border-left: 0; background: repeating-linear-gradient(135deg, var(--pause) 0 2px, transparent 2px 5px); }
-#wBar :is(.gh, .bu) b { font: 600 var(--fs-xs)/1 var(--mono); white-space: nowrap; padding: 0 .15rem; background: var(--scr); }
+/* Past the limit: the bar makes room on its right and the line runs out of it in red to the dot, with the time the
+   limit comes on it */
+#wBar .bu { --c: var(--pause); position: absolute; top: 0; bottom: 0; left: 100%; width: var(--bu-w, 0%); box-sizing: border-box; display: grid; place-items: center; padding-right: .3rem; }
+#wBar .bu::before { right: .3rem; }
+#wBar .bu::after { right: 0; }
+#wBar :is(.gh, .bu) b { position: relative; z-index: 1; font: 600 var(--fs-xs)/1 var(--mono); white-space: nowrap; padding: 0 .15rem; background: var(--scr); }
 #wBar .gh b { color: var(--crt-accent); }
 #wBar .bu b { color: var(--pause); }
 .band .wk .pl { grid-column: 1; justify-self: end; font: 600 var(--fs-xs)/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--sm); }

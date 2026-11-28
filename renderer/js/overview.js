@@ -8,10 +8,10 @@ function renderOverview(m, fresh = false) {
   applyAutoWeights(m); // Settings > Plan, "Follow my usual week": saves and draws again when the plan changes
   renderVerdict(m, fresh);
   renderToday(m);
-  renderSession(m);
+  renderSession(m, fresh);
   renderExtra();
   renderPast(m); // before the week: the chart draws the past weeks
-  renderWeek(m);
+  renderWeek(m, fresh);
   renderHours(m);
   renderTypeIn(m);
   if ($("mathDrawer").open) renderMathDrawer(m);
