@@ -18,7 +18,7 @@ function checkPage({ format, scrolls: formatScrolls, view = "panel" }) {
   };
   const overview = document.getElementById(`view-${view}`);
   const dialogs = [...document.querySelectorAll("dialog[open], [popover]:popover-open")];
-  const notices = [...document.querySelectorAll(".toast:not(.hidden), #errMsg:not(.hidden)")];
+  const notices = [...document.querySelectorAll(".toast:not(.hidden), .soon:not(.hidden)")];
   const scope = [overview, ...dialogs, ...notices];
   const inScope = (e) => scope.some((s) => s.contains(e));
 

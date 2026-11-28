@@ -93,7 +93,7 @@ async function openOverview(browser, opts) {
   if (interaction === "type") { await openMenu(); await page.click("#typeBtn"); }
   if (interaction === "plan") await page.click(".day:nth-child(3)");
   // The longest error, with its action: it goes to the error strip, which pushes the Overview down
-  if (interaction === "toast") await page.evaluate(() => toast(t("sync.err.format"), "error", { label: t("sync.openPage"), run: () => {} }));
+  if (interaction === "toast") await page.evaluate(() => toast(t("sync.err.format"), "error", { label: t("sync.openPage"), run: () => {} }, { sync: true }));
   if (view === "about") await page.evaluate(() => go("about")); // About has no key of its own: it opens from Help
   else if (view !== "panel") await page.click(`.nav-btn[data-view="${view}"]`);
   if (view === "about" && update) {

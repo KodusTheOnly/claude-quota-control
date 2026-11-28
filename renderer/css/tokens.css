@@ -27,6 +27,7 @@ html { font-size: 16px; }
   --ink: #1A1A18;
   --ink2: #3E3C35;
   --cobalt: #1F3FA6;
+  --sweep-core: #0B1A5E; /* the lit stretch on the rule while a reading runs: darker on the light panel */
   --keybg: #E6E2D6;
   --keyhi: #F0EDE3;
   --bezel: #1A1A18;
@@ -111,6 +112,7 @@ html[data-theme="dark"] {
   --ink: #E8E6DE;
   --ink2: #ABA99F;
   --cobalt: #86A2FF;
+  --sweep-core: #E4EBFF;
   --keybg: #2D3134;
   --keyhi: #383D41;
   --bezel: #5B626A;

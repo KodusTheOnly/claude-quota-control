@@ -81,6 +81,22 @@ function setAutoLive(st) {
 // ---- The menu ----
 
 function renderAutoMenu() {
+  // The last reading failed: its error and way out first (the notice that said it may be gone by now)
+  const lastFail = state.syncFail;
+  $("amErr").classList.toggle("hidden", !lastFail);
+  if (lastFail) {
+    const { msg, action } = syncErrorInfo(lastFail);
+    $("amErrText").textContent = msg;
+    const act = $("amErrAct");
+    act.classList.toggle("hidden", !action);
+    act.textContent = action ? action.label : "";
+    act.onclick = action
+      ? () => {
+          closeAutoMenu();
+          action.run();
+        }
+      : null;
+  }
   $("amStatus").textContent = autoMenuStatus();
   const on = autoOn();
   $("amEvery").classList.toggle("hidden", !on);

@@ -68,38 +68,96 @@ button.lamp:focus-visible { outline: 2px solid var(--fc); outline-offset: 2px; }
 .am-logt { display: flex; justify-content: space-between; font: 500 var(--fs-xs)/1.2 var(--mono); color: var(--ink2); }
 .automenu .am-set { justify-content: flex-start; }
 #connectBtn .short { display: none; }
-.rule { flex: none; height: .5rem; margin: .1rem 0 0; background: repeating-linear-gradient(0deg, var(--cobalt) 0 2px, transparent 2px 4px); }
-
+/* The rule under the header. It is also the reading indicator: while a reading runs, a lit stretch runs along it
+   (.sweep, chrome.js). It already has its height, so nothing under it moves. Still (fully lit) with motion off. */
+.rule { flex: none; position: relative; overflow: hidden; height: .5rem; margin: .1rem 0 0; background: repeating-linear-gradient(0deg, var(--cobalt) 0 2px, transparent 2px 4px); }
+.rule.sweep::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -28%; width: 28%;
+  background: linear-gradient(90deg, var(--cobalt), var(--sweep-core) 50%, var(--cobalt));
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+  animation: rule-sweep 1.15s cubic-bezier(.45, 0, .55, 1) infinite;
+}
+@keyframes rule-sweep { from { left: -28%; } to { left: 100%; } }
+html[data-motion="off"] .rule.sweep::after { left: 0; width: 100%; -webkit-mask-image: none; }
+@media (prefers-reduced-motion: reduce) { .rule.sweep::after { animation: none; left: 0; width: 100%; -webkit-mask-image: none; } }
 
 /* Strips under the header: data-state message and the "week reset" notice */
-.prog { flex: none; position: relative; height: 4px; background: var(--mod); overflow: hidden; margin-top: .1rem; }
-.prog::after { content: ""; position: absolute; top: 0; bottom: 0; width: 30%; background: var(--cobalt); animation: prog 1.2s ease-in-out infinite; }
-@keyframes prog { 0% { left: -30%; } 100% { left: 100%; } }
-@media (prefers-reduced-motion: reduce) { .prog::after { animation: none; width: 100%; } }
 .msg, .banner {
   flex: none; display: flex; align-items: center; gap: .8rem; margin: .5rem .7rem 0; padding: .45rem .7rem;
   background: var(--card); border-top: 2px solid var(--ink); font-size: var(--fs-md); line-height: 1.35;
 }
 .msg .bt { flex: 1 1 auto; min-width: 0; }
-.msg .key { flex: none; }
-/* The error strip sits between the header and the content, so the content moves down instead of being covered.
-   Its mark is a red triangle, like the old error toast: shape and color, never color alone. */
-.msg.err { flex-wrap: wrap; border-top-color: var(--danger); }
-.msg.err .bt { flex-basis: 16rem; }
+#dataMsgMark.is-updating .shp { animation: lamp-pulse 1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { #dataMsgMark.is-updating .shp { animation: none; } }
+/* The error mark is a red triangle: shape and color, never color alone */
 .err-mark { --c: var(--pause); }
 .err-mark .shp { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 
-/* Floating notice: a short confirmation on a small CRT that shows over the content and pushes nothing.
-   Errors never use it: they go to the error strip (.msg.err). */
+/* Floating notice (account.js): confirmations and errors on a small CRT over the content. It pushes nothing and goes
+   away by itself; the line along its bottom shows the time left, and the mouse on it pauses that. A reading's notice
+   sits under Refresh (.at-sync); the others at the top, centered. */
 .toast {
-  position: fixed; top: 3.2rem; left: 50%; transform: translateX(-50%); z-index: 20;
-  display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .6rem; width: max-content; max-width: calc(100vw - 2rem); margin: 0; padding: .45rem .8rem;
+  position: fixed; top: 3.2rem; left: 50%; transform: translateX(-50%); z-index: 20; overflow: hidden;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .35rem .6rem;
+  width: max-content; max-width: min(28rem, calc(100vw - 2rem)); margin: 0; padding: .5rem .4rem .6rem .8rem;
   background: var(--scr); color: var(--st); border: 1px solid var(--sline); border-radius: var(--r-sm);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, .35); font: 500 var(--fs-sm)/1.35 var(--mono);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .4); font: 500 var(--fs-sm)/1.4 var(--mono);
   transition: opacity .45s ease, transform .45s ease;
   animation: toast-in .22s ease-out;
 }
-.toast::before { content: ""; flex: none; width: .75rem; height: .75rem; border-radius: 50%; background: var(--free); }
+.toast .tmark { width: .75rem; height: .75rem; border-radius: 50%; background: var(--free); }
+.toast.err { border-top: 2px solid var(--pause); }
+.toast.err .tmark { border-radius: 0; background: var(--pause); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+/* The action goes under the text, so a long message keeps its width */
+.toast .tact { grid-column: 2; grid-row: 2; justify-self: start; min-height: 2rem; padding: .2rem .65rem; font-size: var(--fs-xs); background: transparent; color: var(--st); border-color: var(--crt-line); }
+.toast .tact:hover { background: var(--crt-hover); }
+.toast .tx { grid-column: 3; grid-row: 1; width: 2rem; height: 2rem; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-sm); background: none; color: var(--sm); cursor: pointer; }
+.toast .tx:hover { background: var(--crt-hover); color: var(--st); }
+.toast .tx svg { width: .7rem; height: .7rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.toast .ttime { position: absolute; left: 0; bottom: 0; width: 100%; height: 2px; background: var(--sm); transform-origin: left; animation: toast-time var(--dur, 4s) linear forwards; }
+.toast.err .ttime { background: var(--pause); }
+.toast.sticky .ttime { display: none; }
+.toast:hover .ttime, .toast:focus-within .ttime { animation-play-state: paused; }
+@keyframes toast-time { to { transform: scaleX(0); } }
 .toast.fade { opacity: 0; transform: translate(-50%, -6px); }
-.toast .tmsg { flex: 1 1 12rem; min-width: 0; }
+.toast.at-sync { left: auto; transform: none; animation-name: toast-in-r; }
+.toast.at-sync.fade { transform: translateY(-6px); }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, -8px); } }
+@keyframes toast-in-r { from { opacity: 0; transform: translateY(-8px); } }
+
+/* The minute between readings (claude-sync.js reads at most once a minute): Refresh's base fills up and its arrow
+   dims until a reading can run. A click before that only gets this bubble under the key. */
+#syncBtn .cool { display: none; position: absolute; left: -1px; right: -1px; bottom: -3px; height: 3px; border-radius: 0 0 var(--r-sm) var(--r-sm); background: var(--cobalt); transform-origin: left; transform: scaleX(var(--cool, 0)); }
+#syncBtn.cooling .cool { display: block; }
+#syncBtn.cooling .ico { opacity: .5; }
+#syncBtn.ready { animation: key-ready .7s ease-out; }
+@keyframes key-ready { 30% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cobalt) 45%, transparent); } }
+#syncBtn.nudge { animation: key-nudge .34s ease-out; }
+@keyframes key-nudge { 20% { transform: translateX(-3px); } 40% { transform: translateX(3px); } 60% { transform: translateX(-2px); } 80% { transform: translateX(1px); } }
+.soon {
+  position: fixed; z-index: 21; margin: 0; padding: .45rem .7rem; white-space: nowrap;
+  background: var(--scr); color: var(--st); border: 1px solid var(--sline); border-radius: var(--r-sm);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .4); font: 500 var(--fs-sm)/1.35 var(--mono);
+  transition: opacity .25s; animation: toast-in-r .16s ease-out;
+}
+.soon small { display: block; font-size: var(--fs-xs); color: var(--sm); }
+.soon::before { content: ""; position: absolute; top: -6px; left: var(--ax, 50%); width: 10px; height: 10px; margin-left: -5px; background: var(--scr); border-left: 1px solid var(--sline); border-top: 1px solid var(--sline); transform: rotate(45deg); }
+.soon.fade { opacity: 0; }
+
+/* The lamp after a failed reading: Failed with the red triangle until a reading works. A failed reading's notice flies
+   into it as it goes, and the lamp answers with a short ring. */
+.lamp.is-failed { --c: var(--pause); color: var(--pause); }
+.lamp.is-failed .shp { border: 0; border-radius: 0; background: var(--c); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.lamp.ping { animation: lamp-ping .6s ease-out; }
+@keyframes lamp-ping { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c) 70%, transparent); } to { box-shadow: 0 0 0 8px transparent; } }
+/* A reading that worked: the lamp and the time of the reading blink once (no notice: the numbers already changed) */
+.lamp.read-ok, .rd.read-ok { animation: read-ok .9s ease-out; }
+@keyframes read-ok { 25% { filter: brightness(1.8); } }
+@media (prefers-reduced-motion: reduce) { #syncBtn.nudge, #syncBtn.ready, .lamp.ping, .lamp.read-ok, .rd.read-ok, .soon, .toast { animation: none; } }
+
+/* The error again, at the top of the lamp's menu */
+.am-err { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: .5rem .6rem; padding-bottom: .6rem; border-bottom: 1px solid var(--edge); }
+.am-err p { margin: 0; font-size: var(--fs-sm); line-height: 1.4; }
+.am-err .lc { margin-top: .1rem; }
+.am-err .key { grid-column: 2; justify-self: start; }
+.am-err.hidden { display: none; }
